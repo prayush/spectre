@@ -332,7 +332,7 @@
  */
 
 /*!
- * \defgroup TimeSteppers Time Steppers
+ * \defgroup TimeSteppersGroup Time Steppers
  * A collection of ODE integrators primarily used for time stepping.
  */
 
