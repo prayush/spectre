@@ -44,6 +44,12 @@ target_link_libraries(
   ${SPECTRE_LIBRARIES}
 )
 
+add_dependencies(
+  ${executable}
+  module_ConstGlobalCache
+  module_Main
+  )
+
 spectre_add_catch_tests(${executable})
 
 # Setup code coverage for unit tests
