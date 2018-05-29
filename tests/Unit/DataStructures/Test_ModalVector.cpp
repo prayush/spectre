@@ -272,10 +272,6 @@ SPECTRE_TEST_CASE("Unit.DataStructures.ModalVector.Math",
   check_vectors(ModalVector{1., 2., 3., 4., 8., 12., 14.}, abs(val));
   check_vectors(ModalVector{1., 2., 3., 4., 8., 12., 14.}, fabs(val));
 
-  check_vectors(step_function(
-                ModalVector{-12.3, 2.0, -4.0, 0.0, 7.0, -8.0}),
-                ModalVector{0.0, 1.0, 0.0, 1.0, 1.0, 0.0});
-
   check_vectors(ModalVector(num_pts, 81.0), nine * nine);
   check_vectors(ModalVector(num_pts, 81.0), nine * (nine * one));
   check_vectors(ModalVector(num_pts, 81.0), (nine * nine) * one);
