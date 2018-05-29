@@ -41,7 +41,7 @@ using std::abs;  // NOLINT
  * non-owning, meaning it just has a pointer to an array.
  *
  * Only basic mathematical operations are supported with ModalVectors. In
- * addition to the addition, subtraction, multiplication, division, etc. there
+ * addition to the addition, subtraction, multiplication, division. there
  * are the following element-wise operations:
  *
  * - abs
