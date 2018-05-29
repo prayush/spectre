@@ -359,12 +359,6 @@ class ModalVector {
   }
   // @}
 
-  /// If less than zero returns zero, otherwise returns one
-  SPECTRE_ALWAYS_INLINE friend decltype(auto) step_function(
-      const ModalVector& t) noexcept {
-    return step_function(t.data_);
-  }
-
  private:
   /// \cond HIDDEN_SYMBOLS
   size_t size_ = 0;
