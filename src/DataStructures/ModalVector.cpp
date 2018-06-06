@@ -111,7 +111,7 @@ void ModalVector::pup(PUP::er& p) noexcept {  // NOLINT
 
 std::ostream& operator<<(std::ostream& os, const ModalVector& d) {
   // This function is inside the detail namespace StdHelpers.hpp
-  StdHelpers_detail::print_helper(os, d.begin(), d.end());
+  print_helper(os, d.begin(), d.end());
   return os;
 }
 
