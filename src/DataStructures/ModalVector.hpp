@@ -116,8 +116,8 @@ class ModalVector {
   template <typename VT, bool VF>
   ModalVector(const blaze::Vector<VT, VF>& expression);  // NOLINT
 
-  template <typename VT, bool VF>
-  ModalVector& operator=(const blaze::Vector<VT, VF>& expression);
+  //~ template <typename VT, bool VF>
+  //~ ModalVector& operator=(const blaze::Vector<VT, VF>& expression);
   /// \endcond
 
   /// Number of values stored
@@ -474,17 +474,17 @@ ModalVector::ModalVector(const blaze::Vector<VT, VF>& expression)
   data_ = expression;
 }
 
-template <typename VT, bool VF>
-ModalVector& ModalVector::operator=(
-    const blaze::Vector<VT, VF>& expression) {
-  if (owning_ and (~expression).size() != size()) {
-    size_ = (~expression).size();
-    owned_data_ = InternalStorage_t(size_);
-    data_ = decltype(data_){owned_data_.data(), size_};
-  } else if (not owning_) {
-    ASSERT((~expression).size() == size(), "Must copy into same size");
-  }
-  data_ = expression;
-  return *this;
-}
+//~ template <typename VT, bool VF>
+//~ ModalVector& ModalVector::operator=(
+    //~ const blaze::Vector<VT, VF>& expression) {
+  //~ if (owning_ and (~expression).size() != size()) {
+    //~ size_ = (~expression).size();
+    //~ owned_data_ = InternalStorage_t(size_);
+    //~ data_ = decltype(data_){owned_data_.data(), size_};
+  //~ } else if (not owning_) {
+    //~ ASSERT((~expression).size() == size(), "Must copy into same size");
+  //~ }
+  //~ data_ = expression;
+  //~ return *this;
+//~ }
 /// \endcond
