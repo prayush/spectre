@@ -110,6 +110,15 @@ struct TuplePrinter<0> {
 };
 }  // namespace StdHelpers_detail
 
+// prints all the items as a comma separated list surrounded by parens
+template <typename ForwardIt>
+inline void print_helper(std::ostream& out, ForwardIt&& begin,
+                         ForwardIt&& end) {
+  StdHelpers_detail::print_helper(out, std::forward<ForwardIt>(begin),
+               std::forward<ForwardIt>(end),
+               [](std::ostream& os, const ForwardIt& it) { os << *it; });
+}
+
 /*!
  * \ingroup UtilitiesGroup
  * \brief Output the items of a std::list
