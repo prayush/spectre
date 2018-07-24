@@ -9,7 +9,6 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
-#include <functional>  // for std::reference_wrapper
 #include <initializer_list>
 #include <limits>
 #include <ostream>
