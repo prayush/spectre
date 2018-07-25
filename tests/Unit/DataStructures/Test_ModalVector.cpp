@@ -9,16 +9,6 @@
 #include <cstddef>
 #include <functional>  // for std::reference_wrapper
 #include <numeric>
-//#include <iostream>
-//#include <typeinfo>
-//#include <type_traits>
-//#include <typeinfo>
-//~ #ifndef _MSC_VER
-//~ #   include <cxxabi.h>
-//~ #endif
-//~ #include <memory>
-//~ #include <string>
-//~ #include <cstdlib>
 
 #include "DataStructures/ModalVector.hpp"
 #include "DataStructures/DataVector.hpp"
