@@ -11,9 +11,7 @@
 #include <numeric>
 
 #include "DataStructures/ModalVector.hpp"
-#include "DataStructures/DataVector.hpp"
 #include "ErrorHandling/Error.hpp"
-#include "Utilities/ConstantExpressions.hpp"
 #include "Utilities/DereferenceWrapper.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/Requires.hpp"

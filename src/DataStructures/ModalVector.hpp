@@ -22,6 +22,7 @@
 #include "Utilities/MakeWithValue.hpp"
 #include "Utilities/PointerVector.hpp" // IWYU pragma: keep
 #include "Utilities/Requires.hpp"
+#include "Utilities/TMPL.hpp"          // for list
 
 /// \cond HIDDEN_SYMBOLS
 // IWYU pragma: no_forward_declare ConstantExpressions_detail::pow
