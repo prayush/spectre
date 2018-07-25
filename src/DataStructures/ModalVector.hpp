@@ -328,7 +328,7 @@ struct UnaryMapTrait<ModalVector, Operator> {
                 blaze::Erf, blaze::Erfc, blaze::StepFunction
                 >, Operator>,
                 "This operation is not permitted on a ModalVector."
-                "Only unary operation permitted are: abs, fabs.");
+                "Only unary operation permitted are: abs, fabs, sqrt.");
   using Type = ModalVector;
 };
 
