@@ -144,7 +144,6 @@ SPECTRE_TEST_CASE("Unit.DataStructures.ModalVector_Ref",
 #ifdef __clang__
 #pragma GCC diagnostic pop
 #endif  // defined(__clang__)
-    CHECK_FALSE(data_2_ref.is_owning());
     CHECK(data_2[0] == 2.43);
     CHECK(data_2[1] == 3.83);
     CHECK(data_2[2] == 4.94);
@@ -531,12 +530,3 @@ SPECTRE_TEST_CASE("Unit.DataStructures.ModalVector.Math",
 #endif
 }
 
-// [[OutputRegex, Trigonometric functions must be disabled]]
-[[noreturn]] SPECTRE_TEST_CASE(
-    "Unit.DataStructures.ModalVector.UnaryOpError",
-    "[Unit][DataStructures]") {
-  ERROR_TEST();
-  DataVector almost_pi(10, 3.14159);
-  DataVector sin_almost_pi{};
-  sin_almost_pi = sin(almost_pi);
-}
