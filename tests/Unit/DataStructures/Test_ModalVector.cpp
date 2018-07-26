@@ -19,6 +19,10 @@
 #include "Utilities/StdHelpers.hpp"  // IWYU pragma: keep
 #include "tests/Unit/TestHelpers.hpp"
 
+// IWYU doesn't like something in ModalVector, but wants to include DataVector
+//
+// IWYU pragma: no_include "DataStructures/DataVector.hpp"
+
 SPECTRE_TEST_CASE("Unit.DataStructures.ModalVector",
                   "[DataStructures][Unit]") {
   ModalVector a{2};
