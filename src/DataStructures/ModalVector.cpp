@@ -8,7 +8,7 @@
 
 #include "Utilities/StdHelpers.hpp"
 
-ModalVector::ModalVector(const size_t size, const double value) noexcept
+ModalVector::ModalVector(const size_t size, const double value)
     : owned_data_(size, value) {
   reset_pointer_vector();
 }
@@ -17,7 +17,7 @@ ModalVector::ModalVector(double* start, size_t size) noexcept
     : BaseType(start, size), owned_data_(0), owning_(false) {}
 
 template <class T, Requires<cpp17::is_same_v<T, double>>>
-ModalVector::ModalVector(std::initializer_list<T> list) noexcept
+ModalVector::ModalVector(std::initializer_list<T> list)
     : owned_data_(std::move(list)) {
   reset_pointer_vector();
 }
@@ -111,5 +111,5 @@ bool operator!=(const ModalVector& lhs, const ModalVector& rhs) noexcept {
 }
 
 /// \cond
-template ModalVector::ModalVector(std::initializer_list<double> list) noexcept;
+template ModalVector::ModalVector(std::initializer_list<double> list);
 /// \endcond
