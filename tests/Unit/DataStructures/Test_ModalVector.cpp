@@ -10,6 +10,7 @@
 #include <functional>
 #include <numeric>
 
+#include "DataStructures/DataVector.hpp"      // for operator+, smpAssign
 #include "DataStructures/ModalVector.hpp"
 #include "ErrorHandling/Error.hpp"
 #include "Utilities/ConstantExpressions.hpp"
