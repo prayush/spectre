@@ -7,13 +7,21 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <initializer_list>
+#include <limits>
 #include <functional>  // for std::reference_wrapper
 #include <numeric>
+#include <ostream>
+#include <type_traits>
+#include <vector>
 
 #include "DataStructures/ModalVector.hpp"
+#include "ErrorHandling/Assert.hpp"
 #include "ErrorHandling/Error.hpp"
+/* #include "Utilities/ConstantExpressions.hpp" */
 #include "Utilities/DereferenceWrapper.hpp"
 #include "Utilities/Gsl.hpp"
+#include "Utilities/MakeWithValue.hpp"
 #include "Utilities/Requires.hpp"
 #include "Utilities/StdArrayHelpers.hpp"
 #include "Utilities/StdHelpers.hpp"  // IWYU pragma: keep

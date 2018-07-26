@@ -24,7 +24,6 @@
 #include "Utilities/TMPL.hpp"          // for list
 
 /// \cond HIDDEN_SYMBOLS
-// IWYU pragma: no_forward_declare ConstantExpressions_detail::pow
 namespace PUP {
 class er;
 }  // namespace PUP
