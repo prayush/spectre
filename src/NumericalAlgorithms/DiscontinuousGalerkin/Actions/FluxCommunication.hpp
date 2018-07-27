@@ -31,8 +31,6 @@ template <typename Tag>
 struct Magnitude;
 template <typename Tag>
 struct Next;
-template <typename Tag>
-struct Normalized;
 }  // namespace Tags
 // IWYU pragma: no_forward_declare db::DataBox
 /// \endcond
@@ -181,18 +179,15 @@ struct ReceiveDataForFluxes {
 /// - DataBox:
 ///   - Tags::Element<volume_dim>
 ///   - Interface<Tags listed in
-///               Metavariables::normal_dot_numerical_flux::type::slice_tags>
-///   - Interface<FluxCommunicationTypes<Metavariables>::normal_dot_fluxes_tag>
-///   - Interface<Tags::Extents<volume_dim - 1>>
-///   - Interface<Tags::Normalized<Tags::UnnormalizedFaceNormal<volume_dim>>>
+///               Metavariables::normal_dot_numerical_flux::type::argument_tags>
+///   - Interface<Tags::Mesh<volume_dim - 1>>
 ///   - Interface<Tags::Magnitude<Tags::UnnormalizedFaceNormal<volume_dim>>>,
 ///   - Metavariables::temporal_id
 ///   - Tags::Next<Metavariables::temporal_id>
 ///
 /// DataBox changes:
 /// - Adds: nothing
-/// - Removes:
-///   Interface<FluxCommunicationTypes<Metavariables>::normal_dot_fluxes_tag>
+/// - Removes: nothing
 /// - Modifies: Tags::VariablesBoundaryData
 ///
 /// \see ReceiveDataForFluxes
@@ -240,9 +235,9 @@ struct SendDataForFluxes {
                  << "\nNeighbors:\n"
                  << neighbors_in_direction);
       const auto& orientation = neighbors_in_direction.orientation();
-      const auto& boundary_extents =
+      const auto& boundary_mesh =
           db::get<Tags::Interface<Tags::InternalDirections<volume_dim>,
-                                  Tags::Extents<volume_dim - 1>>>(box)
+                                  Tags::Mesh<volume_dim - 1>>>(box)
               .at(direction);
 
       // Everything below here needs to be fixed for
@@ -252,20 +247,16 @@ struct SendDataForFluxes {
       // from this side of the mortar now, then package it into a Variables.
       // We store one copy of the Variables and send another, since we need
       // the data on both sides of the mortar.
-      using package_arguments = tmpl::append<
-          typename db::item_type<
-              typename flux_comm_types::normal_dot_fluxes_tag>::tags_list,
-          typename Metavariables::normal_dot_numerical_flux::type::slice_tags,
-          tmpl::list<
-              Tags::Normalized<Tags::UnnormalizedFaceNormal<volume_dim>>>>;
+      using package_arguments = typename Metavariables::
+          normal_dot_numerical_flux::type::argument_tags;
       const auto packaged_data = db::apply<tmpl::transform<
           package_arguments,
           tmpl::bind<Tags::Interface, Tags::InternalDirections<volume_dim>,
                      tmpl::_1>>>(
-          [&boundary_extents, &direction, &normal_dot_numerical_flux_computer](
-              const auto&... args) noexcept {
+          [&boundary_mesh, &direction,
+           &normal_dot_numerical_flux_computer ](const auto&... args) noexcept {
             typename flux_comm_types::PackagedData ret(
-                boundary_extents.product(), 0.0);
+                boundary_mesh.number_of_grid_points(), 0.0);
             normal_dot_numerical_flux_computer.package_data(
                 make_not_null(&ret), args.at(direction)...);
             return ret;
@@ -273,7 +264,7 @@ struct SendDataForFluxes {
           box);
 
       typename flux_comm_types::LocalData local_data(
-          boundary_extents.product());
+          boundary_mesh.number_of_grid_points());
       local_data.assign_subset(
           db::get<interface_normal_dot_fluxes_tag>(box).at(direction));
       local_data.assign_subset(packaged_data);
@@ -291,7 +282,7 @@ struct SendDataForFluxes {
       // even with AMR since the quantities are already on the mortar at this
       // point
       const auto neighbor_packaged_data = orient_variables_on_slice(
-          packaged_data, boundary_extents, dimension, orientation);
+          packaged_data, boundary_mesh.extents(), dimension, orientation);
 
       for (const auto& neighbor : neighbors_in_direction) {
         const auto mortar_id = std::make_pair(direction, neighbor);
@@ -312,8 +303,7 @@ struct SendDataForFluxes {
       }  // loop over neighbors_in_direction
     }    // loop over element.neighbors()
 
-    return std::make_tuple(
-        db::create_from<db::RemoveTags<interface_normal_dot_fluxes_tag>>(box));
+    return std::forward_as_tuple(std::move(box));
   }
 };
 }  // namespace Actions

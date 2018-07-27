@@ -37,7 +37,6 @@ void ComputeDuDt<Dim>::apply(
     dt_phi->get(d) = -d_pi.get(d);
   }
 }
-/// \endcond
 
 template <size_t Dim>
 void ComputeNormalDotFluxes<Dim>::apply(
@@ -71,7 +70,6 @@ void UpwindFlux<Dim>::package_data(
     const gsl::not_null<Variables<package_tags>*> packaged_data,
     const Scalar<DataVector>& normal_dot_flux_pi,
     const tnsr::i<DataVector, Dim, Frame::Inertial>& normal_dot_flux_phi,
-    const Scalar<DataVector>& /*normal_dot_flux_psi*/,
     const Scalar<DataVector>& pi,
     const tnsr::i<DataVector, Dim, Frame::Inertial>& interface_unit_normal)
     const noexcept {
@@ -130,6 +128,7 @@ void UpwindFlux<Dim>::operator()(
                normal_times_flux_pi_exterior.get(d));
   }
 }
+/// \endcond
 }  // namespace ScalarWave
 
 // Generate explicit instantiations of partial_derivatives function as well as
@@ -158,7 +157,7 @@ using derivative_frame = Frame::Inertial;
   partial_derivatives<derivative_tags<DIM(data)>, variables_tags<DIM(data)>, \
                       DIM(data), derivative_frame>(                          \
       const Variables<variables_tags<DIM(data)>>& u,                         \
-      const Index<DIM(data)>& extents,                                       \
+      const Mesh<DIM(data)>& mesh,                                           \
       const InverseJacobian<DataVector, DIM(data), Frame::Logical,           \
                             derivative_frame>& inverse_jacobian) noexcept;
 

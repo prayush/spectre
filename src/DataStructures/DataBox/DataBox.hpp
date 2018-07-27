@@ -445,17 +445,8 @@ class DataBox<tmpl::list<Tags...>>
     }
     return *this;
   }
-  DataBox(const DataBox& rhs) = default;
-  DataBox& operator=(const DataBox& rhs) noexcept(
-      tmpl2::flat_all_v<
-          cpp17::is_nothrow_copy_assignable_v<DataBox_detail::DataBoxLeaf<
-              Tags, db::item_type<Tags, tmpl::list<Tags...>>>>...>) {
-    if (&rhs != this) {
-      ::expand_pack(
-          (get_deferred<Tags>() = rhs.template get_deferred<Tags>())...);
-    }
-    return *this;
-  }
+  DataBox(const DataBox& rhs) = delete;
+  DataBox& operator=(const DataBox& rhs) = delete;
 #ifdef SPECTRE_DEBUG
   // Destructor is used for triggering assertions
   ~DataBox() noexcept {
@@ -1100,8 +1091,11 @@ template <typename Tag, Requires<not cpp17::is_same_v<Tag, ::Tags::DataBox>>>
 SPECTRE_ALWAYS_INLINE auto DataBox<tmpl::list<Tags...>>::get() const noexcept
     -> const item_type<Tag, tags_list>& {
   DEBUG_STATIC_ASSERT(
+      not DataBox_detail::has_no_matching_tag_v<tags_list, Tag>,
+      "Found no tags in the DataBox that match the tag being retrieved.");
+  DEBUG_STATIC_ASSERT(
       DataBox_detail::has_unique_matching_tag_v<tags_list, Tag>,
-      "Found more than one (or no) tag(s) in the DataBox that matches the tag "
+      "Found more than one tag in the DataBox that matches the tag "
       "being retrieved. This happens because more than one tag with the same "
       "base (class) tag was added to the DataBox.");
   using derived_tag = DataBox_detail::first_matching_tag<tags_list, Tag>;
@@ -1212,34 +1206,11 @@ SPECTRE_ALWAYS_INLINE constexpr auto create(Args&&... args) {
       std::forward<Args>(args)...);
 }
 
-/*!
- * \ingroup DataBoxGroup
- * \brief Create a new DataBox from an existing one adding or removing items
- * and compute items
- *
- * \example
- * Removing an item or compute item is done using:
- * \snippet Test_DataBox.cpp create_from_remove
- * Adding an item is done using:
- * \snippet Test_DataBox.cpp create_from_add_item
- * Adding a compute item is done using:
- * \snippet Test_DataBox.cpp create_from_add_compute_item
- *
- * \see create DataBox
- *
- * \tparam RemoveTags typelist of Tags to remove
- * \tparam AddTags typelist of Tags corresponding to the arguments to be
- * added
- * \tparam AddComputeTags list of \ref ComputeTag "compute item tags"
- * to add to the DataBox
- * \param box the DataBox the new box should be based off
- * \param args the values for the items to add to the DataBox
- * \return DataBox like `box` but altered by RemoveTags and AddTags
- */
-template <typename RemoveTags, typename AddTags = tmpl::list<>,
-          typename AddComputeTags = tmpl::list<>, typename Box,
-          typename... Args>
-SPECTRE_ALWAYS_INLINE constexpr auto create_from(Box&& box, Args&&... args) {
+namespace DataBox_detail {
+template <typename RemoveTags, typename AddTags, typename AddComputeTags,
+          typename Box, typename... Args>
+SPECTRE_ALWAYS_INLINE constexpr auto create_from(Box&& box,
+                                                 Args&&... args) noexcept {
   static_assert(tmpl::size<AddTags>::value == sizeof...(Args),
                 "Must pass in as many arguments as AddTags to db::create_from");
 
@@ -1323,6 +1294,68 @@ SPECTRE_ALWAYS_INLINE constexpr auto create_from(Box&& box, Args&&... args) {
                                AddTags{}, AddComputeTags{},
                                std::forward<Args>(args)...);
 }
+}  // namespace DataBox_detail
+
+/*!
+ * \ingroup DataBoxGroup
+ * \brief Create a new DataBox from an existing one adding or removing items
+ * and compute items
+ *
+ * When passed an lvalue this function will return a const DataBox
+ * whose members cannot be modified.  When passed a (mutable) rvalue
+ * this function will return a mutable DataBox.
+ *
+ * \example
+ * Removing an item or compute item is done using:
+ * \snippet Test_DataBox.cpp create_from_remove
+ * Adding an item is done using:
+ * \snippet Test_DataBox.cpp create_from_add_item
+ * Adding a compute item is done using:
+ * \snippet Test_DataBox.cpp create_from_add_compute_item
+ *
+ * \see create DataBox
+ *
+ * \tparam RemoveTags typelist of Tags to remove
+ * \tparam AddTags typelist of Tags corresponding to the arguments to be
+ * added
+ * \tparam AddComputeTags list of \ref ComputeTag "compute item tags"
+ * to add to the DataBox
+ * \param box the DataBox the new box should be based off
+ * \param args the values for the items to add to the DataBox
+ * \return DataBox like `box` but altered by RemoveTags and AddTags
+ *@{
+ */
+template <typename RemoveTags, typename AddTags = tmpl::list<>,
+          typename AddComputeTags = tmpl::list<>, typename Box,
+          Requires<cpp17::is_same_v<Box, std::decay_t<Box>>> = nullptr,
+          typename... Args>
+SPECTRE_ALWAYS_INLINE constexpr auto create_from(Box&& box,
+                                                 Args&&... args) noexcept {
+  return DataBox_detail::create_from<RemoveTags, AddTags, AddComputeTags>(
+      std::forward<Box>(box), std::forward<Args>(args)...);
+}
+
+/// \cond HIDDEN_SYMBOLS
+// Clang warns that the const qualifier on the return type has no
+// effect.  It does have an effect.
+#ifdef __clang__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-qualifiers"
+#endif
+template <typename RemoveTags, typename AddTags = tmpl::list<>,
+          typename AddComputeTags = tmpl::list<>, typename Box,
+          Requires<not cpp17::is_same_v<Box, std::decay_t<Box>>> = nullptr,
+          typename... Args>
+SPECTRE_ALWAYS_INLINE constexpr const auto create_from(
+    Box&& box, Args&&... args) noexcept {
+  return DataBox_detail::create_from<RemoveTags, AddTags, AddComputeTags>(
+      box, std::forward<Args>(args)...);
+}
+#ifdef __clang__
+#pragma GCC diagnostic pop
+#endif
+/// \endcond
+/**@}*/
 
 namespace DataBox_detail {
 template <typename Type, typename... Tags, typename... TagsInBox>

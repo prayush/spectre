@@ -197,7 +197,7 @@ struct NoOpsComponent {
         Parallel::get_parallel_component<NoOpsComponent>(local_cache));
   }
 
-  static void execute_next_global_actions(
+  static void execute_next_phase(
       const typename Metavariables::Phase next_phase,
       const Parallel::CProxy_ConstGlobalCache<Metavariables>& global_cache) {
     auto& local_cache = *(global_cache.ckLocalBranch());
@@ -353,7 +353,7 @@ struct MutateComponent {
     /// [simple_action_call]
   }
 
-  static void execute_next_global_actions(
+  static void execute_next_phase(
       const typename Metavariables::Phase next_phase,
       const Parallel::CProxy_ConstGlobalCache<Metavariables>& global_cache) {
     auto& local_cache = *(global_cache.ckLocalBranch());
@@ -403,7 +403,8 @@ struct add_int0_from_receive {
             .begin());
     tuples::get<IntReceiveTag>(inboxes).erase(db::get<TemporalId>(box));
     return std::make_tuple(
-        db::create_from<tmpl::list<>, tmpl::list<Int0>>(box, int0), ++a >= 5);
+        db::create_from<tmpl::list<>, tmpl::list<Int0>>(std::move(box), int0),
+        ++a >= 5);
   }
 
   /// [is_ready_example]
@@ -506,7 +507,7 @@ struct ReceiveComponent {
         Parallel::get_parallel_component<ReceiveComponent>(local_cache));
   }
 
-  static void execute_next_global_actions(
+  static void execute_next_phase(
       const typename Metavariables::Phase next_phase,
       const Parallel::CProxy_ConstGlobalCache<Metavariables>& global_cache) {
     auto& local_cache = *(global_cache.ckLocalBranch());
@@ -621,7 +622,7 @@ struct AnyOrderComponent {
         Parallel::get_parallel_component<AnyOrderComponent>(local_cache));
   }
 
-  static void execute_next_global_actions(
+  static void execute_next_phase(
       const typename Metavariables::Phase next_phase,
       const Parallel::CProxy_ConstGlobalCache<Metavariables>& global_cache) {
     auto& local_cache = *(global_cache.ckLocalBranch());

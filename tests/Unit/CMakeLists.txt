@@ -4,9 +4,9 @@
 set(executable RunTests)
 
 set(SPECTRE_TESTS
-    "Test_TestHelpers.cpp"
-    "Test_TestingFramework.cpp"
-    )
+  "Test_TestHelpers.cpp"
+  "Test_TestingFramework.cpp"
+  )
 
 set(SPECTRE_COMPILATION_TESTS "TestCompilationFramework.cpp")
 
@@ -17,6 +17,7 @@ add_subdirectory(ApparentHorizons)
 add_subdirectory(ControlSystem)
 add_subdirectory(DataStructures)
 add_subdirectory(Domain)
+add_subdirectory(Elliptic)
 add_subdirectory(ErrorHandling)
 add_subdirectory(Evolution)
 add_subdirectory(IO)
@@ -52,7 +53,6 @@ add_executable(
 
 target_link_libraries(
   ${executable}
-  Informer
   ${SPECTRE_TESTS_LIBRARIES}
   ${SPECTRE_LIBRARIES}
   )

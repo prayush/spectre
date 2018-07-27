@@ -1,6 +1,7 @@
 # Distributed under the MIT License.
 # See LICENSE.txt for details.
 
+add_subdirectory(Amr)
 add_subdirectory(CoordinateMaps)
 add_subdirectory(DomainCreators)
 
@@ -20,6 +21,7 @@ set(LIBRARY_SOURCES
     FaceNormal.cpp
     InitialElementIds.cpp
     LogicalCoordinates.cpp
+    Mesh.cpp
     Neighbors.cpp
     OrientationMap.cpp
     SegmentId.cpp
@@ -30,7 +32,8 @@ add_library(${LIBRARY} ${LIBRARY_SOURCES})
 
 target_link_libraries(
   ${LIBRARY}
+  INTERFACE CoordinateMaps
+  INTERFACE DataStructures
   INTERFACE ErrorHandling
-  # For Basis::lgl
   INTERFACE Spectral
   )

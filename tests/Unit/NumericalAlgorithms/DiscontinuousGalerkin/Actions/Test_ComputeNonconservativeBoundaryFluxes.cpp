@@ -17,7 +17,6 @@
 #include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "DataStructures/DataBox/Prefixes.hpp"
 #include "DataStructures/DataVector.hpp"
-#include "DataStructures/Index.hpp"
 #include "DataStructures/Tensor/EagerMath/Magnitude.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Variables.hpp"
@@ -30,9 +29,11 @@
 #include "Domain/ElementIndex.hpp"  // IWYU pragma: keep
 #include "Domain/ElementMap.hpp"
 #include "Domain/FaceNormal.hpp"
+#include "Domain/Mesh.hpp"
 #include "Domain/Neighbors.hpp"  // IWYU pragma: keep
 #include "Domain/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/ComputeNonconservativeBoundaryFluxes.hpp"
+#include "NumericalAlgorithms/Spectral/Spectral.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/StdHelpers.hpp"
 #include "Utilities/TMPL.hpp"
@@ -67,12 +68,13 @@ struct System {
   using magnitude_tag = Tags::EuclideanMagnitude<Tag>;
 
   struct normal_dot_fluxes {
-    using argument_tags = tmpl::list<Var, OtherArg, Var2>;
+    using argument_tags =
+        tmpl::list<Var, OtherArg, Var2,
+                   Tags::Normalized<Tags::UnnormalizedFaceNormal<2>>>;
     static void apply(
         const gsl::not_null<Scalar<DataVector>*> var_normal_dot_flux,
         const gsl::not_null<tnsr::ii<DataVector, 2>*> var2_normal_dot_flux,
-        const Scalar<DataVector>& var,
-        const double other_arg,
+        const Scalar<DataVector>& var, const double other_arg,
         const tnsr::ii<DataVector, 2>& var2,
         const tnsr::i<DataVector, 2>& unit_face_normal) noexcept {
       get(*var_normal_dot_flux) =
@@ -102,6 +104,9 @@ struct Metavariables {
 template <typename Tag>
 using interface_tag = Tags::Interface<Tags::InternalDirections<2>, Tag>;
 
+using n_dot_f_tag = interface_tag<Tags::NormalDotFlux<Tags::Variables<
+    tmpl::list<Tags::NormalDotFlux<Var>, Tags::NormalDotFlux<Var2>>>>>;
+
 using VarsType = Variables<tmpl::list<Var, Var2>>;
 auto run_action(
     const Element<2>& element,
@@ -109,7 +114,8 @@ auto run_action(
     const std::unordered_map<Direction<2>, double>& other_arg) noexcept {
   ActionTesting::ActionRunner<Metavariables> runner{{}};
 
-  const Index<2> extents{{{3, 3}}};
+  const Mesh<2> mesh{3, Spectral::Basis::Legendre,
+                     Spectral::Quadrature::GaussLobatto};
 
   const CoordinateMaps::Affine xi_map{-1., 1., 3., 7.};
   const CoordinateMaps::Affine eta_map{-1., 1., -2., 4.};
@@ -120,18 +126,24 @@ auto run_action(
                                                        CoordinateMaps::Affine>(
                             xi_map, eta_map)));
 
+  n_dot_f_tag::type n_dot_f_storage{};
+  for (const auto& direction_neighbors : element.neighbors()) {
+    n_dot_f_storage[direction_neighbors.first].initialize(3);
+  }
+
   auto start_box = db::create<
-      db::AddSimpleTags<Tags::Element<2>, Tags::Extents<2>, Tags::ElementMap<2>,
+      db::AddSimpleTags<Tags::Element<2>, Tags::Mesh<2>, Tags::ElementMap<2>,
                         interface_tag<Tags::Variables<tmpl::list<Var, Var2>>>,
-                        interface_tag<OtherArg>>,
+                        interface_tag<OtherArg>, n_dot_f_tag>,
       db::AddComputeTags<
           Tags::InternalDirections<2>, interface_tag<Tags::Direction<2>>,
-          interface_tag<Tags::Extents<1>>,
+          interface_tag<Tags::Mesh<1>>,
           interface_tag<Tags::UnnormalizedFaceNormal<2>>,
           interface_tag<
               Tags::EuclideanMagnitude<Tags::UnnormalizedFaceNormal<2>>>,
           interface_tag<Tags::Normalized<Tags::UnnormalizedFaceNormal<2>>>>>(
-      element, extents, std::move(element_map), vars, other_arg);
+      element, mesh, std::move(element_map), vars, other_arg,
+      std::move(n_dot_f_storage));
 
   return std::get<0>(
       runner
@@ -164,10 +176,7 @@ SPECTRE_TEST_CASE("Unit.DG.Actions.ComputeNonconservativeBoundaryFluxes",
 
   const auto& unit_face_normal = db::get<interface_tag<Tags::Normalized<
       Tags::UnnormalizedFaceNormal<2>>>>(box);
-  const auto& n_dot_f =
-      db::get<interface_tag<Tags::NormalDotFlux<Tags::Variables<
-          tmpl::list<Tags::NormalDotFlux<Var>, Tags::NormalDotFlux<Var2>>>>>>(
-          box);
+  const auto& n_dot_f = db::get<n_dot_f_tag>(box);
 
   std::unordered_map<Direction<2>,
                      Variables<tmpl::list<Tags::NormalDotFlux<Var>,
@@ -196,10 +205,7 @@ SPECTRE_TEST_CASE(
 
   auto box = run_action(element, vars, other_arg);
 
-  const auto& n_dot_f =
-      db::get<interface_tag<Tags::NormalDotFlux<Tags::Variables<
-          tmpl::list<Tags::NormalDotFlux<Var>, Tags::NormalDotFlux<Var2>>>>>>(
-          box);
+  const auto& n_dot_f = db::get<n_dot_f_tag>(box);
 
   CHECK(n_dot_f.empty());
 }

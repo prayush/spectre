@@ -7,7 +7,6 @@ set(LIBRARY_SOURCES
     DataVector.cpp
     Index.cpp
     IndexIterator.cpp
-    Mesh.cpp
     ModalVector.cpp
     SliceIterator.cpp
     StripeIterator.cpp
@@ -18,5 +17,6 @@ add_library(${LIBRARY} ${LIBRARY_SOURCES})
 
 target_link_libraries(
   ${LIBRARY}
+  INTERFACE Domain
   INTERFACE ErrorHandling
   )

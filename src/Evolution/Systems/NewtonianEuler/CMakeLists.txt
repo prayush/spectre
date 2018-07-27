@@ -12,6 +12,8 @@ set(LIBRARY_SOURCES
 
 add_library(${LIBRARY} ${LIBRARY_SOURCES})
 
+add_subdirectory(NewtonianEulerSources)
+
 target_link_libraries(
   ${LIBRARY}
   INTERFACE DataStructures

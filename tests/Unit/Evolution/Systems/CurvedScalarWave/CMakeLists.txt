@@ -1,7 +1,7 @@
 # Distributed under the MIT License.
 # See LICENSE.txt for details.
 
-set(LIBRARY "Test_CurvedScalarwave")
+set(LIBRARY "Test_CurvedScalarWave")
 
 set(LIBRARY_SOURCES
   TestHelpers.cpp
@@ -12,5 +12,5 @@ add_test_library(
   ${LIBRARY}
   "Evolution/Systems/CurvedScalarWave/"
   "${LIBRARY_SOURCES}"
-  "CurvedScalarWave"
+  "CurvedScalarWave;Test_GeneralRelativity"
   )

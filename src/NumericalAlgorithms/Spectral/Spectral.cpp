@@ -4,12 +4,13 @@
 #include "NumericalAlgorithms/Spectral/Spectral.hpp"
 
 #include <algorithm>
+#include <ostream>
 #include <type_traits>
 #include <utility>
 
 #include "DataStructures/DataVector.hpp"
 #include "DataStructures/Matrix.hpp"
-#include "DataStructures/Mesh.hpp"
+#include "Domain/Mesh.hpp"
 #include "ErrorHandling/Assert.hpp"
 #include "ErrorHandling/Error.hpp"
 #include "Utilities/Blas.hpp"
@@ -20,6 +21,23 @@
 #include "Utilities/StaticCache.hpp"
 
 namespace Spectral {
+
+std::ostream& operator<<(std::ostream& os,
+                         const Basis& basis) noexcept {
+  switch (basis) {
+    case Basis::Legendre: return os << "Legendre";
+    default: ERROR("Invalid basis");
+  }
+}
+
+std::ostream& operator<<(std::ostream& os,
+                         const Quadrature& quadrature) noexcept {
+  switch (quadrature) {
+    case Quadrature::Gauss: return os << "Gauss";
+    case Quadrature::GaussLobatto: return os << "GaussLobatto";
+    default: ERROR("Invalid quadrature");
+  }
+}
 
 // Forward declarations with basis-specific implementations
 

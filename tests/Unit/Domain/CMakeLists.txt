@@ -22,12 +22,14 @@ set(LIBRARY_SOURCES
   Test_InitialElementIds.cpp
   Test_InterfaceItems.cpp
   Test_LogicalCoordinates.cpp
+  Test_Mesh.cpp
   Test_Neighbors.cpp
   Test_OrientationMap.cpp
   Test_SegmentId.cpp
   Test_Side.cpp
   )
 
+add_subdirectory(Amr)
 add_subdirectory(CoordinateMaps)
 add_subdirectory(DomainCreators)
 
@@ -35,5 +37,5 @@ add_test_library(
   ${LIBRARY}
   "Domain"
   "${LIBRARY_SOURCES}"
-  "Domain;CoordinateMaps;DomainCreators"
+  "Domain;DomainCreators;Utilities"
   )
