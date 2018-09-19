@@ -16,6 +16,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "DataStructures/VectorMacros.hpp"
 #include "ErrorHandling/Assert.hpp"
 #include "Utilities/ConstantExpressions.hpp"
 #include "Utilities/ForceInline.hpp"
@@ -123,347 +124,31 @@ using std::abs;  // NOLINT
  * - tan
  * - tanh
  */
-class DataVector
-    : public PointerVector<double, blaze::unaligned, blaze::unpadded,
-                           blaze::defaultTransposeFlag, DataVector> {
-  /// \cond HIDDEN_SYMBOLS
-  static constexpr void private_asserts() noexcept {
-    static_assert(std::is_nothrow_move_constructible<DataVector>::value,
-                  "Missing move semantics");
-  }
-  /// \endcond
- public:
-  using value_type = double;
-  using allocator_type = std::allocator<value_type>;
-  using size_type = size_t;
-  using difference_type = std::ptrdiff_t;
-  using BaseType = PointerVector<double, blaze::unaligned, blaze::unpadded,
-                                 blaze::defaultTransposeFlag, DataVector>;
-  static constexpr bool transpose_flag = blaze::defaultTransposeFlag;
-
-  using BaseType::ElementType;
-  using TransposeType = DataVector;
-  using CompositeType = const DataVector&;
-
-  using BaseType::operator[];
-  using BaseType::begin;
-  using BaseType::cbegin;
-  using BaseType::cend;
-  using BaseType::data;
-  using BaseType::end;
-  using BaseType::size;
-
-  // @{
-  // Upcast to `BaseType`
-  const BaseType& operator~() const noexcept {
-    return static_cast<const BaseType&>(*this);
-  }
-  BaseType& operator~() noexcept { return static_cast<BaseType&>(*this); }
-  // @}
-
-  /// Create with the given size and value.
-  ///
-  /// \param size number of values
-  /// \param value the value to initialize each element.
-  explicit DataVector(
-      size_t size,
-      double value = std::numeric_limits<double>::signaling_NaN()) noexcept;
-
-  /// Create a non-owning DataVector that points to `start`
-  DataVector(double* start, size_t size) noexcept;
-
-  /// Create from an initializer list of doubles. All elements in the
-  /// `std::initializer_list` must have decimal points
-  template <class T, Requires<cpp17::is_same_v<T, double>> = nullptr>
-  DataVector(std::initializer_list<T> list) noexcept;
-
-  /// Empty DataVector
-  DataVector() noexcept = default;
-  /// \cond HIDDEN_SYMBOLS
-  ~DataVector() = default;
-
-  DataVector(const DataVector& rhs);
-  DataVector(DataVector&& rhs) noexcept;
-  DataVector& operator=(const DataVector& rhs);
-  DataVector& operator=(DataVector&& rhs) noexcept;
-
-  // This is a converting constructor. clang-tidy complains that it's not
-  // explicit, but we want it to allow conversion.
-  // clang-tidy: mark as explicit (we want conversion to DataVector)
-  template <typename VT, bool VF>
-  DataVector(const blaze::DenseVector<VT, VF>& expression) noexcept;  // NOLINT
-
-  template <typename VT, bool VF>
-  DataVector& operator=(const blaze::DenseVector<VT, VF>& expression) noexcept;
-  /// \endcond
-
-  MAKE_EXPRESSION_MATH_ASSIGN_PV(+=, DataVector)
-  MAKE_EXPRESSION_MATH_ASSIGN_PV(-=, DataVector)
-  MAKE_EXPRESSION_MATH_ASSIGN_PV(*=, DataVector)
-  MAKE_EXPRESSION_MATH_ASSIGN_PV(/=, DataVector)
-
-  DataVector& operator=(const double& rhs) noexcept {
-    ~*this = rhs;
-    return *this;
-  }
-
-  // @{
-  /// Set the DataVector to be a reference to another DataVector object
-  void set_data_ref(gsl::not_null<DataVector*> rhs) noexcept {
-    set_data_ref(rhs->data(), rhs->size());
-  }
-  void set_data_ref(double* start, size_t size) noexcept {
-    owned_data_ = decltype(owned_data_){};
-    (~*this).reset(start, size);
-    owning_ = false;
-  }
-  // @}
-
-  /// Returns true if the class owns the data
-  bool is_owning() const noexcept { return owning_; }
-
-  /// Serialization for Charm++
-  // clang-tidy: google-runtime-references
-  void pup(PUP::er& p) noexcept;  // NOLINT
-
- private:
-  SPECTRE_ALWAYS_INLINE void reset_pointer_vector() noexcept {
-    reset(owned_data_.data(), owned_data_.size());
-  }
-
-  /// \cond HIDDEN_SYMBOLS
-  std::vector<double, allocator_type> owned_data_;
-  bool owning_{true};
-  /// \endcond
-};
-
-/// Output operator for DataVector
-std::ostream& operator<<(std::ostream& os, const DataVector& d);
-
-/// Equivalence operator for DataVector
-bool operator==(const DataVector& lhs, const DataVector& rhs) noexcept;
-
-/// Inequivalence operator for DataVector
-bool operator!=(const DataVector& lhs, const DataVector& rhs) noexcept;
+MAKE_EXPRESSION_DATA_MODAL_VECTOR_CLASSES(DataVector)
+MAKE_EXPRESSION_VECMATH_OP_COMP_SELF(DataVector)
 
 /// \cond
-// Used for comparing DataVector to an expression
-template <typename VT, bool VF>
-bool operator==(const DataVector& lhs,
-                const blaze::DenseVector<VT, VF>& rhs) noexcept {
-  return lhs == DataVector(rhs);
-}
-
-template <typename VT, bool VF>
-bool operator!=(const DataVector& lhs,
-                const blaze::DenseVector<VT, VF>& rhs) noexcept {
-  return not(lhs == rhs);
-}
-
-template <typename VT, bool VF>
-bool operator==(const blaze::DenseVector<VT, VF>& lhs,
-                const DataVector& rhs) noexcept {
-  return DataVector(lhs) == rhs;
-}
-
-template <typename VT, bool VF>
-bool operator!=(const blaze::DenseVector<VT, VF>& lhs,
-                const DataVector& rhs) noexcept {
-  return not(lhs == rhs);
-}
+MAKE_EXPRESSION_VECMATH_OP_COMP_DV(DataVector)
 /// \endcond
 
 // Specialize the Blaze type traits to correctly handle DataVector
-namespace blaze {
-template <>
-struct IsVector<DataVector> : std::true_type {};
+MAKE_EXPRESSION_VECMATH_SPECIALIZE_BLAZE_ARITHMETIC_TRAITS(DataVector)
 
-template <>
-struct TransposeFlag<DataVector> : BoolConstant<DataVector::transpose_flag> {};
-
-template <>
-struct AddTrait<DataVector, DataVector> {
-  using Type = DataVector;
-};
-
-template <>
-struct AddTrait<DataVector, double> {
-  using Type = DataVector;
-};
-
-template <>
-struct AddTrait<double, DataVector> {
-  using Type = DataVector;
-};
-
-template <>
-struct SubTrait<DataVector, DataVector> {
-  using Type = DataVector;
-};
-
-template <>
-struct SubTrait<DataVector, double> {
-  using Type = DataVector;
-};
-
-template <>
-struct SubTrait<double, DataVector> {
-  using Type = DataVector;
-};
-
-template <>
-struct MultTrait<DataVector, DataVector> {
-  using Type = DataVector;
-};
-
-template <>
-struct MultTrait<DataVector, double> {
-  using Type = DataVector;
-};
-
-template <>
-struct MultTrait<double, DataVector> {
-  using Type = DataVector;
-};
-
-template <>
-struct DivTrait<DataVector, DataVector> {
-  using Type = DataVector;
-};
-
-template <>
-struct DivTrait<DataVector, double> {
-  using Type = DataVector;
-};
-
-template <typename Operator>
-struct UnaryMapTrait<DataVector, Operator> {
-  using Type = DataVector;
-};
-
-template <typename Operator>
-struct BinaryMapTrait<DataVector, DataVector, Operator> {
-  using Type = DataVector;
-};
-}  // namespace blaze
+// Specialize the Blaze {Unary,Binary}Map traits to correctly handle DataVector
+MAKE_EXPRESSION_VECMATH_SPECIALIZE_BLAZE_MAP_TRAITS(DataVector)
 
 SPECTRE_ALWAYS_INLINE decltype(auto) fabs(const DataVector& t) noexcept {
   return abs(~t);
 }
 
-template <typename T, size_t Dim>
-std::array<DataVector, Dim> operator+(
-    const std::array<T, Dim>& lhs,
-    const std::array<DataVector, Dim>& rhs) noexcept {
-  std::array<DataVector, Dim> result;
-  for (size_t i = 0; i < Dim; i++) {
-    gsl::at(result, i) = gsl::at(lhs, i) + gsl::at(rhs, i);
-  }
-  return result;
-}
-template <typename U, size_t Dim>
-std::array<DataVector, Dim> operator+(const std::array<DataVector, Dim>& lhs,
-                                      const std::array<U, Dim>& rhs) noexcept {
-  return rhs + lhs;
-}
-template <size_t Dim>
-std::array<DataVector, Dim> operator+(
-    const std::array<DataVector, Dim>& lhs,
-    const std::array<DataVector, Dim>& rhs) noexcept {
-  std::array<DataVector, Dim> result;
-  for (size_t i = 0; i < Dim; i++) {
-    gsl::at(result, i) = gsl::at(lhs, i) + gsl::at(rhs, i);
-  }
-  return result;
-}
-template <size_t Dim>
-std::array<DataVector, Dim>& operator+=(
-    std::array<DataVector, Dim>& lhs,
-    const std::array<DataVector, Dim>& rhs) noexcept {
-  for (size_t i = 0; i < Dim; i++) {
-    gsl::at(lhs, i) += gsl::at(rhs, i);
-  }
-  return lhs;
-}
-template <typename T, size_t Dim>
-std::array<DataVector, Dim> operator-(
-    const std::array<T, Dim>& lhs,
-    const std::array<DataVector, Dim>& rhs) noexcept {
-  std::array<DataVector, Dim> result;
-  for (size_t i = 0; i < Dim; i++) {
-    gsl::at(result, i) = gsl::at(lhs, i) - gsl::at(rhs, i);
-  }
-  return result;
-}
-template <typename U, size_t Dim>
-std::array<DataVector, Dim> operator-(const std::array<DataVector, Dim>& lhs,
-                                      const std::array<U, Dim>& rhs) noexcept {
-  std::array<DataVector, Dim> result;
-  for (size_t i = 0; i < Dim; i++) {
-    gsl::at(result, i) = gsl::at(lhs, i) - gsl::at(rhs, i);
-  }
-  return result;
-}
-template <size_t Dim>
-std::array<DataVector, Dim> operator-(
-    const std::array<DataVector, Dim>& lhs,
-    const std::array<DataVector, Dim>& rhs) noexcept {
-  std::array<DataVector, Dim> result;
-  for (size_t i = 0; i < Dim; i++) {
-    gsl::at(result, i) = gsl::at(lhs, i) - gsl::at(rhs, i);
-  }
-  return result;
-}
-template <size_t Dim>
-std::array<DataVector, Dim>& operator-=(
-    std::array<DataVector, Dim>& lhs,
-    const std::array<DataVector, Dim>& rhs) noexcept {
-  for (size_t i = 0; i < Dim; i++) {
-    gsl::at(lhs, i) -= gsl::at(rhs, i);
-  }
-  return lhs;
-}
+MAKE_EXPRESSION_VECMATH_OP_ADD_ARRAYS_OF_VEC(DataVector)
+MAKE_EXPRESSION_VECMATH_OP_SUB_ARRAYS_OF_VEC(DataVector)
 
 /// \cond HIDDEN_SYMBOLS
-template <typename VT, bool VF>
-DataVector::DataVector(const blaze::DenseVector<VT, VF>& expression) noexcept
-    : owned_data_((~expression).size()) {
-  static_assert(cpp17::is_same_v<typename VT::ResultType, DataVector>,
-                "You are attempting to assign the result of an expression that "
-                "is not a DataVector to a DataVector.");
-  reset_pointer_vector();
-  ~*this = expression;
-}
-
-template <typename VT, bool VF>
-DataVector& DataVector::operator=(
-    const blaze::DenseVector<VT, VF>& expression) noexcept {
-  static_assert(cpp17::is_same_v<typename VT::ResultType, DataVector>,
-                "You are attempting to assign the result of an expression that "
-                "is not a DataVector to a DataVector.");
-  if (owning_ and (~expression).size() != size()) {
-    owned_data_.resize((~expression).size());
-    reset_pointer_vector();
-  } else if (not owning_) {
-    ASSERT((~expression).size() == size(), "Must copy into same size, not "
-                                               << (~expression).size()
-                                               << " into " << size());
-  }
-  ~*this = expression;
-  return *this;
-}
+MAKE_EXPRESSION_VEC_OP_ASSIGNMENT_RESTRICT_TYPE(DataVector)
 /// \endcond
 
-namespace MakeWithValueImpls {
-/// \brief Returns a DataVector the same size as `input`, with each element
-/// equal to `value`.
-template <>
-SPECTRE_ALWAYS_INLINE DataVector
-MakeWithValueImpl<DataVector, DataVector>::apply(const DataVector& input,
-                                                 const double value) {
-  return DataVector(input.size(), value);
-}
-}  // namespace MakeWithValueImpls
+MAKE_EXPRESSION_VEC_OP_MAKE_WITH_VALUE(DataVector)
 
 namespace ConstantExpressions_detail {
 template <>
