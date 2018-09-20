@@ -6,22 +6,22 @@
 
 #pragma once
 
-#include <array>
+//~ #include <array>
 #include <cmath>
-#include <cstddef>
-#include <initializer_list>
-#include <limits>
-#include <ostream>
-#include <type_traits>
-#include <vector>
+//~ #include <cstddef>
+//~ #include <initializer_list>
+//~ #include <limits>
+//~ #include <ostream>
+//~ #include <type_traits>
+//~ #include <vector>
 
 #include "DataStructures/VectorMacros.hpp"
-#include "ErrorHandling/Assert.hpp"
+//~ #include "ErrorHandling/Assert.hpp"
 #include "Utilities/ForceInline.hpp"
-#include "Utilities/Gsl.hpp"
-#include "Utilities/MakeWithValue.hpp"
+//~ #include "Utilities/Gsl.hpp"
+//~ #include "Utilities/MakeWithValue.hpp"
 #include "Utilities/PointerVector.hpp" // IWYU pragma: keep
-#include "Utilities/Requires.hpp"
+//~ #include "Utilities/Requires.hpp"
 #include "Utilities/TMPL.hpp"          // for list
 
 /// \cond HIDDEN_SYMBOLS
@@ -61,6 +61,7 @@ using std::abs;  // NOLINT
 // IWYU pragma: no_include <blaze/math/traits/UnaryMapTrait.h>
 // IWYU pragma: no_include <blaze/math/typetraits/TransposeFlag.h>
 // IWYU pragma: no_include "DataStructures/DataVector.hpp"
+// IWYU pragma: no_include "DataStructures/ModalVector.hpp"
 
 // IWYU pragma: no_forward_declare blaze::DenseVector
 // IWYU pragma: no_forward_declare blaze::UnaryMapTrait
@@ -88,22 +89,28 @@ using std::abs;  // NOLINT
  * operations with a DenseVectors (holding filters) is supported.
  *
  */
+/// ModalVector class
 MAKE_EXPRESSION_DATA_MODAL_VECTOR_CLASSES(ModalVector)
+
+/// Declare shift and (in)equivalence operators for ModalVector with itself
 MAKE_EXPRESSION_VECMATH_OP_COMP_SELF(ModalVector)
 
 /// \cond
+/// Define shift and (in)equivalence operators for ModalVector with
+/// blaze::DenseVector
 MAKE_EXPRESSION_VECMATH_OP_COMP_DV(ModalVector)
 /// \endcond
 
 // Specialize Blaze type traits to correctly handle ModalVector
 MAKE_EXPRESSION_VECMATH_SPECIALIZE_BLAZE_ARITHMETIC_TRAITS(ModalVector)
 
-// Specialize Blaze UnaryMap traits to handle ModalVector
+// Specialize the Blaze {Unary,Binary}Map traits to correctly handle ModalVector
 namespace blaze {
+using ::ModalVector; // for ModalVector::ElementType
 template <typename Operator>
 struct UnaryMapTrait<ModalVector, Operator> {
   // Forbid math operations in this specialization of UnaryMap traits for
-  // ModalVector that are unlikely to be used on spectral coefficients
+  // ModalVector that are inapplicable to spectral coefficients
   static_assert(not tmpl::list_contains_v<tmpl::list<
                 blaze::Sqrt, blaze::Cbrt,
                 blaze::InvSqrt, blaze::InvCbrt,
@@ -117,13 +124,13 @@ struct UnaryMapTrait<ModalVector, Operator> {
                 >, Operator>,
                 "This operation is not permitted on a ModalVector."
                 "Only unary operation permitted are: max, min, abs, fabs.");
-  // Selectively allow unary operations commonly used on spectral coefficients
+  // Selectively allow unary operations for spectral coefficients
   static_assert(tmpl::list_contains_v<tmpl::list<
                 blaze::Abs,
                 blaze::Max, blaze::Min,
-                blaze::AddScalar<double>,
-                blaze::SubScalarRhs<double>,
-                blaze::SubScalarLhs<double>
+                blaze::AddScalar<ModalVector::ElementType>,
+                blaze::SubScalarRhs<ModalVector::ElementType>,
+                blaze::SubScalarLhs<ModalVector::ElementType>
                 >, Operator>,
                 "Only unary operation permitted on a ModalVector are:"
                 " max, min, abs, fabs.");
@@ -135,31 +142,30 @@ template <typename Operator>
 struct BinaryMapTrait<ModalVector, ModalVector, Operator> {
   // Forbid math operations in this specialization of BinaryMap traits for
   // ModalVector that are unlikely to be used on spectral coefficients
-  static_assert(not tmpl::list_contains_v<tmpl::list<blaze::Max, blaze::Min
+  static_assert(not tmpl::list_contains_v<tmpl::list<
+                blaze::Max, blaze::Min
                 >, Operator>,
-                "This operation is not permitted on a ModalVector."
-                "Only unary operation are permitted: abs, fabs.");
-  // Selectively allow operations commonly used on spectral coefficients
-  /* static_assert(not tmpl::list_contains_v<tmpl::list<blaze::Max, blaze::Min
-                >, Operator>,
-                "This operation is not permitted on a ModalVector."
-                "Only unary operation are permitted: abs, fabs."); */
+                "This binary operation is not permitted on a ModalVector.");
   using Type = ModalVector;
 };
 }  // namespace blaze
+
 
 SPECTRE_ALWAYS_INLINE decltype(auto) fabs(const ModalVector& t) noexcept {
   return abs(~t);
 }
 
-SPECTRE_ALWAYS_INLINE decltype(auto) abs(const ModalVector& t) noexcept {
-  return abs(~t);
-}
+//~ SPECTRE_ALWAYS_INLINE decltype(auto) abs(const ModalVector& t) noexcept {
+  //~ return abs(~t);
+//~ }
 
+/// Define +, +=, -, -= operations between std::array's of ModalVectors
 MAKE_EXPRESSION_VECMATH_OP_ADD_ARRAYS_OF_VEC(ModalVector)
 MAKE_EXPRESSION_VECMATH_OP_SUB_ARRAYS_OF_VEC(ModalVector)
 
 /// \cond HIDDEN_SYMBOLS
+/// Forbid assignment of blaze::DenseVector<VT,VF>'s to ModalVector, if its
+/// result type VT::ResultType is not ModalVector
 MAKE_EXPRESSION_VEC_OP_ASSIGNMENT_RESTRICT_TYPE(ModalVector)
 /// \endcond
 

@@ -6,22 +6,22 @@
 
 #pragma once
 
-#include <array>
+//~ #include <array>
 #include <cmath>
 #include <cstddef>
 #include <functional>  // for std::reference_wrapper
-#include <initializer_list>
-#include <limits>
-#include <ostream>
-#include <type_traits>
-#include <vector>
+//~ #include <initializer_list>
+//~ #include <limits>
+//~ #include <ostream>
+//~ #include <type_traits>
+//~ #include <vector>
 
 #include "DataStructures/VectorMacros.hpp"
-#include "ErrorHandling/Assert.hpp"
+//~ #include "ErrorHandling/Assert.hpp"
 #include "Utilities/ConstantExpressions.hpp"
 #include "Utilities/ForceInline.hpp"
-#include "Utilities/Gsl.hpp"
-#include "Utilities/MakeWithValue.hpp"
+//~ #include "Utilities/Gsl.hpp"
+//~ #include "Utilities/MakeWithValue.hpp"
 #include "Utilities/PointerVector.hpp"
 #include "Utilities/Requires.hpp"
 
@@ -124,10 +124,15 @@ using std::abs;  // NOLINT
  * - tan
  * - tanh
  */
+/// DataVector class
 MAKE_EXPRESSION_DATA_MODAL_VECTOR_CLASSES(DataVector)
+
+/// Declare shift and (in)equivalence operators for DataVector with itself
 MAKE_EXPRESSION_VECMATH_OP_COMP_SELF(DataVector)
 
 /// \cond
+/// Define shift and (in)equivalence operators for DataVector with
+/// blaze::DenseVector
 MAKE_EXPRESSION_VECMATH_OP_COMP_DV(DataVector)
 /// \endcond
 
@@ -141,13 +146,17 @@ SPECTRE_ALWAYS_INLINE decltype(auto) fabs(const DataVector& t) noexcept {
   return abs(~t);
 }
 
+/// Define +, +=, -, -= operations between std::array's of DataVectors
 MAKE_EXPRESSION_VECMATH_OP_ADD_ARRAYS_OF_VEC(DataVector)
 MAKE_EXPRESSION_VECMATH_OP_SUB_ARRAYS_OF_VEC(DataVector)
 
 /// \cond HIDDEN_SYMBOLS
+/// Forbid assignment of blaze::DenseVector<VT,VF>'s to DataVector, if its
+/// result type VT::ResultType is not DataVector
 MAKE_EXPRESSION_VEC_OP_ASSIGNMENT_RESTRICT_TYPE(DataVector)
 /// \endcond
 
+/// Construct a DataVector with value(s)
 MAKE_EXPRESSION_VEC_OP_MAKE_WITH_VALUE(DataVector)
 
 namespace ConstantExpressions_detail {
