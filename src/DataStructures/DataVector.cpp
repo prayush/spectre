@@ -3,10 +3,10 @@
 
 #include "DataStructures/DataVector.hpp"
 
-#include <algorithm>
-#include <pup.h>
+#include <algorithm>                  // IWYU pragma: keep
+#include <pup.h>                      // IWYU pragma: keep
 
-#include "Utilities/StdHelpers.hpp"
+#include "Utilities/StdHelpers.hpp"   // IWYU pragma: keep
 
 /// Construct a DataVector with value(s)
 MAKE_EXPRESSION_VEC_DEF_CONSTRUCT_WITH_VALUE(DataVector)

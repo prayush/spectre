@@ -6,28 +6,28 @@
 
 #pragma once
 
-#include <array>
+#include <array>                // IWYU pragma: keep
 #include <cmath>
 #include <cstddef>
 #include <functional>  // for std::reference_wrapper
-#include <initializer_list>
-#include <limits>
-#include <ostream>
-#include <type_traits>
-#include <vector>
+#include <initializer_list>     // IWYU pragma: keep
+#include <limits>               // IWYU pragma: keep
+#include <ostream>              // IWYU pragma: keep
+#include <type_traits>          // IWYU pragma: keep
+#include <vector>               // IWYU pragma: keep
 
 #include "DataStructures/VectorMacros.hpp"
-#include "ErrorHandling/Assert.hpp"
+#include "ErrorHandling/Assert.hpp"           // IWYU pragma: keep
 #include "Utilities/ConstantExpressions.hpp"
 #include "Utilities/ForceInline.hpp"
-#include "Utilities/Gsl.hpp"
-#include "Utilities/MakeWithValue.hpp"
+#include "Utilities/Gsl.hpp"                  // IWYU pragma: keep
+#include "Utilities/MakeWithValue.hpp"        // IWYU pragma: keep
 #include "Utilities/PointerVector.hpp"
 #include "Utilities/Requires.hpp"
 
 /// \cond HIDDEN_SYMBOLS
 // IWYU pragma: no_forward_declare ConstantExpressions_detail::pow
-namespace PUP {
+namespace PUP {  // IWYU pragma: keep
 class er;
 }  // namespace PUP
 

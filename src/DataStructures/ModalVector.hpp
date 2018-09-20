@@ -6,26 +6,26 @@
 
 #pragma once
 
-#include <array>
+#include <array>                // IWYU pragma: keep
 #include <cmath>
-#include <cstddef>
-#include <initializer_list>
-#include <limits>
-#include <ostream>
-#include <type_traits>
-#include <vector>
+#include <cstddef>              // IWYU pragma: keep
+#include <initializer_list>     // IWYU pragma: keep
+#include <limits>               // IWYU pragma: keep
+#include <ostream>              // IWYU pragma: keep
+#include <type_traits>          // IWYU pragma: keep
+#include <vector>               // IWYU pragma: keep
 
 #include "DataStructures/VectorMacros.hpp"
-#include "ErrorHandling/Assert.hpp"
+#include "ErrorHandling/Assert.hpp"    // IWYU pragma: keep
 #include "Utilities/ForceInline.hpp"
-#include "Utilities/Gsl.hpp"
-#include "Utilities/MakeWithValue.hpp"
+#include "Utilities/Gsl.hpp"           // IWYU pragma: keep
+#include "Utilities/MakeWithValue.hpp" // IWYU pragma: keep
 #include "Utilities/PointerVector.hpp" // IWYU pragma: keep
-#include "Utilities/Requires.hpp"
+#include "Utilities/Requires.hpp"      // IWYU pragma: keep
 #include "Utilities/TMPL.hpp"          // for list
 
 /// \cond HIDDEN_SYMBOLS
-namespace PUP {
+namespace PUP {   // IWYU pragma: keep
 class er;
 }  // namespace PUP
 
@@ -60,6 +60,7 @@ using std::abs;  // NOLINT
 // IWYU pragma: no_include <blaze/math/traits/BinaryMapTrait.h>
 // IWYU pragma: no_include <blaze/math/traits/UnaryMapTrait.h>
 // IWYU pragma: no_include <blaze/math/typetraits/TransposeFlag.h>
+// IWYU pragma: no_include "DataStructures/DataVector.hpp"
 // IWYU pragma: no_include "DataStructures/ModalVector.hpp"
 
 // IWYU pragma: no_forward_declare blaze::DenseVector
@@ -127,6 +128,7 @@ struct UnaryMapTrait<ModalVector, Operator> {
   static_assert(tmpl::list_contains_v<tmpl::list<
                 blaze::Abs,
                 blaze::Max, blaze::Min,
+                // Following 3 reqd. by operator(+,+=), (-,-=), (-) w/doubles
                 blaze::AddScalar<ModalVector::ElementType>,
                 blaze::SubScalarRhs<ModalVector::ElementType>,
                 blaze::SubScalarLhs<ModalVector::ElementType>
