@@ -3,10 +3,10 @@
 
 #include "DataStructures/ModalVector.hpp"
 
-//~ #include <algorithm>
+#include <algorithm>
 #include <pup.h>
 
-//~ #include "Utilities/StdHelpers.hpp"
+#include "Utilities/StdHelpers.hpp"
 
 /// Construct a ModalVector with value(s)
 MAKE_EXPRESSION_VEC_DEF_CONSTRUCT_WITH_VALUE(ModalVector)

@@ -6,22 +6,22 @@
 
 #pragma once
 
-//~ #include <array>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <functional>  // for std::reference_wrapper
-//~ #include <initializer_list>
-//~ #include <limits>
-//~ #include <ostream>
-//~ #include <type_traits>
-//~ #include <vector>
+#include <initializer_list>
+#include <limits>
+#include <ostream>
+#include <type_traits>
+#include <vector>
 
 #include "DataStructures/VectorMacros.hpp"
-//~ #include "ErrorHandling/Assert.hpp"
+#include "ErrorHandling/Assert.hpp"
 #include "Utilities/ConstantExpressions.hpp"
 #include "Utilities/ForceInline.hpp"
-//~ #include "Utilities/Gsl.hpp"
-//~ #include "Utilities/MakeWithValue.hpp"
+#include "Utilities/Gsl.hpp"
+#include "Utilities/MakeWithValue.hpp"
 #include "Utilities/PointerVector.hpp"
 #include "Utilities/Requires.hpp"
 
@@ -62,6 +62,7 @@ using std::abs;  // NOLINT
 // IWYU pragma: no_include <blaze/math/traits/BinaryMapTrait.h>
 // IWYU pragma: no_include <blaze/math/traits/UnaryMapTrait.h>
 // IWYU pragma: no_include <blaze/math/typetraits/TransposeFlag.h>
+// IWYU pragma: no_include "DataStructures/DataVector.hpp"
 
 // IWYU pragma: no_forward_declare blaze::DenseVector
 // IWYU pragma: no_forward_declare blaze::UnaryMapTrait

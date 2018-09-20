@@ -6,68 +6,6 @@
 
 #pragma once
 
-#include <array>
-#include <cmath>
-#include <cstddef>
-#include <functional>  // for std::reference_wrapper
-#include <initializer_list>
-#include <limits>
-#include <ostream>
-#include <type_traits>
-#include <vector>
-
-#include "ErrorHandling/Assert.hpp"
-#include "Utilities/ConstantExpressions.hpp"
-#include "Utilities/ForceInline.hpp"
-#include "Utilities/Gsl.hpp"
-#include "Utilities/MakeWithValue.hpp"
-#include "Utilities/PointerVector.hpp"
-#include "Utilities/Requires.hpp"
-#include "Utilities/StdHelpers.hpp"
-
-/// \cond HIDDEN_SYMBOLS
-// IWYU pragma: no_forward_declare ConstantExpressions_detail::pow
-namespace PUP {
-class er;
-}  // namespace PUP
-
-// clang-tidy: no using declarations in header files
-//             We want the std::abs to be used
-using std::abs;  // NOLINT
-/// \endcond
-
-// IWYU doesn't like that we want PointerVector.hpp to expose Blaze and also
-// have DataVector.hpp to expose PointerVector.hpp without including Blaze
-// directly in DataVector.hpp
-//
-// IWYU pragma: no_include <blaze/math/dense/DenseVector.h>
-// IWYU pragma: no_include <blaze/math/expressions/DVecDVecAddExpr.h>
-// IWYU pragma: no_include <blaze/math/expressions/DVecDVecDivExpr.h>
-// IWYU pragma: no_include <blaze/math/expressions/DVecDVecMultExpr.h>
-// IWYU pragma: no_include <blaze/math/expressions/DVecDVecSubExpr.h>
-// IWYU pragma: no_include <blaze/math/expressions/DVecMapExpr.h>
-// IWYU pragma: no_include <blaze/math/expressions/DVecScalarDivExpr.h>
-// IWYU pragma: no_include <blaze/math/expressions/DVecScalarMultExpr.h>
-// IWYU pragma: no_include <blaze/math/expressions/DenseVector.h>
-// IWYU pragma: no_include <blaze/math/expressions/Vector.h>
-// IWYU pragma: no_include <blaze/math/typetraits/IsVector.h>
-// IWYU pragma: no_include <blaze/math/expressions/Forward.h>
-// IWYU pragma: no_include <blaze/math/AlignmentFlag.h>
-// IWYU pragma: no_include <blaze/math/PaddingFlag.h>
-// IWYU pragma: no_include <blaze/math/traits/AddTrait.h>
-// IWYU pragma: no_include <blaze/math/traits/DivTrait.h>
-// IWYU pragma: no_include <blaze/math/traits/MultTrait.h>
-// IWYU pragma: no_include <blaze/math/traits/SubTrait.h>
-// IWYU pragma: no_include <blaze/system/TransposeFlag.h>
-// IWYU pragma: no_include <blaze/math/traits/BinaryMapTrait.h>
-// IWYU pragma: no_include <blaze/math/traits/UnaryMapTrait.h>
-// IWYU pragma: no_include <blaze/math/typetraits/TransposeFlag.h>
-
-// IWYU pragma: no_forward_declare blaze::DenseVector
-// IWYU pragma: no_forward_declare blaze::UnaryMapTrait
-// IWYU pragma: no_forward_declare blaze::BinaryMapTrait
-// IWYU pragma: no_forward_declare blaze::IsVector
-// IWYU pragma: no_forward_declare blaze::TransposeFlag
 
 /**
  * \ingroup DataStructuresGroup
@@ -150,10 +88,10 @@ class VECTYPE                                                                  \
   /** \cond HIDDEN_SYMBOLS */                                                  \
   ~VECTYPE() = default;                                                        \
                                                                                \
-  VECTYPE(const VECTYPE& rhs);                                                 \
-  VECTYPE(VECTYPE&& rhs) noexcept;                                             \
-  VECTYPE& operator=(const VECTYPE& rhs);                                      \
-  VECTYPE& operator=(VECTYPE&& rhs) noexcept;                                  \
+  VECTYPE(const VECTYPE& rhs);   /* NOLINT */                                  \
+  VECTYPE(VECTYPE&& rhs) noexcept;   /* NOLINT */                              \
+  VECTYPE& operator=(const VECTYPE& rhs);   /* NOLINT */                       \
+  VECTYPE& operator=(VECTYPE&& rhs) noexcept;  /* NOLINT */                    \
                                                                                \
   /* This is a converting constructor. clang-tidy complains that it's not */   \
   /* explicit, but we want it to allow conversion.                        */   \
@@ -524,8 +462,8 @@ VECTYPE& VECTYPE::operator=(const VECTYPE& rhs) {                            \
   }                                                                          \
   return *this;                                                              \
 }                                                                            \
-/** NOLINTNEXTLINE(misc-macro-parentheses) */                                \
-VECTYPE::VECTYPE(VECTYPE&& rhs) noexcept {                                   \
+                                                                             \
+VECTYPE::VECTYPE(VECTYPE&& rhs) noexcept {  /* NOLINT */                     \
   owned_data_ = std::move(rhs.owned_data_);                                  \
   ~*this = ~rhs;  /* PointerVector is trivially copyable */                  \
   owning_ = rhs.owning_;                                                     \
@@ -533,8 +471,8 @@ VECTYPE::VECTYPE(VECTYPE&& rhs) noexcept {                                   \
   rhs.owning_ = true;                                                        \
   rhs.reset();                                                               \
 }                                                                            \
-/** NOLINTNEXTLINE(misc-macro-parentheses) */                                \
-VECTYPE& VECTYPE::operator=(VECTYPE&& rhs) noexcept {                        \
+                                                                             \
+VECTYPE& VECTYPE::operator=(VECTYPE&& rhs) noexcept {  /* NOLINT */          \
   if (this != &rhs) {                                                        \
     if (owning_) {                                                           \
       owned_data_ = std::move(rhs.owned_data_);                              \

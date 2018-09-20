@@ -6,22 +6,22 @@
 
 #pragma once
 
-//~ #include <array>
+#include <array>
 #include <cmath>
-//~ #include <cstddef>
-//~ #include <initializer_list>
-//~ #include <limits>
-//~ #include <ostream>
-//~ #include <type_traits>
-//~ #include <vector>
+#include <cstddef>
+#include <initializer_list>
+#include <limits>
+#include <ostream>
+#include <type_traits>
+#include <vector>
 
 #include "DataStructures/VectorMacros.hpp"
-//~ #include "ErrorHandling/Assert.hpp"
+#include "ErrorHandling/Assert.hpp"
 #include "Utilities/ForceInline.hpp"
-//~ #include "Utilities/Gsl.hpp"
-//~ #include "Utilities/MakeWithValue.hpp"
+#include "Utilities/Gsl.hpp"
+#include "Utilities/MakeWithValue.hpp"
 #include "Utilities/PointerVector.hpp" // IWYU pragma: keep
-//~ #include "Utilities/Requires.hpp"
+#include "Utilities/Requires.hpp"
 #include "Utilities/TMPL.hpp"          // for list
 
 /// \cond HIDDEN_SYMBOLS
@@ -60,7 +60,6 @@ using std::abs;  // NOLINT
 // IWYU pragma: no_include <blaze/math/traits/BinaryMapTrait.h>
 // IWYU pragma: no_include <blaze/math/traits/UnaryMapTrait.h>
 // IWYU pragma: no_include <blaze/math/typetraits/TransposeFlag.h>
-// IWYU pragma: no_include "DataStructures/DataVector.hpp"
 // IWYU pragma: no_include "DataStructures/ModalVector.hpp"
 
 // IWYU pragma: no_forward_declare blaze::DenseVector
@@ -81,7 +80,7 @@ using std::abs;  // NOLINT
  * addition to addition, subtraction, multiplication, division, there
  * are the following element-wise operations:
  *
- * - abs/fabs/magnitude
+ * - abs/fabs
  * - max
  * - min
  *
@@ -155,9 +154,6 @@ SPECTRE_ALWAYS_INLINE decltype(auto) fabs(const ModalVector& t) noexcept {
   return abs(~t);
 }
 
-//~ SPECTRE_ALWAYS_INLINE decltype(auto) abs(const ModalVector& t) noexcept {
-  //~ return abs(~t);
-//~ }
 
 /// Define +, +=, -, -= operations between std::array's of ModalVectors
 MAKE_EXPRESSION_VECMATH_OP_ADD_ARRAYS_OF_VEC(ModalVector)
