@@ -25,10 +25,9 @@
 #include "Utilities/TMPL.hpp"          // for list
 
 /// \cond HIDDEN_SYMBOLS
-namespace PUP {  // IWYU pragma: keep
-class er;        // IWYU pragma: keep
-}                // IWYU pragma: keep
-// namespace PUP
+namespace PUP { // NOLINT  // IWYU pragma: keep
+class er; // NOLINT        // IWYU pragma: keep
+} // NOLINT                // IWYU pragma: keep // namespace PUP
 
 // clang-tidy: no using declarations in header files
 //             We want the std::abs to be used

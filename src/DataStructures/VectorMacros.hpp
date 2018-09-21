@@ -29,11 +29,11 @@
  * non-owning, meaning it just has a pointer to an array.
  */
 #define MAKE_EXPRESSION_DATA_MODAL_VECTOR_CLASSES(VECTYPE)                     \
-class VECTYPE   /* NOLINT */                                                   \
+class VECTYPE /* NOLINT */                                                     \
     : public PointerVector<double, blaze::unaligned, blaze::unpadded,          \
                            blaze::defaultTransposeFlag, VECTYPE> { /* NOLINT */\
   /** \cond HIDDEN_SYMBOLS */                                                  \
-  static constexpr void private_asserts() noexcept {  /* NOLINTNEXTLINE */     \
+  static constexpr void private_asserts() noexcept { /* NOLINTNEXTLINE */      \
     static_assert(std::is_nothrow_move_constructible<VECTYPE>::value,          \
                   "Missing move semantics");                                   \
   }                                                                            \
@@ -45,12 +45,12 @@ class VECTYPE   /* NOLINT */                                                   \
   using difference_type = std::ptrdiff_t;                                      \
   using BaseType = PointerVector<double, blaze::unaligned, blaze::unpadded,    \
                                  blaze::defaultTransposeFlag,                  \
-                                 VECTYPE>;   /* NOLINT */                      \
+                                 VECTYPE>; /* NOLINT */                        \
   static constexpr bool transpose_flag = blaze::defaultTransposeFlag;          \
                                                                                \
   using BaseType::ElementType;                                                 \
-  using TransposeType = VECTYPE;    /* NOLINT */                               \
-  using CompositeType = const VECTYPE&;   /* NOLINT */                         \
+  using TransposeType = VECTYPE; /* NOLINT */                                  \
+  using CompositeType = const VECTYPE&; /* NOLINT */                           \
                                                                                \
   using BaseType::operator[];                                                  \
   using BaseType::begin;                                                       \
@@ -72,27 +72,27 @@ class VECTYPE   /* NOLINT */                                                   \
   /** */                                                                       \
   /** \param size number of values */                                          \
   /** \param value the value to initialize each element. */                    \
-  explicit VECTYPE(  /* NOLINT */                                              \
+  explicit VECTYPE( /* NOLINT */                                               \
       size_t size,                                                             \
       double value = std::numeric_limits<double>::signaling_NaN()) noexcept;   \
                                                                                \
   /** Create a non-owning VECTYPE that points to `start` */                    \
-  VECTYPE(double* start, size_t size) noexcept;   /* NOLINT */                 \
+  VECTYPE(double* start, size_t size) noexcept; /* NOLINT */                   \
                                                                                \
   /** Create from an initializer list of doubles. All elements in the */       \
   /** `std::initializer_list` must have decimal points */                      \
   template <class T, Requires<cpp17::is_same_v<T, double>> = nullptr>          \
-  VECTYPE(std::initializer_list<T> list) noexcept;    /* NOLINT */             \
+  VECTYPE(std::initializer_list<T> list) noexcept; /* NOLINT */                \
                                                                                \
   /** Empty VECTYPE */                                                         \
   VECTYPE() noexcept = default; /* NOLINT */                                   \
   /** \cond HIDDEN_SYMBOLS */                                                  \
-  ~VECTYPE() = default;         /* NOLINT */                                   \
+  ~VECTYPE() = default; /* NOLINT */                                           \
                                                                                \
-  VECTYPE(const VECTYPE& rhs);                 /* NOLINT */                    \
-  VECTYPE(VECTYPE&& rhs) noexcept;             /* NOLINT */                    \
-  VECTYPE& operator=(const VECTYPE& rhs);      /* NOLINT */                    \
-  VECTYPE& operator=(VECTYPE&& rhs) noexcept;  /* NOLINT */                    \
+  VECTYPE(const VECTYPE& rhs); /* NOLINT */                                    \
+  VECTYPE(VECTYPE&& rhs) noexcept; /* NOLINT */                                \
+  VECTYPE& operator=(const VECTYPE& rhs); /* NOLINT */                         \
+  VECTYPE& operator=(VECTYPE&& rhs) noexcept; /* NOLINT */                     \
                                                                                \
   /* This is a converting constructor. clang-tidy complains that it's not */   \
   /* explicit, but we want it to allow conversion.                        */   \
@@ -104,19 +104,19 @@ class VECTYPE   /* NOLINT */                                                   \
   VECTYPE& operator=(const blaze::DenseVector<VT, VF>& expression) noexcept;   \
   /** \endcond */                                                              \
                                                                                \
-  MAKE_EXPRESSION_MATH_ASSIGN_PV(+=, VECTYPE)   /* NOLINT */                   \
-  MAKE_EXPRESSION_MATH_ASSIGN_PV(-=, VECTYPE)   /* NOLINT */                   \
-  MAKE_EXPRESSION_MATH_ASSIGN_PV(*=, VECTYPE)   /* NOLINT */                   \
-  MAKE_EXPRESSION_MATH_ASSIGN_PV(/=, VECTYPE)   /* NOLINT */                   \
+  MAKE_EXPRESSION_MATH_ASSIGN_PV(+=, VECTYPE) /* NOLINT */                     \
+  MAKE_EXPRESSION_MATH_ASSIGN_PV(-=, VECTYPE) /* NOLINT */                     \
+  MAKE_EXPRESSION_MATH_ASSIGN_PV(*=, VECTYPE) /* NOLINT */                     \
+  MAKE_EXPRESSION_MATH_ASSIGN_PV(/=, VECTYPE) /* NOLINT */                     \
                                                                                \
-  VECTYPE& operator=(const double& rhs) noexcept {   /* NOLINT */              \
+  VECTYPE& operator=(const double& rhs) noexcept { /* NOLINT */                \
     ~*this = rhs;                                                              \
     return *this;                                                              \
   }                                                                            \
                                                                                \
   /** @{ */                                                                    \
   /** Set the VECTYPE to be a reference to another VECTYPE object */           \
-  void set_data_ref(gsl::not_null<VECTYPE*> rhs) noexcept {  /* NOLINT */      \
+  void set_data_ref(gsl::not_null<VECTYPE*> rhs) noexcept { /* NOLINT */       \
     set_data_ref(rhs->data(), rhs->size());                                    \
   }                                                                            \
   void set_data_ref(double* start, size_t size) noexcept {                     \
@@ -131,7 +131,7 @@ class VECTYPE   /* NOLINT */                                                   \
                                                                                \
   /** Serialization for Charm++ */                                             \
   /* clang-tidy: google-runtime-references */                                  \
-  void pup(PUP::er& p) noexcept;  /* NOLINT */                                 \
+  void pup(PUP::er& p) noexcept; /* NOLINT */                                  \
                                                                                \
  private:                                                                      \
   SPECTRE_ALWAYS_INLINE void reset_pointer_vector() noexcept {                 \
@@ -168,26 +168,26 @@ bool operator!=(const VECTYPE& lhs, const VECTYPE& rhs) noexcept; /* NOLINT */
 #define MAKE_EXPRESSION_VECMATH_OP_COMP_DV(VECTYPE)               \
 /* Used for comparing VECTYPE to an expression */                 \
 template <typename VT, bool VF>                                   \
-bool operator==(const VECTYPE& lhs,  /* NOLINT */                 \
+bool operator==(const VECTYPE& lhs, /* NOLINT */                  \
                 const blaze::DenseVector<VT, VF>& rhs) noexcept { \
-  return lhs == VECTYPE(rhs);        /* NOLINT */                 \
+  return lhs == VECTYPE(rhs); /* NOLINT */                        \
 }                                                                 \
                                                                   \
 template <typename VT, bool VF>                                   \
-bool operator!=(const VECTYPE& lhs,   /* NOLINT */                \
+bool operator!=(const VECTYPE& lhs, /* NOLINT */                  \
                 const blaze::DenseVector<VT, VF>& rhs) noexcept { \
   return not(lhs == rhs);                                         \
 }                                                                 \
                                                                   \
 template <typename VT, bool VF>                                   \
 bool operator==(const blaze::DenseVector<VT, VF>& lhs,            \
-                const VECTYPE& rhs) noexcept {   /* NOLINT */     \
-  return VECTYPE(lhs) == rhs;                    /* NOLINT */     \
+                const VECTYPE& rhs) noexcept { /* NOLINT */       \
+  return VECTYPE(lhs) == rhs; /* NOLINT */                        \
 }                                                                 \
                                                                   \
 template <typename VT, bool VF>                                   \
 bool operator!=(const blaze::DenseVector<VT, VF>& lhs,            \
-                const VECTYPE& rhs) noexcept {   /* NOLINT */     \
+                const VECTYPE& rhs) noexcept { /* NOLINT */       \
   return not(lhs == rhs);                                         \
 }
 /// \endcond
@@ -199,65 +199,65 @@ bool operator!=(const blaze::DenseVector<VT, VF>& lhs,            \
 #define MAKE_EXPRESSION_VECMATH_SPECIALIZE_BLAZE_ARITHMETIC_TRAITS(VECTYPE) \
 namespace blaze {                                                           \
 template <>                                                                 \
-struct IsVector<VECTYPE> : std::true_type {};   /* NOLINT */                \
+struct IsVector<VECTYPE> : std::true_type {}; /* NOLINT */                  \
                                                                             \
 template <>                                                                 \
-struct TransposeFlag<VECTYPE> : BoolConstant<   /* NOLINT */                \
-                VECTYPE::transpose_flag> {};    /* NOLINT */                \
+struct TransposeFlag<VECTYPE> : BoolConstant< /* NOLINT */                  \
+                VECTYPE::transpose_flag> {}; /* NOLINT */                   \
                                                                             \
 template <>                                                                 \
-struct AddTrait<VECTYPE, VECTYPE> {   /* NOLINT */                          \
-  using Type = VECTYPE;               /* NOLINT */                          \
+struct AddTrait<VECTYPE, VECTYPE> { /* NOLINT */                            \
+  using Type = VECTYPE; /* NOLINT */                                        \
 };                                                                          \
                                                                             \
 template <>                                                                 \
-struct AddTrait<VECTYPE, double> {    /* NOLINT */                          \
-  using Type = VECTYPE;               /* NOLINT */                          \
+struct AddTrait<VECTYPE, double> { /* NOLINT */                             \
+  using Type = VECTYPE; /* NOLINT */                                        \
 };                                                                          \
                                                                             \
 template <>                                                                 \
-struct AddTrait<double, VECTYPE> {    /* NOLINT */                          \
-  using Type = VECTYPE;               /* NOLINT */                          \
+struct AddTrait<double, VECTYPE> { /* NOLINT */                             \
+  using Type = VECTYPE; /* NOLINT */                                        \
 };                                                                          \
                                                                             \
 template <>                                                                 \
-struct SubTrait<VECTYPE, VECTYPE> {   /* NOLINT */                          \
-  using Type = VECTYPE;               /* NOLINT */                          \
+struct SubTrait<VECTYPE, VECTYPE> { /* NOLINT */                            \
+  using Type = VECTYPE; /* NOLINT */                                        \
 };                                                                          \
                                                                             \
 template <>                                                                 \
-struct SubTrait<VECTYPE, double> {    /* NOLINT */                          \
-  using Type = VECTYPE;               /* NOLINT */                          \
+struct SubTrait<VECTYPE, double> { /* NOLINT */                             \
+  using Type = VECTYPE; /* NOLINT */                                        \
 };                                                                          \
                                                                             \
 template <>                                                                 \
-struct SubTrait<double, VECTYPE> {    /* NOLINT */                          \
-  using Type = VECTYPE;               /* NOLINT */                          \
+struct SubTrait<double, VECTYPE> { /* NOLINT */                             \
+  using Type = VECTYPE; /* NOLINT */                                        \
 };                                                                          \
                                                                             \
 template <>                                                                 \
-struct MultTrait<VECTYPE, VECTYPE> {  /* NOLINT */                          \
-  using Type = VECTYPE;               /* NOLINT */                          \
+struct MultTrait<VECTYPE, VECTYPE> { /* NOLINT */                           \
+  using Type = VECTYPE; /* NOLINT */                                        \
 };                                                                          \
                                                                             \
 template <>                                                                 \
-struct MultTrait<VECTYPE, double> {   /* NOLINT */                          \
-  using Type = VECTYPE;               /* NOLINT */                          \
+struct MultTrait<VECTYPE, double> { /* NOLINT */                            \
+  using Type = VECTYPE; /* NOLINT */                                        \
 };                                                                          \
                                                                             \
 template <>                                                                 \
-struct MultTrait<double, VECTYPE> {   /* NOLINT */                          \
-  using Type = VECTYPE;               /* NOLINT */                          \
+struct MultTrait<double, VECTYPE> { /* NOLINT */                            \
+  using Type = VECTYPE; /* NOLINT */                                        \
 };                                                                          \
                                                                             \
 template <>                                                                 \
-struct DivTrait<VECTYPE, VECTYPE> {   /* NOLINT */                          \
-  using Type = VECTYPE;               /* NOLINT */                          \
+struct DivTrait<VECTYPE, VECTYPE> { /* NOLINT */                            \
+  using Type = VECTYPE; /* NOLINT */                                        \
 };                                                                          \
                                                                             \
 template <>                                                                 \
-struct DivTrait<VECTYPE, double> {    /* NOLINT */                          \
-  using Type = VECTYPE;               /* NOLINT */                          \
+struct DivTrait<VECTYPE, double> { /* NOLINT */                             \
+  using Type = VECTYPE; /* NOLINT */                                        \
 };                                                                          \
 } /* namespace blaze*/
 
@@ -268,13 +268,13 @@ struct DivTrait<VECTYPE, double> {    /* NOLINT */                          \
 #define MAKE_EXPRESSION_VECMATH_SPECIALIZE_BLAZE_MAP_TRAITS(VECTYPE) \
 namespace blaze {                                                    \
 template <typename Operator>                                         \
-struct UnaryMapTrait<VECTYPE, Operator> {  /* NOLINT */              \
-  using Type = VECTYPE;                    /* NOLINT */              \
+struct UnaryMapTrait<VECTYPE, Operator> { /* NOLINT */               \
+  using Type = VECTYPE; /* NOLINT */                                 \
 };                                                                   \
                                                                      \
 template <typename Operator>                                         \
 struct BinaryMapTrait<VECTYPE, VECTYPE, Operator> { /* NOLINT */     \
-  using Type = VECTYPE;                             /* NOLINT */     \
+  using Type = VECTYPE; /* NOLINT */                                 \
 };                                                                   \
 }  /* namespace blaze */
 
@@ -284,34 +284,34 @@ struct BinaryMapTrait<VECTYPE, VECTYPE, Operator> { /* NOLINT */     \
  */
 #define MAKE_EXPRESSION_VECMATH_OP_ADD_ARRAYS_OF_VEC(VECTYPE)                \
 template <typename T, size_t Dim>                                            \
-std::array<VECTYPE, Dim> operator+(                 /* NOLINT */             \
+std::array<VECTYPE, Dim> operator+( /* NOLINT */                             \
     const std::array<T, Dim>& lhs,                                           \
     const std::array<VECTYPE, Dim>& rhs) noexcept { /* NOLINT */             \
-  std::array<VECTYPE, Dim> result;                  /* NOLINT */             \
+  std::array<VECTYPE, Dim> result; /* NOLINT */                              \
   for (size_t i = 0; i < Dim; i++) {                                         \
     gsl::at(result, i) = gsl::at(lhs, i) + gsl::at(rhs, i);                  \
   }                                                                          \
   return result;                                                             \
 }                                                                            \
 template <typename U, size_t Dim>                                            \
-std::array<VECTYPE, Dim> operator+(       /* NOLINT */                       \
-    const std::array<VECTYPE, Dim>& lhs,  /* NOLINT */                       \
+std::array<VECTYPE, Dim> operator+( /* NOLINT */                             \
+    const std::array<VECTYPE, Dim>& lhs, /* NOLINT */                        \
     const std::array<U, Dim>& rhs) noexcept {                                \
   return rhs + lhs;                                                          \
 }                                                                            \
 template <size_t Dim>                                                        \
-std::array<VECTYPE, Dim> operator+(                 /* NOLINT */             \
-    const std::array<VECTYPE, Dim>& lhs,            /* NOLINT */             \
+std::array<VECTYPE, Dim> operator+( /* NOLINT */                             \
+    const std::array<VECTYPE, Dim>& lhs, /* NOLINT */                        \
     const std::array<VECTYPE, Dim>& rhs) noexcept { /* NOLINT */             \
-  std::array<VECTYPE, Dim> result;                  /* NOLINT */             \
+  std::array<VECTYPE, Dim> result; /* NOLINT */                              \
   for (size_t i = 0; i < Dim; i++) {                                         \
     gsl::at(result, i) = gsl::at(lhs, i) + gsl::at(rhs, i);                  \
   }                                                                          \
   return result;                                                             \
 }                                                                            \
 template <size_t Dim>                                                        \
-std::array<VECTYPE, Dim>& operator+=(               /* NOLINT */             \
-    std::array<VECTYPE, Dim>& lhs,                  /* NOLINT */             \
+std::array<VECTYPE, Dim>& operator+=( /* NOLINT */                           \
+    std::array<VECTYPE, Dim>& lhs, /* NOLINT */                              \
     const std::array<VECTYPE, Dim>& rhs) noexcept { /* NOLINT */             \
   for (size_t i = 0; i < Dim; i++) {                                         \
     gsl::at(lhs, i) += gsl::at(rhs, i);                                      \
@@ -324,38 +324,38 @@ std::array<VECTYPE, Dim>& operator+=(               /* NOLINT */             \
  */
 #define MAKE_EXPRESSION_VECMATH_OP_SUB_ARRAYS_OF_VEC(VECTYPE)                \
 template <typename T, size_t Dim>                                            \
-std::array<VECTYPE, Dim> operator-(                 /* NOLINT */             \
+std::array<VECTYPE, Dim> operator-( /* NOLINT */                             \
     const std::array<T, Dim>& lhs,                                           \
     const std::array<VECTYPE, Dim>& rhs) noexcept { /* NOLINT */             \
-  std::array<VECTYPE, Dim> result;                  /* NOLINT */             \
+  std::array<VECTYPE, Dim> result; /* NOLINT */                              \
   for (size_t i = 0; i < Dim; i++) {                                         \
     gsl::at(result, i) = gsl::at(lhs, i) - gsl::at(rhs, i);                  \
   }                                                                          \
   return result;                                                             \
 }                                                                            \
 template <typename U, size_t Dim>                                            \
-std::array<VECTYPE, Dim> operator-(       /* NOLINT */                       \
-    const std::array<VECTYPE, Dim>& lhs,  /* NOLINT */                       \
+std::array<VECTYPE, Dim> operator-( /* NOLINT */                             \
+    const std::array<VECTYPE, Dim>& lhs, /* NOLINT */                        \
     const std::array<U, Dim>& rhs) noexcept {                                \
-  std::array<VECTYPE, Dim> result;        /* NOLINT */                       \
+  std::array<VECTYPE, Dim> result; /* NOLINT */                              \
   for (size_t i = 0; i < Dim; i++) {                                         \
     gsl::at(result, i) = gsl::at(lhs, i) - gsl::at(rhs, i);                  \
   }                                                                          \
   return result;                                                             \
 }                                                                            \
 template <size_t Dim>                                                        \
-std::array<VECTYPE, Dim> operator-(                 /* NOLINT */             \
-    const std::array<VECTYPE, Dim>& lhs,            /* NOLINT */             \
+std::array<VECTYPE, Dim> operator-( /* NOLINT */                             \
+    const std::array<VECTYPE, Dim>& lhs, /* NOLINT */                        \
     const std::array<VECTYPE, Dim>& rhs) noexcept { /* NOLINT */             \
-  std::array<VECTYPE, Dim> result;                  /* NOLINT */             \
+  std::array<VECTYPE, Dim> result; /* NOLINT */                              \
   for (size_t i = 0; i < Dim; i++) {                                         \
     gsl::at(result, i) = gsl::at(lhs, i) - gsl::at(rhs, i);                  \
   }                                                                          \
   return result;                                                             \
 }                                                                            \
 template <size_t Dim>                                                        \
-std::array<VECTYPE, Dim>& operator-=(               /* NOLINT */             \
-    std::array<VECTYPE, Dim>& lhs,                  /* NOLINT */             \
+std::array<VECTYPE, Dim>& operator-=( /* NOLINT */                           \
+    std::array<VECTYPE, Dim>& lhs, /* NOLINT */                              \
     const std::array<VECTYPE, Dim>& rhs) noexcept { /* NOLINT */             \
   for (size_t i = 0; i < Dim; i++) {                                         \
     gsl::at(lhs, i) -= gsl::at(rhs, i);                                      \
@@ -369,22 +369,22 @@ std::array<VECTYPE, Dim>& operator-=(               /* NOLINT */             \
  * type VT::ResultType is not VECTYPE
  */
 #define MAKE_EXPRESSION_VEC_OP_ASSIGNMENT_RESTRICT_TYPE(VECTYPE)               \
-template <typename VT, bool VF>   /* NOLINTNEXTLINE */                         \
+template <typename VT, bool VF> /* NOLINTNEXTLINE */                         \
 VECTYPE::VECTYPE(const blaze::DenseVector<VT, VF>& expression) noexcept        \
     : owned_data_((~expression).size()) {                                      \
-  static_assert(cpp17::is_same_v<typename VT::ResultType, VECTYPE>,/* NOLINT */\
+  static_assert(cpp17::is_same_v<typename VT::ResultType,VECTYPE>, /* NOLINT */\
               "You are attempting to assign the result of an expression that " \
-              "is not a " #VECTYPE " to a " #VECTYPE ".");         /* NOLINT */\
+              "is not a " #VECTYPE " to a " #VECTYPE "."); /* NOLINT */        \
   reset_pointer_vector();                                                      \
   ~*this = expression;                                                         \
 }                                                                              \
                                                                                \
 template <typename VT, bool VF>                                                \
-VECTYPE& VECTYPE::operator=(                                       /* NOLINT */\
+VECTYPE& VECTYPE::operator=( /* NOLINT */                                      \
     const blaze::DenseVector<VT, VF>& expression) noexcept {                   \
-  static_assert(cpp17::is_same_v<typename VT::ResultType, VECTYPE>,/* NOLINT */\
+  static_assert(cpp17::is_same_v<typename VT::ResultType,VECTYPE>, /* NOLINT */\
               "You are attempting to assign the result of an expression that " \
-              "is not a " #VECTYPE " to a " #VECTYPE ".");         /* NOLINT */\
+              "is not a " #VECTYPE " to a " #VECTYPE "."); /* NOLINT */        \
   if (owning_ and (~expression).size() != size()) {                            \
     owned_data_.resize((~expression).size());                                  \
     reset_pointer_vector();                                                    \
@@ -403,10 +403,10 @@ namespace MakeWithValueImpls {                                              \
 /** \brief Returns a VECTYPE the same size as `input`, with each element */ \
 /** equal to `value`. */                                                    \
 template <>                                                                 \
-SPECTRE_ALWAYS_INLINE VECTYPE                                   /* NOLINT */\
-MakeWithValueImpl<VECTYPE, VECTYPE>::apply(const VECTYPE& input,/* NOLINT */\
+SPECTRE_ALWAYS_INLINE VECTYPE /* NOLINT */                                  \
+MakeWithValueImpl<VECTYPE,VECTYPE>::apply(const VECTYPE& input, /* NOLINT */\
                                            const double value) {            \
-  return VECTYPE(input.size(), value);                          /* NOLINT */\
+  return VECTYPE(input.size(), value); /* NOLINT */                         \
 }                                                                           \
 }  /* namespace MakeWithValueImpls*/
 
@@ -423,11 +423,11 @@ VECTYPE::VECTYPE(const size_t size, const double value) noexcept /* NOLINT */\
   reset_pointer_vector();                                                    \
 }                                                                            \
                                                                              \
-VECTYPE::VECTYPE(double* start, size_t size) noexcept            /* NOLINT */\
+VECTYPE::VECTYPE(double* start, size_t size) noexcept /* NOLINT */           \
     : BaseType(start, size), owned_data_(0), owning_(false) {}               \
                                                                              \
 template <class T, Requires<cpp17::is_same_v<T, double>>>                    \
-VECTYPE::VECTYPE(std::initializer_list<T> list) noexcept         /* NOLINT */\
+VECTYPE::VECTYPE(std::initializer_list<T> list) noexcept /* NOLINT */        \
     : owned_data_(std::move(list)) {                                         \
   reset_pointer_vector();                                                    \
 }
@@ -439,7 +439,7 @@ VECTYPE::VECTYPE(std::initializer_list<T> list) noexcept         /* NOLINT */\
 //             We reset the base class in reset_pointer_vector after calling its
 //             default constructor
 #define MAKE_EXPRESSION_VEC_DEF_CONSTRUCT_WITH_VEC(VECTYPE)                  \
-VECTYPE::VECTYPE(const VECTYPE& rhs) : BaseType{} {  /* NOLINT */            \
+VECTYPE::VECTYPE(const VECTYPE& rhs) : BaseType{} { /* NOLINT */             \
   if (rhs.is_owning()) {                                                     \
     owned_data_ = rhs.owned_data_;                                           \
   } else {                                                                   \
@@ -448,7 +448,7 @@ VECTYPE::VECTYPE(const VECTYPE& rhs) : BaseType{} {  /* NOLINT */            \
   reset_pointer_vector();                                                    \
 }                                                                            \
                                                                              \
-VECTYPE& VECTYPE::operator=(const VECTYPE& rhs) {  /* NOLINT */              \
+VECTYPE& VECTYPE::operator=(const VECTYPE& rhs) { /* NOLINT */               \
   if (this != &rhs) {                                                        \
     if (owning_) {                                                           \
       if (rhs.is_owning()) {                                                 \
@@ -466,7 +466,7 @@ VECTYPE& VECTYPE::operator=(const VECTYPE& rhs) {  /* NOLINT */              \
   return *this;                                                              \
 }                                                                            \
                                                                              \
-VECTYPE::VECTYPE(VECTYPE&& rhs) noexcept {  /* NOLINT */                     \
+VECTYPE::VECTYPE(VECTYPE&& rhs) noexcept { /* NOLINT */                      \
   owned_data_ = std::move(rhs.owned_data_);                                  \
   ~*this = ~rhs;  /* PointerVector is trivially copyable */                  \
   owning_ = rhs.owning_;                                                     \
@@ -475,7 +475,7 @@ VECTYPE::VECTYPE(VECTYPE&& rhs) noexcept {  /* NOLINT */                     \
   rhs.reset();                                                               \
 }                                                                            \
                                                                              \
-VECTYPE& VECTYPE::operator=(VECTYPE&& rhs) noexcept {  /* NOLINT */          \
+VECTYPE& VECTYPE::operator=(VECTYPE&& rhs) noexcept { /* NOLINT */           \
   if (this != &rhs) {                                                        \
     if (owning_) {                                                           \
       owned_data_ = std::move(rhs.owned_data_);                              \
@@ -497,7 +497,7 @@ VECTYPE& VECTYPE::operator=(VECTYPE&& rhs) noexcept {  /* NOLINT */          \
  * Charm++ packing / unpacking of object
  */
 #define MAKE_EXPRESSION_VEC_OP_PUP_CHARM(VECTYPE)       \
-void VECTYPE::pup(PUP::er& p) noexcept {  /* NOLINT */  \
+void VECTYPE::pup(PUP::er& p) noexcept { /* NOLINT */   \
   auto my_size = size();                                \
   p | my_size;                                          \
   if (my_size > 0) {                                    \
@@ -517,7 +517,7 @@ void VECTYPE::pup(PUP::er& p) noexcept {  /* NOLINT */  \
  */
 #define MAKE_EXPRESSION_VECMATH_OP_DEF_COMP_SELF(VECTYPE)                      \
 /** Left-shift operator for VECTYPE */                                         \
-std::ostream& operator<<(std::ostream& os, const VECTYPE& d) {     /* NOLINT */\
+std::ostream& operator<<(std::ostream& os, const VECTYPE& d) { /* NOLINT */    \
   /* This function is inside the detail namespace StdHelpers.hpp */            \
   StdHelpers_detail::print_helper(os, d.begin(), d.end());                     \
   return os;                                                                   \
