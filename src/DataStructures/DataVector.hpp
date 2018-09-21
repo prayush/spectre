@@ -8,7 +8,7 @@
 
 #include <array>                // IWYU pragma: keep
 #include <cmath>
-#include <cstddef>
+#include <cstddef>              // IWYU pragma: keep
 #include <functional>  // for std::reference_wrapper
 #include <initializer_list>     // IWYU pragma: keep
 #include <limits>               // IWYU pragma: keep
@@ -28,8 +28,9 @@
 /// \cond HIDDEN_SYMBOLS
 // IWYU pragma: no_forward_declare ConstantExpressions_detail::pow
 namespace PUP {  // IWYU pragma: keep
-class er;
-}  // namespace PUP
+class er;        // IWYU pragma: keep
+}                // IWYU pragma: keep
+// namespace PUP
 
 // clang-tidy: no using declarations in header files
 //             We want the std::abs to be used
