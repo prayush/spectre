@@ -12,6 +12,7 @@
 
 #include "DataStructures/DataBox/Prefixes.hpp" // IWYU pragma: keep
 #include "DataStructures/DataVector.hpp"
+#include "DataStructures/Tensor/EagerMath/DeterminantAndInverse.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "Domain/CoordinateMaps/Affine.hpp"
 #include "Domain/CoordinateMaps/CoordinateMap.hpp"
@@ -25,10 +26,13 @@
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "Utilities/ConstantExpressions.hpp"
 #include "Utilities/Gsl.hpp"
+#include "Utilities/MakeWithValue.hpp"
 #include "Utilities/TaggedTuple.hpp"
 #include "tests/Unit/Pypp/CheckWithRandomValues.hpp"
 #include "tests/Unit/Pypp/SetupLocalPythonEnvironment.hpp"
 #include "tests/Utilities/MakeWithRandomValues.hpp"
+
+// IWYU pragma: no_forward_declare Tensor
 
 namespace {
 template <size_t Dim, typename DataType>
@@ -139,6 +143,29 @@ void test_lapse_deriv_functions(const DataVector& used_for_size) noexcept {
       &::GeneralizedHarmonic::time_deriv_of_lapse<SpatialDim, Frame, DataType>),
       "TestFunctions", "dt_lapse",
       {{{std::numeric_limits<double>::denorm_min(), 10.}}}, used_for_size);
+
+template <typename DataType, size_t SpatialDim, typename Frame>
+void test_gij_deriv_functions(const DataVector& used_for_size) noexcept {
+  // time_deriv_of_spatial_metric
+  pypp::check_with_random_values<1>(
+      static_cast<tnsr::ii<DataType, SpatialDim, Frame> (*)(
+        const Scalar<DataType>&,
+        const tnsr::I<DataType, SpatialDim, Frame>&,
+        const tnsr::iaa<DataType, SpatialDim, Frame>&,
+        const tnsr::aa<DataType, SpatialDim, Frame>&)>(
+          &::GeneralizedHarmonic::time_deriv_of_spatial_metric<SpatialDim,
+          Frame, DataType>), "TestFunctions", "dt_spatial_metric",
+      {{{std::numeric_limits<double>::denorm_min(), 10.0}}}, used_for_size);
+  // spacetime_deriv_of_det_spatial_metric
+  pypp::check_with_random_values<1>(
+      static_cast<tnsr::a<DataType, SpatialDim, Frame> (*)(
+        const Scalar<DataType>&,
+        const tnsr::II<DataType, SpatialDim, Frame>&,
+        const tnsr::ii<DataType, SpatialDim, Frame>&,
+        const tnsr::iaa<DataType, SpatialDim, Frame>&)>(
+          &::GeneralizedHarmonic::spacetime_deriv_of_det_spatial_metric<
+          SpatialDim, Frame, DataType>), "TestFunctions","spacetime_deriv_detg",
+      {{{std::numeric_limits<double>::denorm_min(), 10.0}}}, used_for_size);
 }
 
 // Test computation of derivs of lapse by comparing to Kerr-Schild
@@ -203,6 +230,113 @@ void test_lapse_deriv_functions_analytic(
   CHECK_ITERABLE_APPROX(dt_lapse, d0_lapse_from_func);
   CHECK_ITERABLE_APPROX(d_lapse, d_lapse_from_func);
 }
+
+// Test computation of derivs of spatial metric by comparing to Kerr-Schild
+template <typename Solution>
+void test_gij_deriv_functions_analytic(
+    const Solution& solution, const size_t grid_size_each_dimension,
+    const std::array<double, 3>& lower_bound,
+    const std::array<double, 3>& upper_bound) noexcept {
+  // Setup grid
+  const size_t SpatialDim = 3;
+  const size_t data_size = pow<SpatialDim>(grid_size_each_dimension);
+  Mesh<SpatialDim> mesh{grid_size_each_dimension, Spectral::Basis::Legendre,
+               Spectral::Quadrature::GaussLobatto};
+   using Affine = CoordinateMaps::Affine;
+  using Affine3D = CoordinateMaps::ProductOf3Maps<Affine, Affine, Affine>;
+  const auto coord_map =
+      make_coordinate_map<Frame::Logical, Frame::Inertial>(Affine3D{
+          Affine{-1., 1., lower_bound[0], upper_bound[0]},
+          Affine{-1., 1., lower_bound[1], upper_bound[1]},
+          Affine{-1., 1., lower_bound[2], upper_bound[2]},
+      });
+   // Setup coordinates
+  const auto x_logical = logical_coordinates(mesh);
+  const auto x = coord_map(x_logical);
+  // Arbitrary time for time-independent solution.
+  const double t = std::numeric_limits<double>::signaling_NaN();
+   // Evaluate analytic solution
+  const auto vars =
+      solution.variables(x, t, typename Solution::template tags<DataVector>{});
+  const auto& lapse = get<gr::Tags::Lapse<>>(vars);
+  const auto& dt_lapse = get<Tags::dt<gr::Tags::Lapse<>>>(vars);
+  const auto& d_lapse =
+      get<typename Solution::template DerivLapse<DataVector>>(vars);
+  const auto& shift = get<gr::Tags::Shift<SpatialDim>>(vars);
+  const auto& d_shift =
+      get<typename Solution::template DerivShift<DataVector>>(vars);
+  const auto& dt_shift = get<Tags::dt<gr::Tags::Shift<SpatialDim>>>(vars);
+  const auto& spatial_metric = get<gr::Tags::SpatialMetric<SpatialDim>>(vars);
+  const auto& dt_spatial_metric =
+      get<Tags::dt<gr::Tags::SpatialMetric<SpatialDim>>>(vars);
+  const auto& d_spatial_metric =
+      get<typename Solution::template DerivSpatialMetric<DataVector>>(vars);
+   // Get ingredients
+  const auto& inverse_spatial_metric =
+      determinant_and_inverse(spatial_metric).second;
+  const auto& det_spatial_metric =
+      determinant_and_inverse(spatial_metric).first;
+  const auto& phi = GeneralizedHarmonic::phi(lapse, d_lapse, shift, d_shift,
+    spatial_metric, d_spatial_metric);
+  const auto& pi = GeneralizedHarmonic::pi(lapse, dt_lapse, shift, dt_shift,
+    spatial_metric, dt_spatial_metric, phi);
+  const auto& normal_vector = gr::spacetime_normal_vector(lapse, shift);
+  const auto& gamma_1 = make_with_value<Scalar<DataVector>>(x, 0.1);
+  auto d_spacetime_metric =
+    make_with_value<tnsr::iaa<DataVector, SpatialDim, Frame::Inertial>>(x, 0.);
+  for (size_t i = 0; i < SpatialDim; ++i) {
+    for (size_t j = 0; j < SpatialDim; ++j) {
+      for (size_t k = 0; k < SpatialDim; ++k) {
+        d_spacetime_metric.get(i, 1 + j, 1 + k) = d_spatial_metric.get(i, j, k);
+        // \partial_i \psi_{0j} = \partial_i N_j
+        d_spacetime_metric.get(i, 0, 1 + j) +=
+          spatial_metric.get(j, k) * d_shift.get(i, k) +
+          shift.get(k) * d_spatial_metric.get(i, j, k);
+        // \partial_i \psi_{00} = -2 N \partial_i N + \partial_i (norm_of_shift)
+        d_spacetime_metric.get(i, 0, 0) +=
+          (-2. * get(lapse)) * d_lapse.get(i) +
+          shift.get(j) * shift.get(k) * d_spatial_metric.get(i, j, k) +
+          2. * spatial_metric.get(j, k) * d_shift.get(i, j) * shift.get(k);
+      }
+    }
+  }
+  // Get spacetime deriv of Det[g]
+  auto d4_g =
+    make_with_value<tnsr::a<DataVector, SpatialDim, Frame::Inertial>>(x, 0.);
+  const Scalar<DataVector>
+    sqrt_det_spatial_metric{sqrt(get(det_spatial_metric))};
+  // \f$ \partial_0 g = g g^{jk} \partial_0 g_{jk}\f$
+  for (size_t j = 0; j < SpatialDim; ++j) {
+    for (size_t k = 0; k < SpatialDim; ++k) {
+      get<0>(d4_g) +=
+        inverse_spatial_metric.get(j, k) * dt_spatial_metric.get(j, k);
+    }
+  }
+  get<0>(d4_g) *= get(det_spatial_metric);
+  // \f$ \partial_i g = g g^{jk} \partial_i g_{jk}\f$
+  for (size_t i = 0; i < SpatialDim; ++i) {
+    for (size_t j = 0; j < SpatialDim; ++j) {
+      for (size_t k = 0; k < SpatialDim; ++k) {
+        d4_g.get(1 + i) +=
+          inverse_spatial_metric.get(j, k) * d_spatial_metric.get(i, j, k);
+      }
+    }
+    d4_g.get(1 + i) *= get(det_spatial_metric);
+  }
+  // Check that locally computed derivs match returned ones
+  const auto& d0_gij_from_func =
+    GeneralizedHarmonic::time_deriv_of_spatial_metric<SpatialDim,
+      Frame::Inertial, DataVector>(lapse, shift, phi, pi);
+   const auto& d_gij_from_func = GeneralizedHarmonic::deriv_spatial_metric<
+    SpatialDim, Frame::Inertial, DataVector>(phi);
+   const auto& d4_g_from_func =
+    GeneralizedHarmonic::spacetime_deriv_of_det_spatial_metric<SpatialDim,
+      Frame::Inertial, DataVector>(sqrt_det_spatial_metric,
+        inverse_spatial_metric, dt_spatial_metric, phi);
+   CHECK_ITERABLE_APPROX(dt_spatial_metric, d0_gij_from_func);
+  CHECK_ITERABLE_APPROX(d_spatial_metric, d_gij_from_func);
+  CHECK_ITERABLE_APPROX(d4_g, d4_g_from_func);
+}
 }  // namespace
 
 SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GeneralRelativity.GhQuantities",
@@ -225,6 +359,13 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GeneralRelativity.GhQuantities",
   test_lapse_deriv_functions<DataVector, 2, Frame::Inertial>(used_for_size);
   test_lapse_deriv_functions<DataVector, 3, Frame::Inertial>(used_for_size);
 
+  test_gij_deriv_functions<DataVector, 1, Frame::Grid>(used_for_size);
+  test_gij_deriv_functions<DataVector, 2, Frame::Grid>(used_for_size);
+  test_gij_deriv_functions<DataVector, 3, Frame::Grid>(used_for_size);
+  test_gij_deriv_functions<DataVector, 1, Frame::Inertial>(used_for_size);
+  test_gij_deriv_functions<DataVector, 2, Frame::Inertial>(used_for_size);
+  test_gij_deriv_functions<DataVector, 3, Frame::Inertial>(used_for_size);
+
   const double mass = 2.;
   const std::array<double, 3> spin{{0.3, 0.5, 0.2}};
   const std::array<double, 3> center{{0.2, 0.3, 0.4}};
@@ -235,5 +376,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GeneralRelativity.GhQuantities",
   const std::array<double, 3> upper_bound{{0.8, 1.22, 1.30}};
 
   test_lapse_deriv_functions_analytic(solution, grid_size, lower_bound,
+    upper_bound);
+  test_gij_deriv_functions_analytic(solution, grid_size, lower_bound,
     upper_bound);
 }
