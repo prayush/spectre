@@ -21,7 +21,7 @@ tnsr::iaa<DataType, SpatialDim, Frame> phi(
   tnsr::iaa<DataType, SpatialDim, Frame> phi(
       make_with_value<DataType>(deriv_lapse, 0.));
   for (size_t k = 0; k < SpatialDim; ++k) {
-    phi.get(k, 0, 0) = -2. * lapse.get() * deriv_lapse.get(k);
+    phi.get(k, 0, 0) = -2. * get(lapse) * deriv_lapse.get(k);
     for (size_t m = 0; m < SpatialDim; ++m) {
       for (size_t n = 0; n < SpatialDim; ++n) {
         phi.get(k, 0, 0) +=
@@ -56,11 +56,11 @@ tnsr::aa<DataType, SpatialDim, Frame> pi(
   tnsr::aa<DataType, SpatialDim, Frame> pi{
       make_with_value<DataType>(lapse, 0.)};
 
-  pi.get(0, 0) = -2. * lapse.get() * dt_lapse.get();
+  get<0,0>(pi) = -2. * get(lapse) * get(dt_lapse);
 
   for (size_t m = 0; m < SpatialDim; ++m) {
     for (size_t n = 0; n < SpatialDim; ++n) {
-      pi.get(0, 0) +=
+      get<0,0>(pi) +=
           dt_spatial_metric.get(m, n) * shift.get(m) * shift.get(n) +
           2. * spatial_metric.get(m, n) * shift.get(m) * dt_shift.get(n);
     }
@@ -80,7 +80,7 @@ tnsr::aa<DataType, SpatialDim, Frame> pi(
       for (size_t i = 0; i < SpatialDim; ++i) {
         pi.get(mu, nu) -= shift.get(i) * phi.get(i, mu, nu);
       }
-      pi.get(mu, nu) /= -lapse.get();
+      pi.get(mu, nu) /= -get(lapse);
     }
   }
   return pi;
@@ -209,6 +209,56 @@ Scalar<DataType> time_deriv_of_lapse(
   return dt_lapse;
 }
 
+template <size_t SpatialDim, typename Frame, typename DataType>
+tnsr::ii<DataType, SpatialDim, Frame> time_deriv_of_spatial_metric(
+    const Scalar<DataType>& lapse,
+    const tnsr::I<DataType, SpatialDim, Frame>& shift,
+    const tnsr::iaa<DataType, SpatialDim, Frame>& phi,
+    const tnsr::aa<DataType, SpatialDim, Frame>& pi) noexcept {
+  auto dt_spatial_metric =
+    make_with_value<tnsr::ii<DataType, SpatialDim, Frame>>(get(lapse), 0.);
+  for (size_t i = 0; i < SpatialDim; ++i) {
+    for (size_t j = i; j < SpatialDim; ++j) {
+      dt_spatial_metric.get(i, j) = -get(lapse) * pi.get(i + 1, j + 1);
+      for (size_t k = 0; k < SpatialDim; ++k) {
+        dt_spatial_metric.get(i, j) += shift.get(k) * phi.get(k, i + 1, j + 1);
+      }
+    }
+  }
+  return dt_spatial_metric;
+}
+
+template <size_t SpatialDim, typename Frame, typename DataType>
+tnsr::a<DataType, SpatialDim, Frame> spacetime_deriv_of_det_spatial_metric(
+    const Scalar<DataType>& sqrt_det_spatial_metric,
+    const tnsr::II<DataType, SpatialDim, Frame>& inverse_spatial_metric,
+    const tnsr::ii<DataType, SpatialDim, Frame>& dt_spatial_metric,
+    const tnsr::iaa<DataType, SpatialDim, Frame>& phi) noexcept {
+  auto d4_det_spatial_metric = make_with_value<tnsr::a<DataType,
+      SpatialDim, Frame>>(get(sqrt_det_spatial_metric), 0.);
+  const auto deriv_of_g = deriv_spatial_metric(phi);
+  const auto det_spatial_metric = square(get(sqrt_det_spatial_metric));
+  // \f$ \partial_0 g = g g^{jk} \partial_0 g_{jk}\f$
+  for (size_t j = 0; j < SpatialDim; ++j) {
+    for (size_t k = 0; k < SpatialDim; ++k) {
+      get<0>(d4_det_spatial_metric) += inverse_spatial_metric.get(j, k)
+        * dt_spatial_metric.get(j, k);
+    }
+  }
+  get<0>(d4_det_spatial_metric) *= det_spatial_metric;
+  // \f$ \partial_i g = g g^{jk} \partial_i g_{jk}\f$
+  for (size_t i = 0; i < SpatialDim; ++i) {
+    for (size_t j = 0; j < SpatialDim; ++j) {
+      for (size_t k = 0; k < SpatialDim; ++k) {
+        d4_det_spatial_metric.get(i + 1) += inverse_spatial_metric.get(j, k)
+          * deriv_of_g.get(i, j, k);
+      }
+    }
+    d4_det_spatial_metric.get(i + 1) *= det_spatial_metric;
+  }
+  return d4_det_spatial_metric;
+}
+
 }  // namespace GeneralizedHarmonic
 
 /// \cond
@@ -256,6 +306,19 @@ Scalar<DataType> time_deriv_of_lapse(
         spacetime_unit_normal,                                                \
       const tnsr::iaa<DTYPE(data), DIM(data), FRAME(data)>& phi,              \
       const tnsr::aa<DTYPE(data), DIM(data), FRAME(data)>& pi) noexcept;      \
+  template tnsr::ii<DTYPE(data), DIM(data), FRAME(data)>                      \
+  GeneralizedHarmonic::time_deriv_of_spatial_metric(                          \
+      const Scalar<DTYPE(data)>& lapse,                                       \
+      const tnsr::I<DTYPE(data), DIM(data), FRAME(data)>& shift,              \
+      const tnsr::iaa<DTYPE(data), DIM(data), FRAME(data)>& phi,              \
+      const tnsr::aa<DTYPE(data), DIM(data), FRAME(data)>& pi) noexcept;      \
+  template tnsr::a<DTYPE(data), DIM(data), FRAME(data)>                       \
+  GeneralizedHarmonic::spacetime_deriv_of_det_spatial_metric(                 \
+      const Scalar<DTYPE(data)>& det_spatial_metric,                          \
+      const tnsr::II<DTYPE(data), DIM(data), FRAME(data)>&                    \
+        inverse_spatial_metric,                                               \
+      const tnsr::ii<DTYPE(data), DIM(data), FRAME(data)>& dt_spatial_metric, \
+      const tnsr::iaa<DTYPE(data), DIM(data), FRAME(data)>& phi) noexcept;    \
   template tnsr::a<DTYPE(data), DIM(data), FRAME(data)>                       \
   GeneralizedHarmonic::gauge_source(                                          \
       const Scalar<DTYPE(data)>& lapse, const Scalar<DTYPE(data)>& dt_lapse,  \
