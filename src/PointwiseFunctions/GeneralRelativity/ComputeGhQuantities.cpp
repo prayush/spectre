@@ -4,18 +4,13 @@
 #include "PointwiseFunctions/GeneralRelativity/ComputeGhQuantities.hpp"
 
 #include "DataStructures/Tensor/EagerMath/DeterminantAndInverse.hpp"
-#include "DataStructures/Variables.hpp"
+#include "DataStructures/Tensor/Tensor.hpp"
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "Utilities/ConstantExpressions.hpp"
 #include "Utilities/ContainerHelpers.hpp"
 #include "Utilities/GenerateInstantiations.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/MakeWithValue.hpp"
-#include "Utilities/TMPL.hpp"
-
-/// \cond
-class DataVector;
-/// \endcond
 
 namespace GeneralizedHarmonic {
 template <size_t SpatialDim, typename Frame, typename DataType>
