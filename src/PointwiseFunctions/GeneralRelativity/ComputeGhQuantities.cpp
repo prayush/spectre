@@ -5,6 +5,7 @@
 
 #include "DataStructures/Tensor/EagerMath/DeterminantAndInverse.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
+#include "DataStructures/Variables.hpp"
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "Utilities/ConstantExpressions.hpp"
 #include "Utilities/ContainerHelpers.hpp"
@@ -309,6 +310,43 @@ tnsr::I<DataType, SpatialDim, Frame> time_deriv_of_shift(
   return dt_shift;
 }
 
+namespace {
+template <size_t SpatialDim, typename Frame, typename DataType>
+struct D0LowerShiftBuffer;
+
+template <size_t SpatialDim, typename Frame>
+struct D0LowerShiftBuffer<SpatialDim, Frame, double> {
+  explicit D0LowerShiftBuffer(const size_t /*size*/) noexcept {}
+
+  tnsr::II<double, SpatialDim, Frame> inverse_spatial_metric{};
+  tnsr::I<double, SpatialDim, Frame> dt_shift{};
+  tnsr::ii<double, SpatialDim, Frame> dt_spatial_metric{};
+};
+
+template <size_t SpatialDim, typename Frame>
+struct D0LowerShiftBuffer<SpatialDim, Frame, DataVector> {
+ private:
+  // We make one giant allocation so that we don't thrash the heap.
+  Variables<tmpl::list<::Tags::TempII<0, SpatialDim, Frame, DataVector>,
+                       ::Tags::TempI<1, SpatialDim, Frame, DataVector>,
+                       ::Tags::Tempii<2, SpatialDim, Frame, DataVector>>>
+      buffer_;
+
+ public:
+  explicit D0LowerShiftBuffer(const size_t size) noexcept
+      : buffer_(size),
+        inverse_spatial_metric(
+            get<::Tags::TempII<0, SpatialDim, Frame, DataVector>>(buffer_)),
+        dt_shift(get<::Tags::TempI<1, SpatialDim, Frame, DataVector>>(buffer_)),
+        dt_spatial_metric(
+            get<::Tags::Tempii<2, SpatialDim, Frame, DataVector>>(buffer_)) {}
+
+  tnsr::II<DataVector, SpatialDim, Frame>& inverse_spatial_metric;
+  tnsr::I<DataVector, SpatialDim, Frame>& dt_shift;
+  tnsr::ii<DataVector, SpatialDim, Frame>& dt_spatial_metric;
+};
+}  // namespace
+
 template <size_t SpatialDim, typename Frame, typename DataType>
 void time_deriv_of_lower_shift(
     const gsl::not_null<tnsr::i<DataType, SpatialDim, Frame>*> dt_lower_shift,
@@ -321,30 +359,36 @@ void time_deriv_of_lower_shift(
   if (UNLIKELY(get_size(get<0>(*dt_lower_shift)) != get_size(get(lapse)))) {
     *dt_lower_shift = tnsr::i<DataType, SpatialDim, Frame>(get(lapse));
   }
+  // Use a Variables to reduce total number of allocations. This is especially
+  // important in a multithreaded environment.
+  D0LowerShiftBuffer<SpatialDim, Frame, DataType> buffer(get_size(get(lapse)));
   // get \partial_0 N^j
-  auto inverse_spatial_metric = determinant_and_inverse(spatial_metric).second;
-  auto dt_shift = time_deriv_of_shift<SpatialDim, Frame, DataType>(
-      lapse, shift, inverse_spatial_metric, spacetime_unit_normal, phi, pi);
+  buffer.inverse_spatial_metric =
+      determinant_and_inverse(spatial_metric).second;
+  time_deriv_of_shift<SpatialDim, Frame, DataType>(
+      make_not_null(&buffer.dt_shift), lapse, shift,
+      buffer.inverse_spatial_metric, spacetime_unit_normal, phi, pi);
   // Following code (till the end of next loop) to be replaced with:
-  // auto dt_spatial_metric =
   //  GeneralizedHarmonic::time_deriv_of_spatial_metric<SpatialDim, Frame,
-  //    DataType>(lapse, shift, phi, pi);
-  tnsr::ii<DataType, SpatialDim, Frame> dt_spatial_metric(get(lapse));
+  //    DataType>(make_not_null(&buffer.dt_spatial_metric),
+  //              lapse, shift, phi, pi);
   for (size_t i = 0; i < SpatialDim; ++i) {
     for (size_t j = i; j < SpatialDim; ++j) {
-      dt_spatial_metric.get(i, j) = -get(lapse) * pi.get(i + 1, j + 1);
+      buffer.dt_spatial_metric.get(i, j) = -get(lapse) * pi.get(i + 1, j + 1);
       for (size_t k = 0; k < SpatialDim; ++k) {
-        dt_spatial_metric.get(i, j) += shift.get(k) * phi.get(k, i + 1, j + 1);
+        buffer.dt_spatial_metric.get(i, j) +=
+            shift.get(k) * phi.get(k, i + 1, j + 1);
       }
     }
   }
   for (size_t i = 0; i < SpatialDim; ++i) {
-    dt_lower_shift->get(i) = spatial_metric.get(i, 0) * dt_shift.get(0) +
-                             shift.get(0) * dt_spatial_metric.get(i, 0);
+    dt_lower_shift->get(i) = spatial_metric.get(i, 0) * buffer.dt_shift.get(0) +
+                             shift.get(0) * buffer.dt_spatial_metric.get(i, 0);
     for (size_t j = 0; j < SpatialDim; ++j) {
       if (j != 0) {
-        dt_lower_shift->get(i) += spatial_metric.get(i, j) * dt_shift.get(j) +
-                                  shift.get(j) * dt_spatial_metric.get(i, j);
+        dt_lower_shift->get(i) +=
+            spatial_metric.get(i, j) * buffer.dt_shift.get(j) +
+            shift.get(j) * buffer.dt_spatial_metric.get(i, j);
       }
     }
   }
@@ -365,6 +409,49 @@ tnsr::i<DataType, SpatialDim, Frame> time_deriv_of_lower_shift(
   return dt_lower_shift;
 }
 
+namespace {
+template <size_t SpatialDim, typename Frame, typename DataType>
+struct D4NormOfShiftBuffer;
+
+template <size_t SpatialDim, typename Frame>
+struct D4NormOfShiftBuffer<SpatialDim, Frame, double> {
+  explicit D4NormOfShiftBuffer(const size_t /*size*/) noexcept {}
+
+  tnsr::i<double, SpatialDim, Frame> lower_shift{};
+  tnsr::iJ<double, SpatialDim, Frame> deriv_shift{};
+  tnsr::i<double, SpatialDim, Frame> dt_lower_shift{};
+  tnsr::I<double, SpatialDim, Frame> dt_shift{};
+};
+
+template <size_t SpatialDim, typename Frame>
+struct D4NormOfShiftBuffer<SpatialDim, Frame, DataVector> {
+ private:
+  // We make one giant allocation so that we don't thrash the heap.
+  Variables<tmpl::list<::Tags::Tempi<0, SpatialDim, Frame, DataVector>,
+                       ::Tags::TempiJ<1, SpatialDim, Frame, DataVector>,
+                       ::Tags::Tempi<2, SpatialDim, Frame, DataVector>,
+                       ::Tags::TempI<3, SpatialDim, Frame, DataVector>>>
+      buffer_;
+
+ public:
+  explicit D4NormOfShiftBuffer(const size_t size) noexcept
+      : buffer_(size),
+        lower_shift(
+            get<::Tags::Tempi<0, SpatialDim, Frame, DataVector>>(buffer_)),
+        deriv_shift(
+            get<::Tags::TempiJ<1, SpatialDim, Frame, DataVector>>(buffer_)),
+        dt_lower_shift(
+            get<::Tags::Tempi<2, SpatialDim, Frame, DataVector>>(buffer_)),
+        dt_shift(
+            get<::Tags::TempI<3, SpatialDim, Frame, DataVector>>(buffer_)) {}
+
+  tnsr::i<DataVector, SpatialDim, Frame>& lower_shift;
+  tnsr::iJ<DataVector, SpatialDim, Frame>& deriv_shift;
+  tnsr::i<DataVector, SpatialDim, Frame>& dt_lower_shift;
+  tnsr::I<DataVector, SpatialDim, Frame>& dt_shift;
+};
+}  // namespace
+
 template <size_t SpatialDim, typename Frame, typename DataType>
 void spacetime_deriv_of_norm_of_shift(
     const gsl::not_null<tnsr::a<DataType, SpatialDim, Frame>*> d4_norm_of_shift,
@@ -379,28 +466,36 @@ void spacetime_deriv_of_norm_of_shift(
   if (UNLIKELY(get_size(get<0>(*d4_norm_of_shift)) != get_size(get(lapse)))) {
     *d4_norm_of_shift = tnsr::a<DataType, SpatialDim, Frame>(get(lapse));
   }
-  auto lower_shift = raise_or_lower_index(shift, spatial_metric);
-  auto deriv_shift = spatial_deriv_of_shift(lapse, inverse_spacetime_metric,
-                                            spacetime_unit_normal, phi);
-  auto dt_lower_shift = time_deriv_of_lower_shift(
-      lapse, shift, spatial_metric, spacetime_unit_normal, phi, pi);
-  auto dt_shift = time_deriv_of_shift(lapse, shift, inverse_spatial_metric,
-                                      spacetime_unit_normal, phi, pi);
+  // Use a Variables to reduce total number of allocations. This is especially
+  // important in a multithreaded environment.
+  D4NormOfShiftBuffer<SpatialDim, Frame, DataType> buffer(get_size(get(lapse)));
+
+  raise_or_lower_index(make_not_null(&buffer.lower_shift), shift,
+                       spatial_metric);
+  spatial_deriv_of_shift(make_not_null(&buffer.deriv_shift), lapse,
+                         inverse_spacetime_metric, spacetime_unit_normal, phi);
+  time_deriv_of_lower_shift(make_not_null(&buffer.dt_lower_shift), lapse, shift,
+                            spatial_metric, spacetime_unit_normal, phi, pi);
+  time_deriv_of_shift(make_not_null(&buffer.dt_shift), lapse, shift,
+                      inverse_spatial_metric, spacetime_unit_normal, phi, pi);
   // first term for component 0
-  get<0>(*d4_norm_of_shift) = shift.get(0) * dt_lower_shift.get(0) +
-                              lower_shift.get(0) * dt_shift.get(0);
+  get<0>(*d4_norm_of_shift) =
+      shift.get(0) * buffer.dt_lower_shift.get(0) +
+      buffer.lower_shift.get(0) * buffer.dt_shift.get(0);
   for (size_t i = 1; i < SpatialDim; ++i) {
-    get<0>(*d4_norm_of_shift) += shift.get(i) * dt_lower_shift.get(i) +
-                                 lower_shift.get(i) * dt_shift.get(i);
+    get<0>(*d4_norm_of_shift) +=
+        shift.get(i) * buffer.dt_lower_shift.get(i) +
+        buffer.lower_shift.get(i) * buffer.dt_shift.get(i);
   }
   // second term for components 1,2,3
   for (size_t j = 0; j < SpatialDim; ++j) {
-    d4_norm_of_shift->get(1 + j) = shift.get(0) * phi.get(j, 0, 1) +
-                                   lower_shift.get(0) * deriv_shift.get(j, 0);
+    d4_norm_of_shift->get(1 + j) =
+        shift.get(0) * phi.get(j, 0, 1) +
+        buffer.lower_shift.get(0) * buffer.deriv_shift.get(j, 0);
     for (size_t i = 1; i < SpatialDim; ++i) {
       d4_norm_of_shift->get(1 + j) +=
           shift.get(i) * phi.get(j, 0, i + 1) +
-          lower_shift.get(i) * deriv_shift.get(j, i);
+          buffer.lower_shift.get(i) * buffer.deriv_shift.get(j, i);
     }
   }
 }
