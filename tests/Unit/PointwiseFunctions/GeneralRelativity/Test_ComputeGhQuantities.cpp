@@ -10,8 +10,9 @@
 #include <pup.h>
 #include <random>
 
-#include "DataStructures/DataBox/Prefixes.hpp" // IWYU pragma: keep
+#include "DataStructures/DataBox/Prefixes.hpp"  // IWYU pragma: keep
 #include "DataStructures/DataVector.hpp"
+#include "DataStructures/Tensor/EagerMath/DeterminantAndInverse.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "Domain/CoordinateMaps/Affine.hpp"
 #include "Domain/CoordinateMaps/CoordinateMap.hpp"
@@ -22,12 +23,17 @@
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/KerrSchild.hpp"
 #include "PointwiseFunctions/GeneralRelativity/ComputeGhQuantities.hpp"
 #include "PointwiseFunctions/GeneralRelativity/ComputeSpacetimeQuantities.hpp"
+#include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
+#include "Utilities/ConstantExpressions.hpp"  // IWYU pragma: export
 #include "Utilities/Gsl.hpp"
+#include "Utilities/MakeWithValue.hpp"
 #include "Utilities/TaggedTuple.hpp"
 #include "tests/Unit/Pypp/CheckWithRandomValues.hpp"
 #include "tests/Unit/Pypp/SetupLocalPythonEnvironment.hpp"
 #include "tests/Utilities/MakeWithRandomValues.hpp"
+
+// IWYU pragma: no_forward_declare Tensor
 
 namespace {
 template <size_t Dim, typename DataType>
@@ -121,21 +127,21 @@ void test_lapse_deriv_functions(const DataVector& used_for_size) noexcept {
   // spatial_deriv_of_lapse
   pypp::check_with_random_values<1>(
       static_cast<tnsr::i<DataType, SpatialDim, Frame> (*)(
-        const Scalar<DataType>&,
-        const tnsr::A<DataType, SpatialDim, Frame>&,
-        const tnsr::iaa<DataType, SpatialDim, Frame>&)>(
+          const Scalar<DataType>&, const tnsr::A<DataType, SpatialDim, Frame>&,
+          const tnsr::iaa<DataType, SpatialDim, Frame>&)>(
           &::GeneralizedHarmonic::spatial_deriv_of_lapse<SpatialDim, Frame,
-          DataType>), "TestFunctions", "deriv_lapse",
+                                                         DataType>),
+      "TestFunctions", "deriv_lapse",
       {{{std::numeric_limits<double>::denorm_min(), 10.}}}, used_for_size);
   // time_deriv_of_lapse
   pypp::check_with_random_values<1>(
       static_cast<Scalar<DataType> (*)(
-        const Scalar<DataType>&,
-        const tnsr::I<DataType, SpatialDim, Frame>&,
-        const tnsr::A<DataType, SpatialDim, Frame>&,
-        const tnsr::iaa<DataType, SpatialDim, Frame>&,
-        const tnsr::aa<DataType, SpatialDim, Frame>&)>(
-      &::GeneralizedHarmonic::time_deriv_of_lapse<SpatialDim, Frame, DataType>),
+          const Scalar<DataType>&, const tnsr::I<DataType, SpatialDim, Frame>&,
+          const tnsr::A<DataType, SpatialDim, Frame>&,
+          const tnsr::iaa<DataType, SpatialDim, Frame>&,
+          const tnsr::aa<DataType, SpatialDim, Frame>&)>(
+          &::GeneralizedHarmonic::time_deriv_of_lapse<SpatialDim, Frame,
+                                                      DataType>),
       "TestFunctions", "dt_lapse",
       {{{std::numeric_limits<double>::denorm_min(), 10.}}}, used_for_size);
 }
@@ -149,7 +155,128 @@ void test_lapse_deriv_functions_analytic(
   // Setup grid
   const size_t spatial_dim = 3;
   Mesh<spatial_dim> mesh{grid_size_each_dimension, Spectral::Basis::Legendre,
-               Spectral::Quadrature::GaussLobatto};
+                         Spectral::Quadrature::GaussLobatto};
+
+  using Affine = CoordinateMaps::Affine;
+  using Affine3D = CoordinateMaps::ProductOf3Maps<Affine, Affine, Affine>;
+  const auto coord_map =
+      make_coordinate_map<Frame::Logical, Frame::Inertial>(Affine3D{
+          Affine{-1., 1., lower_bound[0], upper_bound[0]},
+          Affine{-1., 1., lower_bound[1], upper_bound[1]},
+          Affine{-1., 1., lower_bound[2], upper_bound[2]},
+      });
+
+  // Setup coordinates
+  const auto x_logical = logical_coordinates(mesh);
+  const auto x = coord_map(x_logical);
+  // Arbitrary time for time-independent solution.
+  const double t = std::numeric_limits<double>::signaling_NaN();
+
+  // Evaluate analytic solution
+  const auto vars =
+      solution.variables(x, t, typename Solution::template tags<DataVector>{});
+  const auto& lapse = get<gr::Tags::Lapse<>>(vars);
+  const auto& dt_lapse_expected = get<Tags::dt<gr::Tags::Lapse<>>>(vars);
+  const auto& d_lapse_expected =
+      get<typename Solution::template DerivLapse<DataVector>>(vars);
+  const auto& shift = get<gr::Tags::Shift<spatial_dim>>(vars);
+  const auto& d_shift =
+      get<typename Solution::template DerivShift<DataVector>>(vars);
+  const auto& dt_shift = get<Tags::dt<gr::Tags::Shift<spatial_dim>>>(vars);
+  const auto& spatial_metric = get<gr::Tags::SpatialMetric<spatial_dim>>(vars);
+  const auto& dt_spatial_metric =
+      get<Tags::dt<gr::Tags::SpatialMetric<spatial_dim>>>(vars);
+  const auto& d_spatial_metric =
+      get<typename Solution::template DerivSpatialMetric<DataVector>>(vars);
+
+  // Get ingredients
+  const auto phi =
+      GeneralizedHarmonic::phi(lapse, d_lapse_expected, shift, d_shift,
+                               spatial_metric, d_spatial_metric);
+  const auto pi =
+      GeneralizedHarmonic::pi(lapse, dt_lapse_expected, shift, dt_shift,
+                              spatial_metric, dt_spatial_metric, phi);
+  const auto normal_vector = gr::spacetime_normal_vector(lapse, shift);
+
+  // Check that locally computed derivs match returned ones
+  const auto dt_lapse =
+      GeneralizedHarmonic::time_deriv_of_lapse<spatial_dim, Frame::Inertial,
+                                               DataVector>(
+          lapse, shift, normal_vector, phi, pi);
+
+  const auto d_lapse =
+      GeneralizedHarmonic::spatial_deriv_of_lapse<spatial_dim, Frame::Inertial,
+                                                  DataVector>(
+          lapse, normal_vector, phi);
+
+  CHECK_ITERABLE_APPROX(dt_lapse_expected, dt_lapse);
+  CHECK_ITERABLE_APPROX(d_lapse_expected, d_lapse);
+}
+
+template <typename DataType, size_t SpatialDim, typename Frame>
+void test_shift_deriv_functions(const DataVector& used_for_size) noexcept {
+  // spatial_deriv_of_shift
+  pypp::check_with_random_values<1>(
+      static_cast<tnsr::iJ<DataType, SpatialDim, Frame> (*)(
+          const Scalar<DataType>&, const tnsr::AA<DataType, SpatialDim, Frame>&,
+          const tnsr::A<DataType, SpatialDim, Frame>&,
+          const tnsr::iaa<DataType, SpatialDim, Frame>&)>(
+          &::GeneralizedHarmonic::spatial_deriv_of_shift<SpatialDim, Frame,
+                                                         DataType>),
+      "TestFunctions", "deriv_shift",
+      {{{std::numeric_limits<double>::denorm_min(), 10.0}}}, used_for_size);
+  // time_deriv_of_shift
+  pypp::check_with_random_values<1>(
+      static_cast<tnsr::I<DataType, SpatialDim, Frame> (*)(
+          const Scalar<DataType>& lapse,
+          const tnsr::I<DataType, SpatialDim, Frame>&,
+          const tnsr::II<DataType, SpatialDim, Frame>&,
+          const tnsr::A<DataType, SpatialDim, Frame>&,
+          const tnsr::iaa<DataType, SpatialDim, Frame>&,
+          const tnsr::aa<DataType, SpatialDim, Frame>&)>(
+          &::GeneralizedHarmonic::time_deriv_of_shift<SpatialDim, Frame,
+                                                      DataType>),
+      "TestFunctions", "dt_shift",
+      {{{std::numeric_limits<double>::denorm_min(), 10.0}}}, used_for_size);
+  // time_deriv_of_lower_shift
+  pypp::check_with_random_values<1>(
+      static_cast<tnsr::i<DataType, SpatialDim, Frame> (*)(
+          const Scalar<DataType>&, const tnsr::I<DataType, SpatialDim, Frame>&,
+          const tnsr::ii<DataType, SpatialDim, Frame>&,
+          const tnsr::A<DataType, SpatialDim, Frame>&,
+          const tnsr::iaa<DataType, SpatialDim, Frame>&,
+          const tnsr::aa<DataType, SpatialDim, Frame>&)>(
+          &::GeneralizedHarmonic::time_deriv_of_lower_shift<SpatialDim, Frame,
+                                                            DataType>),
+      "TestFunctions", "dt_lower_shift",
+      {{{std::numeric_limits<double>::denorm_min(), 10.0}}}, used_for_size);
+  // spacetime_deriv_of_norm_of_shift
+  pypp::check_with_random_values<1>(
+      static_cast<tnsr::a<DataType, SpatialDim, Frame> (*)(
+          const Scalar<DataType>&, const tnsr::I<DataType, SpatialDim, Frame>&,
+          const tnsr::ii<DataType, SpatialDim, Frame>&,
+          const tnsr::II<DataType, SpatialDim, Frame>&,
+          const tnsr::AA<DataType, SpatialDim, Frame>&,
+          const tnsr::A<DataType, SpatialDim, Frame>&,
+          const tnsr::iaa<DataType, SpatialDim, Frame>&,
+          const tnsr::aa<DataType, SpatialDim, Frame>&)>(
+          &::GeneralizedHarmonic::spacetime_deriv_of_norm_of_shift<
+              SpatialDim, Frame, DataType>),
+      "TestFunctions", "spacetime_deriv_norm_shift",
+      {{{std::numeric_limits<double>::denorm_min(), 10.0}}}, used_for_size);
+}
+
+// Test computation of derivs of shift by comparing to Kerr-Schild
+template <typename Solution>
+void test_shift_deriv_functions_analytic(
+    const Solution& solution, const size_t grid_size_each_dimension,
+    const std::array<double, 3>& lower_bound,
+    const std::array<double, 3>& upper_bound) noexcept {
+  // Setup grid
+  const size_t SpatialDim = 3;
+  const size_t data_size = pow<SpatialDim>(grid_size_each_dimension);
+  Mesh<SpatialDim> mesh{grid_size_each_dimension, Spectral::Basis::Legendre,
+                        Spectral::Quadrature::GaussLobatto};
 
   using Affine = CoordinateMaps::Affine;
   using Affine3D = CoordinateMaps::ProductOf3Maps<Affine, Affine, Affine>;
@@ -173,33 +300,83 @@ void test_lapse_deriv_functions_analytic(
   const auto& dt_lapse = get<Tags::dt<gr::Tags::Lapse<>>>(vars);
   const auto& d_lapse =
       get<typename Solution::template DerivLapse<DataVector>>(vars);
-  const auto& shift = get<gr::Tags::Shift<spatial_dim>>(vars);
-  const auto& d_shift =
+  const auto& shift = get<gr::Tags::Shift<SpatialDim>>(vars);
+  const auto& d_shift_expected =
       get<typename Solution::template DerivShift<DataVector>>(vars);
-  const auto& dt_shift = get<Tags::dt<gr::Tags::Shift<spatial_dim>>>(vars);
-  const auto& spatial_metric = get<gr::Tags::SpatialMetric<spatial_dim>>(vars);
+  const auto& dt_shift_expected =
+      get<Tags::dt<gr::Tags::Shift<SpatialDim>>>(vars);
+  const auto& spatial_metric = get<gr::Tags::SpatialMetric<SpatialDim>>(vars);
   const auto& dt_spatial_metric =
-      get<Tags::dt<gr::Tags::SpatialMetric<spatial_dim>>>(vars);
+      get<Tags::dt<gr::Tags::SpatialMetric<SpatialDim>>>(vars);
   const auto& d_spatial_metric =
       get<typename Solution::template DerivSpatialMetric<DataVector>>(vars);
 
   // Get ingredients
-  const auto& phi = GeneralizedHarmonic::phi(lapse, d_lapse, shift, d_shift,
-    spatial_metric, d_spatial_metric);
-  const auto& pi = GeneralizedHarmonic::pi(lapse, dt_lapse, shift, dt_shift,
-    spatial_metric, dt_spatial_metric, phi);
-  const auto& normal_vector = gr::spacetime_normal_vector(lapse, shift);
+  const auto inverse_spatial_metric =
+      determinant_and_inverse(spatial_metric).second;
+  const auto inverse_spacetime_metric =
+      gr::inverse_spacetime_metric(lapse, shift, inverse_spatial_metric);
+  const auto phi =
+      GeneralizedHarmonic::phi(lapse, d_lapse, shift, d_shift_expected,
+                               spatial_metric, d_spatial_metric);
+  const auto pi =
+      GeneralizedHarmonic::pi(lapse, dt_lapse, shift, dt_shift_expected,
+                              spatial_metric, dt_spatial_metric, phi);
+  const auto normal_vector = gr::spacetime_normal_vector(lapse, shift);
+  const auto lower_shift = raise_or_lower_index(shift, spatial_metric);
+
+  // Compute dt_lower_shift
+  auto dt_lower_shift_expected =
+      make_with_value<tnsr::i<DataVector, SpatialDim, Frame::Inertial>>(x, 0.);
+  for (size_t i = 0; i < SpatialDim; ++i) {
+    for (size_t j = 0; j < SpatialDim; ++j) {
+      dt_lower_shift_expected.get(i) +=
+          spatial_metric.get(i, j) * dt_shift_expected.get(j) +
+          shift.get(j) * dt_spatial_metric.get(i, j);
+    }
+  }
+  // Compute d4_norm_shift
+  auto d4_norm_of_shift_expected =
+      make_with_value<tnsr::a<DataVector, SpatialDim, Frame::Inertial>>(x, 0.);
+  // compute intermediate quantities
+  for (size_t i = 0; i < SpatialDim; ++i) {
+    // first term for component 0
+    get<0>(d4_norm_of_shift_expected) +=
+        lower_shift.get(i) * dt_shift_expected.get(i) +
+        shift.get(i) * dt_lower_shift_expected.get(i);
+    // second term for components 1,2,3
+    for (size_t j = 0; j < SpatialDim; ++j) {
+      d4_norm_of_shift_expected.get(1 + j) +=
+          lower_shift.get(i) * d_shift_expected.get(j, i) +
+          shift.get(i) * phi.get(j, 0, i + 1);
+    }
+  }
 
   // Check that locally computed derivs match returned ones
-  const auto& d0_lapse_from_func = GeneralizedHarmonic::time_deriv_of_lapse<
-    spatial_dim, Frame::Inertial, DataVector>(lapse, shift, normal_vector, phi,
-      pi);
+  const auto dt_shift =
+      GeneralizedHarmonic::time_deriv_of_shift<SpatialDim, Frame::Inertial,
+                                               DataVector>(
+          lapse, shift, inverse_spatial_metric, normal_vector, phi, pi);
 
-  const auto& d_lapse_from_func = GeneralizedHarmonic::spatial_deriv_of_lapse<
-    spatial_dim, Frame::Inertial, DataVector>(lapse, normal_vector, phi);
+  const auto d_shift =
+      GeneralizedHarmonic::spatial_deriv_of_shift<SpatialDim, Frame::Inertial,
+                                                  DataVector>(
+          lapse, inverse_spacetime_metric, normal_vector, phi);
 
-  CHECK_ITERABLE_APPROX(dt_lapse, d0_lapse_from_func);
-  CHECK_ITERABLE_APPROX(d_lapse, d_lapse_from_func);
+  const auto dt_lower_shift = GeneralizedHarmonic::time_deriv_of_lower_shift<
+      SpatialDim, Frame::Inertial, DataVector>(lapse, shift, spatial_metric,
+                                               normal_vector, phi, pi);
+
+  const auto d4_norm_shift =
+      GeneralizedHarmonic::spacetime_deriv_of_norm_of_shift<
+          SpatialDim, Frame::Inertial, DataVector>(
+          lapse, shift, spatial_metric, inverse_spatial_metric,
+          inverse_spacetime_metric, normal_vector, phi, pi);
+
+  CHECK_ITERABLE_APPROX(dt_shift_expected, dt_shift);
+  CHECK_ITERABLE_APPROX(d_shift_expected, d_shift);
+  CHECK_ITERABLE_APPROX(dt_lower_shift_expected, dt_lower_shift);
+  CHECK_ITERABLE_APPROX(d4_norm_of_shift_expected, d4_norm_shift);
 }
 }  // namespace
 
@@ -233,5 +410,15 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GeneralRelativity.GhQuantities",
   const std::array<double, 3> upper_bound{{0.8, 1.22, 1.30}};
 
   test_lapse_deriv_functions_analytic(solution, grid_size, lower_bound,
-    upper_bound);
+                                      upper_bound);
+
+  test_shift_deriv_functions<DataVector, 1, Frame::Grid>(used_for_size);
+  test_shift_deriv_functions<DataVector, 2, Frame::Grid>(used_for_size);
+  test_shift_deriv_functions<DataVector, 3, Frame::Grid>(used_for_size);
+  test_shift_deriv_functions<DataVector, 1, Frame::Inertial>(used_for_size);
+  test_shift_deriv_functions<DataVector, 2, Frame::Inertial>(used_for_size);
+  test_shift_deriv_functions<DataVector, 3, Frame::Inertial>(used_for_size);
+
+  test_shift_deriv_functions_analytic(solution, grid_size, lower_bound,
+                                      upper_bound);
 }
