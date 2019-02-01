@@ -117,5 +117,13 @@ struct EvolvedFieldsFromCharacteristicFields : db::SimpleTag {
     return "EvolvedFieldsFromCharacteristicFields";
   }
 };
+
+template <size_t Dim, typename Frame>
+struct UnitNormalOneForm : db::SimpleTag {
+  using type = tnsr::i<DataVector, Dim, Frame>;
+  static std::string name() noexcept {
+    return "UnitNormalOneForm";
+  }
+};
 }  // namespace Tags
 }  // namespace GeneralizedHarmonic
