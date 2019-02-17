@@ -3,8 +3,11 @@
 
 #pragma once
 
+#include "DataStructures/Tensor/EagerMath/Magnitude.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/TagsDeclarations.hpp"
 #include "PointwiseFunctions/GeneralRelativity/TagsDeclarations.hpp"
+#include "Utilities/TMPL.hpp"
 
 /// \cond
 namespace brigand {
@@ -28,10 +31,20 @@ struct System {
   static constexpr size_t volume_dim = Dim;
   static constexpr bool is_euclidean = false;
 
-  using variables_tags = brigand::list<gr::Tags::SpacetimeMetric<Dim>,
-                                       Tags::Pi<Dim>, Tags::Phi<Dim>>;
-  using gradient_tags = variables_tags;
+  using variables_tag = ::Tags::Variables<tmpl::list<
+      gr::Tags::SpacetimeMetric<Dim, Frame::Inertial>,
+      Tags::Pi<Dim, Frame::Inertial>, Tags::Phi<Dim, Frame::Inertial>>>;
+  using gradients_tags =
+      tmpl::list<gr::Tags::SpacetimeMetric<Dim, Frame::Inertial>,
+                 Tags::Pi<Dim, Frame::Inertial>,
+                 Tags::Phi<Dim, Frame::Inertial>>;
 
-  using Variables = ::Variables<variables_tags>;
+  using compute_time_derivative = ComputeDuDt<Dim>;
+  using normal_dot_fluxes = ComputeNormalDotFluxes<3>;
+  using compute_largest_characteristic_speed =
+      ComputeLargestCharacteristicSpeed<Dim, Frame::Inertial>;
+
+  template <typename Tag>
+  using magnitude_tag = ::Tags::EuclideanMagnitude<Tag>;
 };
 }  // namespace GeneralizedHarmonic
