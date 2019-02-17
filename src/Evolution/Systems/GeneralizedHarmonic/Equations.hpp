@@ -9,9 +9,11 @@
 #include <cstddef>
 
 #include "DataStructures/DataBox/Prefixes.hpp"
+#include "DataStructures/Tensor/EagerMath/Magnitude.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
+#include "Domain/FaceNormal.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"  // IWYU pragma: keep
-#include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp" // IWYU pragma: keep
+#include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"  // IWYU pragma: keep
 #include "Options/Options.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "PointwiseFunctions/GeneralRelativity/TagsDeclarations.hpp"  // IWYU pragma: keep
@@ -116,11 +118,11 @@ struct ComputeDuDt {
 template <size_t Dim>
 struct ComputeNormalDotFluxes {
  public:
-  using argument_tags =
-      tmpl::list<gr::Tags::SpacetimeMetric<Dim>, Tags::Pi<Dim>, Tags::Phi<Dim>,
-                 Tags::ConstraintGamma1, Tags::ConstraintGamma2,
-                 gr::Tags::Lapse<>, gr::Tags::Shift<Dim>,
-                 gr::Tags::InverseSpatialMetric<Dim>>;
+  using argument_tags = tmpl::list<
+      gr::Tags::SpacetimeMetric<Dim>, Tags::Pi<Dim>, Tags::Phi<Dim>,
+      Tags::ConstraintGamma1, Tags::ConstraintGamma2, gr::Tags::Lapse<>,
+      gr::Tags::Shift<Dim>, gr::Tags::InverseSpatialMetric<Dim>,
+      ::Tags::Normalized<::Tags::UnnormalizedFaceNormal<Dim, Frame::Inertial>>>;
 
   static void apply(
       gsl::not_null<tnsr::aa<DataVector, Dim>*>
