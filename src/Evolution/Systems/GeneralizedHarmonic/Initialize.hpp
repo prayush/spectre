@@ -55,7 +55,13 @@ struct Initialize {
         db::AddSimpleTags<variables_tag,
                           ::GeneralizedHarmonic::Tags::ConstraintGamma0,
                           ::GeneralizedHarmonic::Tags::ConstraintGamma1,
-                          ::GeneralizedHarmonic::Tags::ConstraintGamma2>;
+                          ::GeneralizedHarmonic::Tags::ConstraintGamma2,
+                          ::Tags::Interface<
+                              ::Tags::InternalDirections<Dim>,
+                              ::GeneralizedHarmonic::Tags::ConstraintGamma1>,
+                          ::Tags::Interface<
+                              ::Tags::InternalDirections<Dim>,
+                              ::GeneralizedHarmonic::Tags::ConstraintGamma2>>;
     using compute_tags = db::AddComputeTags<>;
 
     template <typename TagsList>
