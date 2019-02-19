@@ -3,26 +3,42 @@
 
 #include "tests/Unit/TestingFramework.hpp"
 
+#include <array>
 #include <cstddef>
 #include <random>
+#include <string>
+#include <utility>
 
+#include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/DataVector.hpp"
 #include "DataStructures/Tensor/EagerMath/DeterminantAndInverse.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "PointwiseFunctions/GeneralRelativity/ComputeSpacetimeQuantities.hpp"
+#include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/MakeWithValue.hpp"
+#include "Utilities/StdHelpers.hpp"
+#include "Utilities/TMPL.hpp"
 #include "tests/Unit/Pypp/CheckWithRandomValues.hpp"
 #include "tests/Unit/Pypp/SetupLocalPythonEnvironment.hpp"
 #include "tests/Unit/TestHelpers.hpp"
 #include "tests/Utilities/MakeWithRandomValues.hpp"
 
+/// \cond
+template <typename X, typename Symm, typename IndexList>
+class Tensor;
+/// \endcond
+
 namespace {
 template <size_t Dim, typename DataType>
 void test_compute_spacetime_metric(const DataType& used_for_size) {
   pypp::check_with_random_values<1>(
-      &gr::spacetime_metric<Dim, Frame::Inertial, DataType>, "TestFunctions",
-      "spacetime_metric", {{{-10., 10.}}}, used_for_size);
+      static_cast<tnsr::aa<DataType, Dim, Frame::Inertial> (*)(
+          const Scalar<DataType>&,
+          const tnsr::I<DataType, Dim, Frame::Inertial>&,
+          const tnsr::ii<DataType, Dim, Frame::Inertial>&)>(
+          &gr::spacetime_metric<Dim, Frame::Inertial, DataType>),
+      "TestFunctions", "spacetime_metric", {{{-10., 10.}}}, used_for_size);
 }
 template <size_t Dim, typename DataType>
 void test_compute_inverse_spacetime_metric(const DataType& used_for_size) {

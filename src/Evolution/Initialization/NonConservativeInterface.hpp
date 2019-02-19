@@ -8,8 +8,10 @@
 
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/DataBox/DataBoxTag.hpp"
+#include "DataStructures/Tensor/IndexType.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
+#include "PointwiseFunctions/GeneralRelativity/ComputeSpacetimeQuantities.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "Utilities/TMPL.hpp"
 
@@ -38,8 +40,9 @@ namespace Initialization {
 /// - Removes: nothing
 /// - Modifies: nothing
 template <typename System>
-struct NonConservativeInterface {
+struct InterfaceForNonConservativeSystem {
   static constexpr size_t dim = System::volume_dim;
+  using frame = Frame::Inertial;
   using simple_tags =
       db::AddSimpleTags<Tags::Interface<Tags::BoundaryDirectionsExterior<dim>,
                                         typename System::variables_tag>>;
@@ -49,38 +52,50 @@ struct NonConservativeInterface {
       Directions, Tags::InterfaceComputeItem<Directions, Tags::Direction<dim>>,
       Tags::InterfaceComputeItem<Directions, Tags::InterfaceMesh<dim>>,
       Tags::Slice<Directions, typename System::variables_tag>,
-      Tags::Interface<Directions, gr::Tags::InverseSpatialMetric<
-                                      dim, Frame::Inertial, DataVector>>,
-      Tags::Interface<Directions, gr::Tags::Lapse<DataVector>>,
-      Tags::Interface<Directions,
-                      gr::Tags::Shift<dim, Frame::Inertial, DataVector>>,
-      Tags::Interface<Directions, GeneralizedHarmonic::Tags::ConstraintGamma0>,
-      Tags::Interface<Directions, GeneralizedHarmonic::Tags::ConstraintGamma1>,
-      Tags::Interface<Directions, GeneralizedHarmonic::Tags::ConstraintGamma2>,
+      Tags::InterfaceComputeItem<Directions,
+                                 gr::Tags::SpatialMetricCompute<dim, frame,
+                                                                DataVector>>,
+      Tags::InterfaceComputeItem<Directions,
+                                 gr::Tags::InverseSpatialMetricCompute<dim,
+                                     frame, DataVector>>,
+      Tags::InterfaceComputeItem<Directions,
+                                 gr::Tags::LapseCompute<dim, frame,
+                                                        DataVector>>,
+      Tags::InterfaceComputeItem<Directions,
+                                 gr::Tags::ShiftCompute<dim, frame,
+                                                        DataVector>>,
+/*      Tags::InterfaceComputeItem<Directions,
+                                 GeneralizedHarmonic::Tags::ConstraintGamma0>,
+      Tags::InterfaceComputeItem<Directions,
+                                 GeneralizedHarmonic::Tags::ConstraintGamma1>,
+      Tags::InterfaceComputeItem<Directions,
+                                 GeneralizedHarmonic::Tags::ConstraintGamma2>,*/
       Tags::InterfaceComputeItem<Directions, Tags::UnnormalizedFaceNormal<dim>>,
       Tags::InterfaceComputeItem<Directions,
                                  typename System::template magnitude_tag<
                                      Tags::UnnormalizedFaceNormal<dim>>>,
       Tags::InterfaceComputeItem<
           Directions, Tags::Normalized<Tags::UnnormalizedFaceNormal<dim>>>,
+      Tags::InterfaceComputeItem<Directions,
+                                 Tags::UnitFaceNormalCompute<dim, frame>>,
+      Tags::Interface<Directions, Tags::UnitFaceNormal<dim, frame>>,
+      Tags::InterfaceComputeItem<Directions,
+                                 Tags::UnitFaceNormalVectorCompute<dim, frame>>,
+      Tags::Interface<Directions, Tags::UnitFaceNormalVector<dim, frame>>,
       Tags::InterfaceComputeItem<
-          Directions, Tags::UnitFaceNormalCompute<dim, Frame::Inertial>>,
-      Tags::Interface<Directions, Tags::UnitFaceNormal<dim, Frame::Inertial>>,
+          Directions,
+          GeneralizedHarmonic::CharacteristicFieldsCompute<dim, frame>>,
       Tags::InterfaceComputeItem<
-          Directions, Tags::UnitFaceNormalVectorCompute<dim, Frame::Inertial>>,
-      Tags::Interface<Directions,
-                      Tags::UnitFaceNormalVector<dim, Frame::Inertial>>,
-      Tags::InterfaceComputeItem<
-          Directions, GeneralizedHarmonic::CharacteristicFieldsCompute<
-                          dim, Frame::Inertial>>,
-      Tags::InterfaceComputeItem<
-          Directions, GeneralizedHarmonic::CharacteristicSpeedsCompute<
-                          dim, Frame::Inertial>>>;
+          Directions,
+          GeneralizedHarmonic::CharacteristicSpeedsCompute<dim, frame>>>;
 
   using ext_tags = tmpl::list<
       Tags::BoundaryDirectionsExterior<dim>,
-      Tags::Interface<Tags::BoundaryDirectionsExterior<dim>,
-                      gr::Tags::InverseSpatialMetric<dim, Frame::Inertial>>,
+      Tags::InterfaceComputeItem<
+          Tags::BoundaryDirectionsExterior<dim>,
+          gr::Tags::SpatialMetricCompute<dim, frame, DataVector>>,
+      Tags::InterfaceComputeItem<Tags::BoundaryDirectionsExterior<dim>,
+          gr::Tags::InverseSpatialMetricCompute<dim, frame, DataVector>>,
       Tags::InterfaceComputeItem<Tags::BoundaryDirectionsExterior<dim>,
                                  Tags::Direction<dim>>,
       Tags::InterfaceComputeItem<Tags::BoundaryDirectionsExterior<dim>,
@@ -98,7 +113,7 @@ struct NonConservativeInterface {
                       GeneralizedHarmonic::Tags::ConstraintGamma1>,
       Tags::Interface<Tags::BoundaryDirectionsExterior<dim>,
                       GeneralizedHarmonic::Tags::ConstraintGamma2>,
-      Tags::InterfaceComputeItem<
+      Tags::Interface<
           Tags::BoundaryDirectionsExterior<dim>,
           Tags::Normalized<Tags::UnnormalizedFaceNormal<dim>>>,
       Tags::InterfaceComputeItem<
@@ -110,7 +125,11 @@ struct NonConservativeInterface {
           Tags::BoundaryDirectionsExterior<dim>,
           Tags::UnitFaceNormalVectorCompute<dim, Frame::Inertial>>,
       Tags::Interface<Tags::BoundaryDirectionsExterior<dim>,
-                      Tags::UnitFaceNormalVector<dim, Frame::Inertial>>>;
+                      Tags::UnitFaceNormalVector<dim, Frame::Inertial>>,
+      Tags::InterfaceComputeItem<
+          Tags::BoundaryDirectionsExterior<dim>,
+          Tags::Normalized<Tags::UnnormalizedFaceNormal<dim>>>
+          >;
 
   using compute_tags =
       tmpl::append<face_tags<Tags::InternalDirections<dim>>,

@@ -3,15 +3,26 @@
 
 #include "tests/Unit/TestingFramework.hpp"
 
+#include <array>
 #include <cstddef>
+#include <string>
 
+#include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/DataVector.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Christoffel.hpp"
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
+#include "Utilities/MakeWithValue.hpp"
+#include "Utilities/TMPL.hpp"
 #include "tests/Unit/Pypp/CheckWithRandomValues.hpp"
 #include "tests/Unit/Pypp/SetupLocalPythonEnvironment.hpp"
+
+/// \cond
+template <typename X, typename Symm, typename IndexList>
+class Tensor;
+/// \endcond
 
 namespace {
 template <size_t Dim, IndexType Index, typename DataType>

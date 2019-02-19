@@ -3,20 +3,27 @@
 
 #pragma once
 
+#include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/Tensor/EagerMath/Magnitude.hpp"
+#include "DataStructures/Variables.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/Equations.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/TagsDeclarations.hpp"
-#include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
+#include "PointwiseFunctions/GeneralRelativity/TagsDeclarations.hpp"
 #include "Utilities/TMPL.hpp"
 
 /// \cond
+class DataVector;
+
 namespace brigand {
 template <class...>
 struct list;
 }  // namespace brigand
 
+namespace Tags {
 template <class>
 class Variables;
+}  // namespace Tags
 /// \endcond
 
 /*!
@@ -41,6 +48,7 @@ struct System {
 
   using compute_time_derivative = ComputeDuDt<Dim>;
   using normal_dot_fluxes = ComputeNormalDotFluxes<3>;
+  using char_speeds_tag = CharacteristicSpeedsCompute<Dim, Frame::Inertial>;
   using compute_largest_characteristic_speed =
       ComputeLargestCharacteristicSpeed<Dim, Frame::Inertial>;
 

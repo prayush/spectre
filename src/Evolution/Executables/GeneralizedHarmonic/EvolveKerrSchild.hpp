@@ -71,21 +71,23 @@ class CProxy_ConstGlobalCache;
 
 struct EvolutionMetavars {
   // Customization/"input options" to simulation
-  using system = GeneralizedHarmonic::System<3>;
+  static constexpr int dim = 3;
+  using frame = Frame::Inertial;
+  using system = GeneralizedHarmonic::System<dim>;
   using temporal_id = Tags::TimeId;
-  static constexpr bool local_time_stepping = true;
+  static constexpr bool local_time_stepping = false;
   using analytic_solution_tag =
       OptionTags::AnalyticSolution<gr::Solutions::KerrSchild>;
   using boundary_condition_tag = analytic_solution_tag;
   using normal_dot_numerical_flux =
-      OptionTags::NumericalFluxParams<GeneralizedHarmonic::UpwindFlux<3>>;
+      OptionTags::NumericalFluxParams<GeneralizedHarmonic::UpwindFlux<dim>>;
   // A tmpl::list of tags to be added to the ConstGlobalCache by the
   // metavariables
   using const_global_cache_tag_list =
       tmpl::list<analytic_solution_tag,
                  OptionTags::TypedTimeStepper<tmpl::conditional_t<
                      local_time_stepping, LtsTimeStepper, TimeStepper>>>;
-  using domain_creator_tag = OptionTags::DomainCreator<3, Frame::Inertial>;
+  using domain_creator_tag = OptionTags::DomainCreator<dim, frame>;
 
   struct ObservationType {};
   using element_observation_type = ObservationType;
@@ -95,17 +97,17 @@ struct EvolutionMetavars {
           tmpl::list<GeneralizedHarmonic::Actions::Observe>>;
 
   using step_choosers =
-      tmpl::list<StepChoosers::Registrars::Cfl<3, Frame::Inertial>,
+      tmpl::list<StepChoosers::Registrars::Cfl<dim, frame>,
                  StepChoosers::Registrars::Constant,
                  StepChoosers::Registrars::Increase>;
 
   using compute_rhs = tmpl::flatten<tmpl::list<
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
-          Tags::InternalDirections<3>>,
+          Tags::InternalDirections<dim>>,
       dg::Actions::SendDataForFluxes<EvolutionMetavars>,
       Actions::ComputeTimeDerivative,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
-          Tags::BoundaryDirectionsInterior<3>>,
+          Tags::BoundaryDirectionsInterior<dim>>,
       dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
       dg::Actions::ReceiveDataForFluxes<EvolutionMetavars>,
       tmpl::conditional_t<local_time_stepping, tmpl::list<>,
@@ -122,7 +124,7 @@ struct EvolutionMetavars {
       observers::Observer<EvolutionMetavars>,
       observers::ObserverWriter<EvolutionMetavars>,
       DgElementArray<
-          EvolutionMetavars, GeneralizedHarmonic::Actions::Initialize<3>,
+          EvolutionMetavars, GeneralizedHarmonic::Actions::Initialize<dim>,
           tmpl::flatten<tmpl::list<
               SelfStart::self_start_procedure<compute_rhs, update_variables>,
               Actions::Label<EvolvePhaseStart>, Actions::AdvanceTime,
@@ -171,5 +173,6 @@ static const std::vector<void (*)()> charm_init_node_funcs{
         StepChooser<metavariables::step_choosers>>,
     &Parallel::register_derived_classes_with_charm<StepController>,
     &Parallel::register_derived_classes_with_charm<TimeStepper>};
+
 static const std::vector<void (*)()> charm_init_proc_funcs{
     &enable_floating_point_exceptions};

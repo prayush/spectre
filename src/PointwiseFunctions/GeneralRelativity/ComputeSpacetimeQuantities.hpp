@@ -6,18 +6,28 @@
 
 #pragma once
 
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
+#include <utility>
 
+#include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "DataStructures/Tensor/EagerMath/DeterminantAndInverse.hpp"
-#include "DataStructures/Tensor/IndexType.hpp"
-#include "DataStructures/Tensor/TypeAliases.hpp"
+#include "DataStructures/Tensor/Tensor.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "Utilities/TMPL.hpp"
+
+/// \cond
+namespace gsl {
+template <class T>
+class not_null;
+}  // namespace gsl
+/// \endcond
 
 /// \ingroup GeneralRelativityGroup
 /// Holds functions related to general relativity.
 namespace gr {
-
+// @{
 /*!
  * \ingroup GeneralRelativityGroup
  * \brief Computes the spacetime metric from the spatial metric, lapse, and
@@ -31,11 +41,18 @@ namespace gr {
  * where \f$ N, N^i\f$ and \f$ g_{ij}\f$ are the lapse, shift and spatial metric
  * respectively
  */
+template <size_t Dim, typename Frame, typename DataType>
+void spacetime_metric(
+    gsl::not_null<tnsr::aa<DataType, Dim, Frame>*> spacetime_metric,
+    const Scalar<DataType>& lapse, const tnsr::I<DataType, Dim, Frame>& shift,
+    const tnsr::ii<DataType, Dim, Frame>& spatial_metric) noexcept;
+
 template <size_t SpatialDim, typename Frame, typename DataType>
 tnsr::aa<DataType, SpatialDim, Frame> spacetime_metric(
     const Scalar<DataType>& lapse,
     const tnsr::I<DataType, SpatialDim, Frame>& shift,
     const tnsr::ii<DataType, SpatialDim, Frame>& spatial_metric) noexcept;
+// @}
 
 /*!
  * \ingroup GeneralRelativityGroup
@@ -188,7 +205,9 @@ namespace Tags {
 template <size_t SpatialDim, typename Frame, typename DataType>
 struct SpacetimeMetricCompute : SpacetimeMetric<SpatialDim, Frame, DataType>,
                                 db::ComputeTag {
-  static constexpr auto function =
+  static constexpr tnsr::aa<DataType, SpatialDim, Frame> (*function)(
+      const Scalar<DataType>&, const tnsr::I<DataType, SpatialDim, Frame>&,
+      const tnsr::ii<DataType, SpatialDim, Frame>&) =
       &spacetime_metric<SpatialDim, Frame, DataType>;
   using argument_tags =
       tmpl::list<Lapse<DataType>, Shift<SpatialDim, Frame, DataType>,
@@ -231,12 +250,13 @@ template <size_t SpatialDim, typename Frame, typename DataType>
 struct DetAndInverseSpatialMetricCompute
     : DetAndInverseSpatialMetric<SpatialDim, Frame, DataType>,
       db::ComputeTag {
+  using argument_tags = tmpl::list<SpatialMetric<SpatialDim, Frame, DataType>>;
+  using base = DetAndInverseSpatialMetric<SpatialDim, Frame, DataType>;
   static constexpr auto function =
       &determinant_and_inverse<DataType,
                                tmpl::integral_list<std::int32_t, 1, 1>,
                                SpatialIndex<SpatialDim, UpLo::Lo, Frame>,
                                SpatialIndex<SpatialDim, UpLo::Lo, Frame>>;
-  using argument_tags = tmpl::list<SpatialMetric<SpatialDim, Frame, DataType>>;
 };
 
 /// Compute item to get the square root of the determinant of the spatial
