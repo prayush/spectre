@@ -12,8 +12,8 @@
 #include "ErrorHandling/FloatingPointExceptions.hpp"
 #include "Evolution/Actions/ComputeTimeDerivative.hpp"  // IWYU pragma: keep
 #include "Evolution/DiscontinuousGalerkin/DgElementArray.hpp"  // IWYU pragma: keep
-#include "Evolution/DiscontinuousGalerkin/InitializeElement.hpp"  // IWYU pragma: keep
 #include "Evolution/Systems/GeneralizedHarmonic/Equations.hpp"  // IWYU pragma: keep // for UpwindFlux
+#include "Evolution/Systems/GeneralizedHarmonic/Initialize.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Observe.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/System.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
@@ -119,7 +119,7 @@ struct EvolutionMetavars {
       observers::Observer<EvolutionMetavars>,
       observers::ObserverWriter<EvolutionMetavars>,
       DgElementArray<
-          EvolutionMetavars, dg::Actions::InitializeElement<3>,
+          EvolutionMetavars, GeneralizedHarmonic::Actions::Initialize<3>,
           tmpl::flatten<tmpl::list<
               SelfStart::self_start_procedure<compute_rhs, update_variables>,
               Actions::Label<EvolvePhaseStart>, Actions::AdvanceTime,
@@ -131,7 +131,7 @@ struct EvolutionMetavars {
               Actions::Goto<EvolvePhaseStart>>>>>;
 
   static constexpr OptionString help{
-      "Evolve a Kerr-Schild black hole in 3 spatial dimension.\n\n"
+      "Evolve a Kerr-Schild black hole in 3 spatial dimensions.\n\n"
       "The analytic solution is: KerrSchild\n"
       "The numerical flux is:    UpwindFlux\n"};
 
