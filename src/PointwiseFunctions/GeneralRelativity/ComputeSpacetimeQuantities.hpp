@@ -8,7 +8,11 @@
 
 #include <cstddef>
 
+#include "DataStructures/Tensor/EagerMath/DeterminantAndInverse.hpp"
+#include "DataStructures/Tensor/IndexType.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
+#include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
+#include "Utilities/TMPL.hpp"
 
 /// \ingroup GeneralRelativityGroup
 /// Holds functions related to general relativity.
@@ -176,4 +180,147 @@ tnsr::ii<DataType, SpatialDim, Frame> extrinsic_curvature(
     const tnsr::ijj<DataType, SpatialDim, Frame>&
         deriv_spatial_metric) noexcept;
 
+namespace Tags {
+/// Compute item for spacetime metric \f$\psi_{ab}\f$ from the
+/// lapse \f$N\f$, shift \f$N^i\f$, and spatial metric \f$g_{ij}\f$.
+///
+/// Can be retrieved using `gr::Tags::SpacetimeMetric`
+template <size_t SpatialDim, typename Frame, typename DataType>
+struct SpacetimeMetricCompute : SpacetimeMetric<SpatialDim, Frame, DataType>,
+                                db::ComputeTag {
+  static constexpr auto function =
+      &spacetime_metric<SpatialDim, Frame, DataType>;
+  using argument_tags =
+      tmpl::list<Lapse<DataType>, Shift<SpatialDim, Frame, DataType>,
+                 SpatialMetric<SpatialDim, Frame, DataType>>;
+};
+
+/// Compute item for spatial metric \f$g_{ij}\f$ from the
+/// spacetime metric \f$\psi_{ab}\f$.
+///
+/// Can be retrieved using `gr::Tags::SpatialMetric`
+template <size_t SpatialDim, typename Frame, typename DataType>
+struct SpatialMetricCompute : SpatialMetric<SpatialDim, Frame, DataType>,
+                              db::ComputeTag {
+  static constexpr auto function = &spatial_metric<SpatialDim, Frame, DataType>;
+  using argument_tags =
+      tmpl::list<SpacetimeMetric<SpatialDim, Frame, DataType>>;
+};
+
+/// Compute item for inverse spacetime metric \f$\psi^{ab}\f$
+/// in terms of the lapse \f$N\f$, shift \f$N^i\f$, and inverse
+/// spatial metric \f$g^{ij}\f$.
+///
+/// Can be retrieved using `gr::Tags::InverseSpacetimeMetric`
+template <size_t SpatialDim, typename Frame, typename DataType>
+struct InverseSpacetimeMetricCompute
+    : InverseSpacetimeMetric<SpatialDim, Frame, DataType>,
+      db::ComputeTag {
+  static constexpr auto function =
+      &inverse_spacetime_metric<SpatialDim, Frame, DataType>;
+  using argument_tags =
+      tmpl::list<Lapse<DataType>, Shift<SpatialDim, Frame, DataType>,
+                 InverseSpatialMetric<SpatialDim, Frame, DataType>>;
+};
+
+/// Compute item for spatial metric determinant \f$\g\f$
+/// and inversre \f$g^{ij}\f$in terms of the spatial metric \f$g_{ij}\f$.
+///
+/// Can be retrieved using `gr::Tags::DetAndInverseSpatialMetric`
+template <size_t SpatialDim, typename Frame, typename DataType>
+struct DetAndInverseSpatialMetricCompute
+    : DetAndInverseSpatialMetric<SpatialDim, Frame, DataType>,
+      db::ComputeTag {
+  static constexpr auto function =
+      &determinant_and_inverse<DataType,
+                               tmpl::integral_list<std::int32_t, 1, 1>,
+                               SpatialIndex<SpatialDim, UpLo::Lo, Frame>,
+                               SpatialIndex<SpatialDim, UpLo::Lo, Frame>>;
+  using argument_tags = tmpl::list<SpatialMetric<SpatialDim, Frame, DataType>>;
+};
+
+/// Compute item to get the square root of the determinant of the spatial
+/// metric \f$\sqrt{g}\f$ via `gr::Tags::DetAndInverseSpatialMetric`.
+///
+/// Can be retrieved using `gr::Tags::SqrtDetSpatialMetric`
+template <size_t SpatialDim, typename Frame, typename DataType>
+struct SqrtDetSpatialMetricCompute : SqrtDetSpatialMetric<DataType>,
+                                     db::ComputeTag {
+  static Scalar<DataType> function(
+      const std::pair<Scalar<DataType>, tnsr::II<DataType, SpatialDim, Frame>>&
+          det_and_inverse_spatial_metric) {
+    return Scalar<DataType>{sqrt(get(det_and_inverse_spatial_metric.first))};
+  }
+  using argument_tags =
+      tmpl::list<DetAndInverseSpatialMetric<SpatialDim, Frame, DataType>>;
+};
+
+/// Compute item for inverse spatial metric \f$\g^{ij}\f$
+/// via `gr::Tags::DetAndInverseSpatialMetric`.
+///
+/// Can be retrieved using `gr::Tags::InverseSpatialMetric`
+template <size_t SpatialDim, typename Frame, typename DataType>
+struct InverseSpatialMetricCompute
+    : InverseSpatialMetric<SpatialDim, Frame, DataType>,
+      db::ComputeTag {
+  static const auto& function(
+      const std::pair<Scalar<DataType>, tnsr::II<DataType, SpatialDim, Frame>>&
+          det_and_inverse_spatial_metric) {
+    return det_and_inverse_spatial_metric.second;
+  }
+  using argument_tags =
+      tmpl::list<DetAndInverseSpatialMetric<SpatialDim, Frame, DataType>>;
+};
+
+/// Compute item for shift \f$N^i\f$ from the spacetime metric
+/// \f$\psi_{ab}\f$ and the inverse spatial metric \f$g^{ij}\f$.
+///
+/// Can be retrieved using `gr::Tags::Shift`
+template <size_t SpatialDim, typename Frame, typename DataType>
+struct ShiftCompute : Shift<SpatialDim, Frame, DataType>, db::ComputeTag {
+  static constexpr auto function = &shift<SpatialDim, Frame, DataType>;
+  using argument_tags =
+      tmpl::list<SpacetimeMetric<SpatialDim, Frame, DataType>,
+                 InverseSpatialMetric<SpatialDim, Frame, DataType>>;
+};
+
+/// Compute item for lapse \f$N\f$ from the spacetime metric
+/// \f$\psi_{ab}\f$ and the shift \f$N^i\f$.
+///
+/// Can be retrieved using `gr::Tags::Lapse`
+template <size_t SpatialDim, typename Frame, typename DataType>
+struct LapseCompute : Lapse<DataType>, db::ComputeTag {
+  static constexpr auto function = &lapse<SpatialDim, Frame, DataType>;
+  using argument_tags =
+      tmpl::list<Shift<SpatialDim, Frame, DataType>,
+                 SpacetimeMetric<SpatialDim, Frame, DataType>>;
+};
+
+/// Compute item for spacetime normal oneform \f$n_a\f$ from
+/// the lapse \f$N\f$.
+///
+/// Can be retrieved using `gr::Tags::SpacetimeNormalOneForm`
+template <size_t SpatialDim, typename Frame, typename DataType>
+struct SpacetimeNormalOneFormCompute
+    : SpacetimeNormalOneForm<SpatialDim, Frame, DataType>,
+      db::ComputeTag {
+  static constexpr auto function =
+      &spacetime_normal_one_form<SpatialDim, Frame, DataType>;
+  using argument_tags = tmpl::list<Lapse<DataType>>;
+};
+
+/// Compute item for spacetime normal vector \f$n^a\f$ from
+/// the lapse \f$N\f$ and the shift \f$N^i\f$.
+///
+/// Can be retrieved using `gr::Tags::SpacetimeNormalVector`
+template <size_t SpatialDim, typename Frame, typename DataType>
+struct SpacetimeNormalVectorCompute
+    : SpacetimeNormalVector<SpatialDim, Frame, DataType>,
+      db::ComputeTag {
+  static constexpr auto function =
+      &spacetime_normal_vector<SpatialDim, Frame, DataType>;
+  using argument_tags =
+      tmpl::list<Lapse<DataType>, Shift<SpatialDim, Frame, DataType>>;
+};
+}  // namespace Tags
 }  // namespace gr
