@@ -8,6 +8,7 @@
 #include "DataStructures/DataVector.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Christoffel.hpp"
+#include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "tests/Unit/Pypp/CheckWithRandomValues.hpp"
 #include "tests/Unit/Pypp/SetupLocalPythonEnvironment.hpp"
 
@@ -40,4 +41,17 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GeneralRelativity.Christoffel.",
   test_christoffel<1, IndexType::Spacetime>(0.);
   test_christoffel<2, IndexType::Spacetime>(0.);
   test_christoffel<3, IndexType::Spacetime>(0.);
+
+  // Check that compute items work correctly in the DataBox
+  // First, check that the names are correct
+  CHECK(gr::Tags::SpacetimeChristoffelFirstKindCompute<3, Frame::Inertial,
+                                                       DataVector>::name() ==
+        "SpacetimeChristoffelFirstKind");
+  CHECK(gr::Tags::SpacetimeChristoffelSecondKindCompute<3, Frame::Inertial,
+                                                        DataVector>::name() ==
+        "SpacetimeChristoffelSecondKind");
+  CHECK(
+      gr::Tags::TraceSpacetimeChristoffelFirstKindCompute<3, Frame::Inertial,
+                                                          DataVector>::name() ==
+      "TraceSpacetimeChristoffelFirstKind");
 }
