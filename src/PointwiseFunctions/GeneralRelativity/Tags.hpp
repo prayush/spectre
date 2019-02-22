@@ -52,7 +52,11 @@ struct Lapse : db::SimpleTag {
   using type = Scalar<DataType>;
   static std::string name() noexcept { return "Lapse"; }
 };
-
+template <size_t Dim, typename Frame, typename DataType>
+struct DerivativesOfSpacetimeMetric : db::SimpleTag {
+  using type = tnsr::abb<DataType, Dim, Frame>;
+  static std::string name() noexcept { return "DerivativesOfSpacetimeMetric"; }
+};
 template <size_t Dim, typename Frame, typename DataType>
 struct SpacetimeChristoffelFirstKind : db::SimpleTag {
   using type = tnsr::abb<DataType, Dim, Frame>;
@@ -61,7 +65,9 @@ struct SpacetimeChristoffelFirstKind : db::SimpleTag {
 template <size_t Dim, typename Frame, typename DataType>
 struct SpacetimeChristoffelSecondKind : db::SimpleTag {
   using type = tnsr::Abb<DataType, Dim, Frame>;
-  static std::string name() noexcept { return "SpactimeChristoffelSecondKind"; }
+  static std::string name() noexcept {
+    return "SpacetimeChristoffelSecondKind";
+  }
 };
 template <size_t Dim, typename Frame, typename DataType>
 struct SpatialChristoffelFirstKind : db::SimpleTag {

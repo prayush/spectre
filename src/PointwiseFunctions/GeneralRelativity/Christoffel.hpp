@@ -53,12 +53,13 @@ template <size_t SpatialDim, typename Frame, typename DataType>
 struct SpacetimeChristoffelFirstKindCompute
     : SpacetimeChristoffelFirstKind<SpatialDim, Frame, DataType>,
       db::ComputeTag {
-  static constexpr auto function =
+  static constexpr tnsr::abb<DataType, SpatialDim, Frame,
+                             IndexType::Spacetime> (*function)(
+      const tnsr::abb<DataType, SpatialDim, Frame, IndexType::Spacetime>&) =
       &christoffel_first_kind<SpatialDim, Frame, IndexType::Spacetime,
                               DataType>;
   using argument_tags =
-      tmpl::list<::Tags::deriv<SpacetimeMetric<SpatialDim, Frame, DataType>,
-                               tmpl::size_t<SpatialDim>, Frame>>;
+      tmpl::list<DerivativesOfSpacetimeMetric<SpatialDim, Frame, DataType>>;
 };
 
 /// Compute item for spacetime Christoffel symbols of the second kind
@@ -70,7 +71,18 @@ template <size_t SpatialDim, typename Frame, typename DataType>
 struct SpacetimeChristoffelSecondKindCompute
     : SpacetimeChristoffelSecondKind<SpatialDim, Frame, DataType>,
       db::ComputeTag {
-  static constexpr auto function =
+  static constexpr Tensor<
+      DataType, Symmetry<2, 1, 1>,
+      index_list<SpacetimeIndex<SpatialDim, UpLo::Up, Frame>,
+                 SpacetimeIndex<SpatialDim, UpLo::Lo, Frame>,
+                 SpacetimeIndex<SpatialDim, UpLo::Lo, Frame>>> (*function)(
+      const Tensor<DataType, Symmetry<2, 1, 1>,
+                   index_list<SpacetimeIndex<SpatialDim, UpLo::Lo, Frame>,
+                              SpacetimeIndex<SpatialDim, UpLo::Lo, Frame>,
+                              SpacetimeIndex<SpatialDim, UpLo::Lo, Frame>>>&,
+      const Tensor<DataType, Symmetry<1, 1>,
+                   index_list<SpacetimeIndex<SpatialDim, UpLo::Up, Frame>,
+                              SpacetimeIndex<SpatialDim, UpLo::Up, Frame>>>&) =
       &raise_or_lower_first_index<DataType,
                                   SpacetimeIndex<SpatialDim, UpLo::Lo, Frame>,
                                   SpacetimeIndex<SpatialDim, UpLo::Lo, Frame>>;
@@ -89,7 +101,16 @@ template <size_t SpatialDim, typename Frame, typename DataType>
 struct TraceSpacetimeChristoffelFirstKindCompute
     : TraceSpacetimeChristoffelFirstKind<SpatialDim, Frame, DataType>,
       db::ComputeTag {
-  static constexpr auto function =
+  static constexpr Tensor<
+      DataType, Symmetry<1>,
+      index_list<SpacetimeIndex<SpatialDim, UpLo::Lo, Frame>>> (*function)(
+      const Tensor<DataType, Symmetry<2, 1, 1>,
+                   index_list<SpacetimeIndex<SpatialDim, UpLo::Lo, Frame>,
+                              SpacetimeIndex<SpatialDim, UpLo::Lo, Frame>,
+                              SpacetimeIndex<SpatialDim, UpLo::Lo, Frame>>>&,
+      const Tensor<DataType, Symmetry<1, 1>,
+                   index_list<SpacetimeIndex<SpatialDim, UpLo::Up, Frame>,
+                              SpacetimeIndex<SpatialDim, UpLo::Up, Frame>>>&) =
       &trace_last_indices<DataType, SpacetimeIndex<SpatialDim, UpLo::Lo, Frame>,
                           SpacetimeIndex<SpatialDim, UpLo::Lo, Frame>>;
   using argument_tags =

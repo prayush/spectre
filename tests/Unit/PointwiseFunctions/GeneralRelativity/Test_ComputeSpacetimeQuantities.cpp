@@ -156,7 +156,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GeneralRelativity.SpacetimeDecomp",
       gr::Tags::SpacetimeNormalVector<3, Frame::Inertial, DataVector>::name() ==
       "SpacetimeNormalVector");
 
-  // Second, Pput the compute items into a data box and check that they
+  // Second, put the compute items into a data box and check that they
   // put the correct results
   // Let's start with a known spacetime metric, and then test the
   // compute items that depend on the spacetime metric
