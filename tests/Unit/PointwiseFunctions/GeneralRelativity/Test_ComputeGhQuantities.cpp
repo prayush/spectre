@@ -19,6 +19,7 @@
 #include "Domain/CoordinateMaps/ProductMaps.hpp"
 #include "Domain/LogicalCoordinates.hpp"
 #include "Domain/Mesh.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "NumericalAlgorithms/Spectral/Spectral.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/KerrSchild.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Christoffel.hpp"
@@ -559,4 +560,31 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GeneralRelativity.GhQuantities",
                                     upper_bound);
   test_shift_deriv_functions_analytic(solution, grid_size, lower_bound,
                                       upper_bound);
+
+  // Check that compute items work correctly in the DataBox
+  // First, check that the names are correct
+  CHECK(GeneralizedHarmonic::Tags::PhiCompute<3, Frame::Inertial>::name() ==
+        "Phi");
+  CHECK(GeneralizedHarmonic::Tags::PiCompute<3, Frame::Inertial>::name() ==
+        "Pi");
+  CHECK(GeneralizedHarmonic::Tags::TraceExtrinsicCurvatureCompute<
+            3, Frame::Inertial>::name() == "TraceExtrinsicCurvature");
+  CHECK(GeneralizedHarmonic::Tags::GaugeHCompute<3, Frame::Inertial>::name() ==
+        "GaugeH");
+  CHECK(GeneralizedHarmonic::Tags::ExtrinsicCurvatureCompute<
+            3, Frame::Inertial>::name() == "ExtrinsicCurvature");
+  CHECK(GeneralizedHarmonic::Tags::DerivSpatialMetricCompute<
+            3, Frame::Inertial>::name() == "DerivSpatialMetric");
+  CHECK(GeneralizedHarmonic::Tags::DerivLapseCompute<3,
+                                                     Frame::Inertial>::name() ==
+        "DerivLapse");
+  CHECK(GeneralizedHarmonic::Tags::DerivShiftCompute<3,
+                                                     Frame::Inertial>::name() ==
+        "DerivShift");
+  CHECK(GeneralizedHarmonic::Tags::TimeDerivSpatialMetricCompute<
+            3, Frame::Inertial>::name() == "TimeDerivSpatialMetric");
+  CHECK(GeneralizedHarmonic::Tags::TimeDerivLapseCompute<
+            3, Frame::Inertial>::name() == "TimeDerivLapse");
+  CHECK(GeneralizedHarmonic::Tags::TimeDerivShiftCompute<
+            3, Frame::Inertial>::name() == "TimeDerivShift");
 }
