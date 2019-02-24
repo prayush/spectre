@@ -97,6 +97,13 @@ struct TraceSpacetimeChristoffelFirstKind : db::SimpleTag {
   }
 };
 template <size_t Dim, typename Frame, typename DataType>
+struct TraceSpatialChristoffelFirstKind : db::SimpleTag {
+  using type = tnsr::i<DataType, Dim, Frame>;
+  static std::string name() noexcept {
+    return "TraceSpatialChristoffelFirstKind";
+  }
+};
+template <size_t Dim, typename Frame, typename DataType>
 struct TraceSpatialChristoffelSecondKind : db::SimpleTag {
   using type = tnsr::I<DataType, Dim, Frame>;
   static std::string name() noexcept {

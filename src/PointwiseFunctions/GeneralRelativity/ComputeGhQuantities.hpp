@@ -8,7 +8,11 @@
 
 #include <cstddef>
 
+#include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
+#include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
+#include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 
 /// \cond
 namespace gsl {
@@ -433,4 +437,152 @@ tnsr::a<DataType, SpatialDim, Frame> spacetime_deriv_of_norm_of_shift(
     const tnsr::iaa<DataType, SpatialDim, Frame>& phi,
     const tnsr::aa<DataType, SpatialDim, Frame>& pi) noexcept;
 // @}
+
+namespace Tags {
+template <size_t SpatialDim, typename Frame>
+struct PhiCompute : Phi<SpatialDim, Frame>, db::ComputeTag {
+  static constexpr auto function = &phi<DataVector, SpatialDim, Frame>;
+  using argument_tags =
+      tmpl::list<gr::Tags::Lapse<DataVector>, DerivLapse<SpatialDim, Frame>,
+                 gr::Tags::Shift<SpatialDim, Frame, DataVector>,
+                 DerivShift<SpatialDim, Frame>,
+                 gr::Tags::SpatialMetric<SpatialDim, Frame, DataVector>,
+                 DerivSpatialMetric<SpatialDim, Frame>>;
+};
+
+template <size_t SpatialDim, typename Frame>
+struct PiCompute : Pi<SpatialDim, Frame>, db::ComputeTag {
+  static constexpr auto function = &pi<DataVector, SpatialDim, Frame>;
+  using argument_tags =
+      tmpl::list<TimeDerivLapse, gr::Tags::Shift<SpatialDim, Frame, DataVector>,
+                 TimeDerivShift<SpatialDim, Frame>,
+                 gr::Tags::SpatialMetric<SpatialDim, Frame, DataVector>,
+                 TimeDerivSpatialMetric<SpatialDim, Frame>,
+                 Phi<SpatialDim, Frame>>;
+};
+
+template <size_t SpatialDim, typename Frame>
+struct TraceExtrinsicCurvatureCompute
+    : gr::Tags::TraceExtrinsicCurvature<DataVector>,
+      db::ComputeTag {
+  static constexpr Scalar<DataVector> (*function)(
+      const Tensor<DataVector, Symmetry<1, 1>,
+                   index_list<SpatialIndex<SpatialDim, UpLo::Lo, Frame>,
+                              SpatialIndex<SpatialDim, UpLo::Lo, Frame>>>&,
+      const Tensor<DataVector, Symmetry<1, 1>,
+                   index_list<SpatialIndex<SpatialDim, UpLo::Up, Frame>,
+                              SpatialIndex<SpatialDim, UpLo::Up, Frame>>>&) =
+      &trace<DataVector, SpacetimeIndex<SpatialDim, UpLo::Lo, Frame>>;
+  using argument_tags = tmpl::list<
+      gr::Tags::ExtrinsicCurvature<SpatialDim, Frame, DataVector>,
+      gr::Tags::InverseSpacetimeMetric<SpatialDim, Frame, DataVector>>;
+};
+
+template <size_t SpatialDim, typename Frame>
+struct GaugeHCompute : GaugeH<SpatialDim, Frame>, db::ComputeTag {
+  static constexpr auto function = &gauge_source<DataVector, SpatialDim, Frame>;
+  using argument_tags =
+      tmpl::list<TimeDerivLapse, DerivLapse<SpatialDim, Frame>,
+                 gr::Tags::Shift<SpatialDim, Frame, DataVector>,
+                 TimeDerivShift<SpatialDim, Frame>,
+                 DerivShift<SpatialDim, Frame>,
+                 gr::Tags::SpatialMetric<SpatialDim, Frame, DataVector>,
+                 gr::Tags::TraceExtrinsicCurvature<DataVector>,
+                 gr::Tags::TraceSpatialChristoffelFirstKind<SpatialDim, Frame,
+                                                            DataVector>>;
+};
+
+template <size_t SpatialDim, typename Frame>
+struct ExtrinsicCurvatureCompute
+    : gr::Tags::ExtrinsicCurvature<SpatialDim, Frame, DataVector>,
+      db::ComputeTag {
+  static constexpr auto function =
+      &extrinsic_curvature<SpatialDim, Frame, DataVector>;
+  using argument_tags =
+      tmpl::list<gr::Tags::SpacetimeNormalVector<SpatialDim, Frame, DataVector>,
+                 Pi<SpatialDim, Frame>, Phi<SpatialDim, Frame>>;
+};
+
+template <size_t SpatialDim, typename Frame>
+struct DerivSpatialMetricCompute : DerivSpatialMetric<SpatialDim, Frame>,
+                                   db::ComputeTag {
+  static constexpr tnsr::ijj<DataVector, SpatialDim, Frame> (*function)(
+      const tnsr::iaa<DataVector, SpatialDim, Frame>&) =
+      &deriv_spatial_metric<SpatialDim, Frame>;
+  using argument_tags = tmpl::list<Phi<SpatialDim, Frame>>;
+};
+
+template <size_t SpatialDim, typename Frame>
+struct DerivLapseCompute : DerivLapse<SpatialDim, Frame>, db::ComputeTag {
+  static constexpr tnsr::i<DataVector, SpatialDim, Frame> (*function)(
+      const Scalar<DataVector>&, const tnsr::A<DataVector, SpatialDim, Frame>&,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>&) =
+      &spatial_deriv_of_lapse<SpatialDim, Frame>;
+  using argument_tags =
+      tmpl::list<gr::Tags::Lapse<DataVector>,
+                 gr::Tags::SpacetimeNormalVector<SpatialDim, Frame, DataVector>,
+                 Phi<SpatialDim, Frame>>;
+};
+
+template <size_t SpatialDim, typename Frame>
+struct DerivShiftCompute : DerivShift<SpatialDim, Frame>, db::ComputeTag {
+  static constexpr tnsr::iJ<DataVector, SpatialDim, Frame> (*function)(
+      const tnsr::iaa<DataVector, SpatialDim, Frame>&) =
+      &spatial_deriv_of_shift<SpatialDim, Frame, DataVector>;
+  using argument_tags = tmpl::list<
+      gr::Tags::InverseSpacetimeMetric<SpatialDim, Frame, DataVector>,
+      gr::Tags::SpacetimeNormalVector<SpatialDim, Frame, DataVector>,
+      Phi<SpatialDim, Frame>>;
+};
+
+template <size_t SpatialDim, typename Frame>
+struct TimeDerivSpatialMetricCompute
+    : TimeDerivSpatialMetric<SpatialDim, Frame>,
+      db::ComputeTag {
+  static constexpr tnsr::ii<DataVector, SpatialDim, Frame> (*function)(
+      const Scalar<DataVector>&, const tnsr::I<DataVector, SpatialDim, Frame>&,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>&,
+      const tnsr::aa<DataVector, SpatialDim, Frame>&) =
+      &time_deriv_of_spatial_metric<SpatialDim, Frame>;
+  using argument_tags =
+      tmpl::list<gr::Tags::Lapse<DataVector>,
+                 gr::Tags::Shift<SpatialDim, Frame, DataVector>,
+                 Phi<SpatialDim, Frame>, Pi<SpatialDim, Frame>>;
+};
+
+template <size_t SpatialDim, typename Frame>
+struct TimeDerivLapseCompute : TimeDerivLapse, db::ComputeTag {
+  static constexpr Scalar<DataVector> (*function)(
+      const Scalar<DataVector>&, const tnsr::I<DataVector, SpatialDim, Frame>&,
+      const tnsr::A<DataVector, SpatialDim, Frame>&,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>&,
+      const tnsr::aa<DataVector, SpatialDim, Frame>&) =
+      &time_deriv_of_lapse<SpatialDim, Frame>;
+  using argument_tags =
+      tmpl::list<gr::Tags::Lapse<DataVector>,
+                 gr::Tags::Shift<SpatialDim, Frame, DataVector>,
+                 gr::Tags::SpacetimeNormalVector<SpatialDim, Frame, DataVector>,
+                 Phi<SpatialDim, Frame>, Pi<SpatialDim, Frame>>;
+};
+
+template <size_t SpatialDim, typename Frame>
+struct TimeDerivShiftCompute : TimeDerivShift<SpatialDim, Frame>,
+                               db::ComputeTag {
+  static constexpr tnsr::I<DataVector, SpatialDim, Frame> (*function)(
+      const Scalar<DataVector>& lapse,
+      const tnsr::I<DataVector, SpatialDim, Frame>&,
+      const tnsr::II<DataVector, SpatialDim, Frame>&,
+      const tnsr::A<DataVector, SpatialDim, Frame>&,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>&,
+      const tnsr::aa<DataVector, SpatialDim, Frame>&) =
+      &time_deriv_of_shift<SpatialDim, Frame, DataVector>;
+  using argument_tags =
+      tmpl::list<gr::Tags::Lapse<DataVector>,
+                 gr::Tags::Shift<SpatialDim, Frame, DataVector>,
+                 gr::Tags::InverseSpatialMetric<SpatialDim, Frame, DataVector>,
+                 gr::Tags::SpacetimeNormalVector<SpatialDim, Frame, DataVector>,
+                 Phi<SpatialDim, Frame>, Pi<SpatialDim, Frame>>;
+};
+
+}  // namespace Tags
 }  // namespace GeneralizedHarmonic
