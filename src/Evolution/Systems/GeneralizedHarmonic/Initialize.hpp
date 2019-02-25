@@ -21,11 +21,15 @@
 #include "Evolution/Initialization/Evolution.hpp"
 #include "Evolution/Initialization/Limiter.hpp"
 #include "Evolution/Initialization/NonConservativeInterface.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "NumericalAlgorithms/LinearOperators/Divergence.tpp"
 #include "Parallel/ConstGlobalCache.hpp"
 #include "PointwiseFunctions/AnalyticData/Tags.hpp"
+#include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/KerrSchild.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/Tags.hpp"
+#include "PointwiseFunctions/GeneralRelativity/ComputeGhQuantities.hpp"
+#include "PointwiseFunctions/GeneralRelativity/ComputeSpacetimeQuantities.hpp"
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "Utilities/Gsl.hpp"
@@ -51,18 +55,29 @@ struct Initialize {
   struct VariablesTags {
     using system = typename Metavariables::system;
     using variables_tag = typename system::variables_tag;
-    using simple_tags =
-        db::AddSimpleTags<variables_tag,
-                          ::GeneralizedHarmonic::Tags::ConstraintGamma0,
-                          ::GeneralizedHarmonic::Tags::ConstraintGamma1,
-                          ::GeneralizedHarmonic::Tags::ConstraintGamma2,
-                          ::Tags::Interface<
-                              ::Tags::InternalDirections<Dim>,
-                              ::GeneralizedHarmonic::Tags::ConstraintGamma1>,
-                          ::Tags::Interface<
-                              ::Tags::InternalDirections<Dim>,
-                              ::GeneralizedHarmonic::Tags::ConstraintGamma2>>;
-    using compute_tags = db::AddComputeTags<>;
+    using simple_tags = db::AddSimpleTags<
+        variables_tag, GeneralizedHarmonic::Tags::ConstraintGamma0,
+        GeneralizedHarmonic::Tags::ConstraintGamma1,
+        GeneralizedHarmonic::Tags::ConstraintGamma2,
+        ::Tags::Interface<::Tags::InternalDirections<Dim>,
+                          GeneralizedHarmonic::Tags::ConstraintGamma1>,
+        ::Tags::Interface<::Tags::InternalDirections<Dim>,
+                          GeneralizedHarmonic::Tags::ConstraintGamma2>>;
+    using compute_tags = db::AddComputeTags<
+        gr::Tags::SpatialMetricCompute<Dim, Frame::Inertial, DataVector>,
+        gr::Tags::DetAndInverseSpatialMetricCompute<Dim, Frame::Inertial,
+                                                    DataVector>,
+        gr::Tags::InverseSpatialMetricCompute<Dim, Frame::Inertial, DataVector>,
+        gr::Tags::ShiftCompute<Dim, Frame::Inertial, DataVector>,
+        gr::Tags::LapseCompute<Dim, Frame::Inertial, DataVector>,
+        ::Tags::Interface<::Tags::InternalDirections<Dim>,
+                          gr::Tags::Lapse<DataVector>>,
+        ::Tags::Interface<::Tags::InternalDirections<Dim>,
+                          gr::Tags::Shift<Dim, Frame::Inertial, DataVector>>,
+        ::Tags::Interface<
+            ::Tags::InternalDirections<Dim>,
+            gr::Tags::InverseSpatialMetric<Dim, Frame::Inertial, DataVector>>,
+        ::Tags::UnitFaceNormalVectorCompute<Dim, Frame::Inertial>>;
 
     template <typename TagsList>
     static auto initialize(
@@ -91,26 +106,57 @@ struct Initialize {
 
       // Set initial data from analytic solution
       Vars vars{num_grid_points};
-      make_overloader(
-          [ initial_time, &inertial_coords ](
-              std::true_type /*is_analytic_solution*/,
-              const gsl::not_null<Vars*> local_vars,
-              const auto& local_cache) noexcept {
-            using solution_tag = OptionTags::AnalyticSolutionBase;
-            local_vars->assign_subset(
-                Parallel::get<solution_tag>(local_cache)
-                    .variables(inertial_coords, initial_time,
-                               typename Vars::tags_list{}));
-          },
-          [&inertial_coords](std::false_type /*is_analytic_solution*/,
-                             const gsl::not_null<Vars*> local_vars,
-                             const auto& local_cache) noexcept {
-            using analytic_data_tag = OptionTags::AnalyticDataBase;
-            local_vars->assign_subset(
-                Parallel::get<analytic_data_tag>(local_cache)
-                    .variables(inertial_coords, typename Vars::tags_list{}));
-          })(detail::has_analytic_solution_alias<Metavariables>{},
-             make_not_null(&vars), cache);
+
+      // FIXME: for now, only support Kerr Schild
+      // Later, support analytic data as well
+      using solution_tag = OptionTags::AnalyticSolutionBase;
+      const auto& solution_vars = Parallel::get<solution_tag>(cache).variables(
+          inertial_coords, initial_time,
+          typename gr::Solutions::KerrSchild::template tags<DataVector>{});
+
+      using DerivLapse = ::Tags::deriv<gr::Tags::Lapse<DataVector>,
+                                       tmpl::size_t<3>, Frame::Inertial>;
+      using DerivShift =
+          ::Tags::deriv<gr::Tags::Shift<3, Frame::Inertial, DataVector>,
+                        tmpl::size_t<3>, Frame::Inertial>;
+      using DerivSpatialMetric =
+          ::Tags::deriv<gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>,
+                        tmpl::size_t<3>, Frame::Inertial>;
+
+      const auto& lapse = get<gr::Tags::Lapse<DataVector>>(solution_vars);
+      const auto& dt_lapse =
+          get<::Tags::dt<gr::Tags::Lapse<DataVector>>>(solution_vars);
+      const auto& deriv_lapse = get<DerivLapse>(solution_vars);
+
+      const auto& shift =
+          get<gr::Tags::Shift<3, Frame::Inertial, DataVector>>(solution_vars);
+      const auto& dt_shift =
+          get<::Tags::dt<gr::Tags::Shift<3, Frame::Inertial, DataVector>>>(
+              solution_vars);
+      const auto& deriv_shift = get<DerivShift>(solution_vars);
+
+      const auto& spatial_metric =
+          get<gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>>(
+              solution_vars);
+      const auto& dt_spatial_metric = get<
+          ::Tags::dt<gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>>>(
+          solution_vars);
+      const auto& deriv_spatial_metric = get<DerivSpatialMetric>(solution_vars);
+
+      const auto& spacetime_metric =
+          gr::spacetime_metric(lapse, shift, spatial_metric);
+      const auto& phi =
+          GeneralizedHarmonic::phi(lapse, deriv_lapse, shift, deriv_shift,
+                                   spatial_metric, deriv_spatial_metric);
+      const auto& pi =
+          GeneralizedHarmonic::pi(lapse, dt_lapse, shift, dt_shift,
+                                  spatial_metric, dt_spatial_metric, phi);
+      const tuples::TaggedTuple<gr::Tags::SpacetimeMetric<3>,
+                                GeneralizedHarmonic::Tags::Pi<3>,
+                                GeneralizedHarmonic::Tags::Phi<3>>
+          solution_tuple(spacetime_metric, pi, phi);
+
+      vars.assign_subset(solution_tuple);
 
       return db::create_from<db::RemoveTags<>, simple_tags, compute_tags>(
           std::move(box), std::move(vars), std::move(gamma0), std::move(gamma1),

@@ -130,11 +130,12 @@ void compute_characteristic_speeds(
  */
 template <size_t Dim, typename Frame>
 struct CharacteristicFieldsCompute : db::ComputeTag {
-  using argument_tags = tmpl::list<
-      Tags::ConstraintGamma2, gr::Tags::SpacetimeMetric<Dim, Frame, DataVector>,
-      gr::Tags::InverseSpatialMetric<Dim, Frame, DataVector>,
-      Tags::Pi<Dim, Frame>, Tags::Phi<Dim, Frame>,
-      ::Tags::Normalized<::Tags::UnnormalizedFaceNormal<Dim, Frame>>>;
+  using argument_tags =
+      tmpl::list<Tags::ConstraintGamma2,
+                 gr::Tags::SpacetimeMetric<Dim, Frame, DataVector>,
+                 Tags::Pi<Dim, Frame>, Tags::Phi<Dim, Frame>,
+                 ::Tags::UnitFaceNormal<Dim, Frame>,
+                 ::Tags::UnitFaceNormalVector<Dim, Frame>>;
 
   static typename Tags::CharacteristicFields<Dim, Frame>::type function(
       const Scalar<DataVector>& gamma_2,

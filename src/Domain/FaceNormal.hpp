@@ -17,6 +17,8 @@
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "Domain/Tags.hpp"  // IWYU pragma: keep
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
+#include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
+#include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "Utilities/TMPL.hpp"
 
 /// \cond
@@ -104,6 +106,25 @@ struct Normalized<UnnormalizedFaceNormal<Dim, Frame>>
   using argument_tags =
       tmpl::list<UnnormalizedFaceNormal<Dim, Frame>,
                  Magnitude<UnnormalizedFaceNormal<Dim, Frame>>>;
+};
+
+template <size_t Dim, typename Frame>
+struct UnitFaceNormalVector : db::SimpleTag {
+  using type = tnsr::I<DataVector, Dim, Frame>;
+  static std::string name() noexcept { return "UnitFaceNormalVector"; }
+};
+
+template <size_t SpatialDim, typename Frame>
+struct UnitFaceNormalVectorCompute : UnitFaceNormalVector<SpatialDim, Frame>,
+                                     db::ComputeTag {
+  static constexpr tnsr::I<DataVector, SpatialDim, Frame> (*function)(
+      const tnsr::i<DataVector, SpatialDim, Frame>&,
+      const tnsr::II<DataVector, SpatialDim, Frame>&) =
+      &raise_or_lower_index<DataVector,
+                            SpatialIndex<SpatialDim, UpLo::Lo, Frame>>;
+  using argument_tags =
+      tmpl::list<UnitFaceNormal<SpatialDim, Frame>,
+                 gr::Tags::InverseSpatialMetric<SpatialDim, Frame, DataVector>>;
 };
 
 /// \ingroup DataBoxTagsGroup
