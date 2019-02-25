@@ -1,5 +1,6 @@
 // Distributed under the MIT License.
 // See LICENSE.txt for details.
+#include <iostream>
 
 #include "tests/Unit/TestingFramework.hpp"
 
@@ -587,4 +588,199 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GeneralRelativity.GhQuantities",
             3, Frame::Inertial>::name() == "TimeDerivLapse");
   CHECK(GeneralizedHarmonic::Tags::TimeDerivShiftCompute<
             3, Frame::Inertial>::name() == "TimeDerivShift");
+  CHECK(GeneralizedHarmonic::Tags::DerivativesOfSpacetimeMetricCompute<
+            3, Frame::Inertial>::name() == "DerivativesOfSpacetimeMetric");
+
+  // Check that the compute items return the correct values
+  const DataVector test_vector{5.0, 4.0};
+  auto spatial_metric =
+      make_with_value<tnsr::ii<DataVector, 3, Frame::Inertial>>(test_vector,
+                                                                0.0);
+  get<0, 0>(spatial_metric) = 1.5;
+  get<0, 1>(spatial_metric) = 0.1;
+  get<0, 2>(spatial_metric) = 0.2;
+  get<1, 1>(spatial_metric) = 1.4;
+  get<1, 2>(spatial_metric) = 0.2;
+  get<2, 2>(spatial_metric) = 1.3;
+
+  auto lapse = make_with_value<Scalar<DataVector>>(test_vector, 0.94);
+
+  auto shift = make_with_value<tnsr::I<DataVector, 3, Frame::Inertial>>(
+      test_vector, 0.0);
+  get<0>(shift) = 0.5;
+  get<1>(shift) = 0.6;
+  get<2>(shift) = 0.7;
+
+  auto dt_spatial_metric =
+      make_with_value<tnsr::ii<DataVector, 3, Frame::Inertial>>(test_vector,
+                                                                0.0);
+  get<0, 0>(dt_spatial_metric) = 0.05;
+  get<0, 1>(dt_spatial_metric) = 0.01;
+  get<0, 2>(dt_spatial_metric) = 0.02;
+  get<1, 1>(dt_spatial_metric) = 0.04;
+  get<1, 2>(dt_spatial_metric) = 0.02;
+  get<2, 2>(dt_spatial_metric) = 0.03;
+
+  auto dt_lapse = make_with_value<Scalar<DataVector>>(test_vector, 0.0);
+  get(dt_lapse) = 0.04;
+
+  auto dt_shift = make_with_value<tnsr::I<DataVector, 3, Frame::Inertial>>(
+      test_vector, 0.0);
+  get<0>(dt_shift) = 0.05;
+  get<1>(dt_shift) = 0.06;
+  get<2>(dt_shift) = 0.07;
+
+  auto deriv_spatial_metric =
+      make_with_value<tnsr::ijj<DataVector, 3, Frame::Inertial>>(test_vector,
+                                                                 0.0);
+  get<0, 0, 0>(deriv_spatial_metric) = 0.1;
+  get<0, 0, 1>(deriv_spatial_metric) = 0.2;
+  get<0, 0, 2>(deriv_spatial_metric) = 0.3;
+  get<0, 1, 1>(deriv_spatial_metric) = 0.2;
+  get<0, 1, 2>(deriv_spatial_metric) = 0.1;
+  get<0, 2, 2>(deriv_spatial_metric) = 0.2;
+  get<1, 0, 0>(deriv_spatial_metric) = 0.3;
+  get<1, 0, 1>(deriv_spatial_metric) = 0.2;
+  get<1, 0, 2>(deriv_spatial_metric) = 0.1;
+  get<1, 1, 1>(deriv_spatial_metric) = 0.2;
+  get<1, 1, 2>(deriv_spatial_metric) = 0.3;
+  get<1, 2, 2>(deriv_spatial_metric) = 0.2;
+  get<2, 0, 0>(deriv_spatial_metric) = -0.1;
+  get<2, 0, 1>(deriv_spatial_metric) = -0.2;
+  get<2, 0, 2>(deriv_spatial_metric) = -0.3;
+  get<2, 1, 1>(deriv_spatial_metric) = -0.2;
+  get<2, 1, 2>(deriv_spatial_metric) = -0.1;
+  get<2, 2, 2>(deriv_spatial_metric) = -0.2;
+
+  auto deriv_lapse = make_with_value<tnsr::i<DataVector, 3, Frame::Inertial>>(
+      test_vector, 0.0);
+  get<0>(deriv_lapse) = -0.1;
+  get<1>(deriv_lapse) = -0.2;
+  get<2>(deriv_lapse) = -0.3;
+
+  auto deriv_shift = make_with_value<tnsr::iJ<DataVector, 3, Frame::Inertial>>(
+      test_vector, 0.0);
+  get<0, 0>(deriv_shift) = -0.05;
+  get<0, 1>(deriv_shift) = 0.06;
+  get<0, 2>(deriv_shift) = 0.07;
+  get<1, 0>(deriv_shift) = -0.03;
+  get<1, 1>(deriv_shift) = 0.04;
+  get<1, 2>(deriv_shift) = 0.03;
+  get<2, 0>(deriv_shift) = 0.01;
+  get<2, 1>(deriv_shift) = 0.02;
+  get<2, 2>(deriv_shift) = -0.01;
+
+  const auto& derivatives_of_spacetime_metric =
+      gr::derivatives_of_spacetime_metric(
+          lapse, dt_lapse, deriv_lapse, shift, dt_shift, deriv_shift,
+          spatial_metric, dt_spatial_metric, deriv_spatial_metric);
+
+  const auto& spacetime_normal_vector =
+      gr::spacetime_normal_vector(lapse, shift);
+  const auto& inverse_spatial_metric =
+      determinant_and_inverse(spatial_metric).second;
+  const auto& inverse_spacetime_metric =
+      gr::inverse_spacetime_metric(lapse, shift, inverse_spatial_metric);
+
+  const auto& phi =
+      GeneralizedHarmonic::phi(lapse, deriv_lapse, shift, deriv_shift,
+                               spatial_metric, deriv_spatial_metric);
+  const auto& pi = GeneralizedHarmonic::pi(
+      lapse, dt_lapse, shift, dt_shift, spatial_metric, dt_spatial_metric, phi);
+
+  const auto& extrinsic_curvature = GeneralizedHarmonic::extrinsic_curvature(
+      spacetime_normal_vector, pi, phi);
+  const auto& trace_extrinsic_curvature =
+      trace(extrinsic_curvature, inverse_spatial_metric);
+
+  const auto& christoffel_first_kind =
+      gr::christoffel_first_kind(deriv_spatial_metric);
+  const auto& trace_christoffel_first_kind =
+      trace_last_indices(christoffel_first_kind, inverse_spatial_metric);
+
+  const auto& gauge_source = GeneralizedHarmonic::gauge_source(
+      lapse, dt_lapse, deriv_lapse, shift, dt_shift, deriv_shift,
+      spatial_metric, trace_extrinsic_curvature, trace_christoffel_first_kind);
+
+  const auto box = db::create<
+      db::AddSimpleTags<
+          gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>,
+          gr::Tags::Lapse<DataVector>,
+          gr::Tags::Shift<3, Frame::Inertial, DataVector>,
+          GeneralizedHarmonic::Tags::DerivSpatialMetric<3, Frame::Inertial>,
+          GeneralizedHarmonic::Tags::DerivLapse<3, Frame::Inertial>,
+          GeneralizedHarmonic::Tags::DerivShift<3, Frame::Inertial>,
+          GeneralizedHarmonic::Tags::TimeDerivSpatialMetric<3, Frame::Inertial>,
+          GeneralizedHarmonic::Tags::TimeDerivLapse,
+          GeneralizedHarmonic::Tags::TimeDerivShift<3, Frame::Inertial>>,
+      db::AddComputeTags<
+          gr::Tags::SpacetimeNormalVectorCompute<3, Frame::Inertial,
+                                                 DataVector>,
+          gr::Tags::DetAndInverseSpatialMetricCompute<3, Frame::Inertial,
+                                                      DataVector>,
+          gr::Tags::InverseSpatialMetricCompute<3, Frame::Inertial, DataVector>,
+          gr::Tags::SpatialChristoffelFirstKindCompute<3, Frame::Inertial,
+                                                       DataVector>,
+          gr::Tags::TraceSpatialChristoffelFirstKindCompute<3, Frame::Inertial,
+                                                            DataVector>,
+          GeneralizedHarmonic::Tags::PhiCompute<3, Frame::Inertial>,
+          GeneralizedHarmonic::Tags::PiCompute<3, Frame::Inertial>,
+          GeneralizedHarmonic::Tags::ExtrinsicCurvatureCompute<3,
+                                                               Frame::Inertial>,
+          GeneralizedHarmonic::Tags::TraceExtrinsicCurvatureCompute<
+              3, Frame::Inertial>,
+          GeneralizedHarmonic::Tags::GaugeHCompute<3, Frame::Inertial>,
+          GeneralizedHarmonic::Tags::DerivativesOfSpacetimeMetricCompute<
+              3, Frame::Inertial>>>(spatial_metric, lapse, shift,
+                                    deriv_spatial_metric, deriv_lapse,
+                                    deriv_shift, dt_spatial_metric, dt_lapse,
+                                    dt_shift);
+
+  CHECK(db::get<GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial>>(box) ==
+        phi);
+  CHECK(db::get<GeneralizedHarmonic::Tags::Pi<3, Frame::Inertial>>(box) == pi);
+  CHECK(db::get<gr::Tags::ExtrinsicCurvature<3, Frame::Inertial, DataVector>>(
+            box) == extrinsic_curvature);
+  CHECK(db::get<gr::Tags::TraceExtrinsicCurvature<DataVector>>(box) ==
+        trace_extrinsic_curvature);
+  CHECK(db::get<GeneralizedHarmonic::Tags::GaugeH<3, Frame::Inertial>>(box) ==
+        gauge_source);
+  CHECK(db::get<gr::Tags::DerivativesOfSpacetimeMetric<3, Frame::Inertial,
+                                                       DataVector>>(box) ==
+        derivatives_of_spacetime_metric);
+
+  const auto other_box = db::create<
+      db::AddSimpleTags<
+          gr::Tags::Lapse<DataVector>,
+          gr::Tags::Shift<3, Frame::Inertial, DataVector>,
+          gr::Tags::SpacetimeNormalVector<3, Frame::Inertial, DataVector>,
+          gr::Tags::InverseSpacetimeMetric<3, Frame::Inertial, DataVector>,
+          gr::Tags::InverseSpatialMetric<3, Frame::Inertial, DataVector>,
+          GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial>,
+          GeneralizedHarmonic::Tags::Pi<3, Frame::Inertial>>,
+      db::AddComputeTags<
+          GeneralizedHarmonic::Tags::DerivSpatialMetricCompute<3,
+                                                               Frame::Inertial>,
+          GeneralizedHarmonic::Tags::DerivLapseCompute<3, Frame::Inertial>,
+          GeneralizedHarmonic::Tags::DerivShiftCompute<3, Frame::Inertial>,
+          GeneralizedHarmonic::Tags::TimeDerivSpatialMetricCompute<
+              3, Frame::Inertial>,
+          GeneralizedHarmonic::Tags::TimeDerivLapseCompute<3, Frame::Inertial>,
+          GeneralizedHarmonic::Tags::TimeDerivShiftCompute<3,
+                                                           Frame::Inertial>>>(
+      lapse, shift, spacetime_normal_vector, inverse_spacetime_metric,
+      inverse_spatial_metric, phi, pi);
+  CHECK(db::get<
+            GeneralizedHarmonic::Tags::DerivSpatialMetric<3, Frame::Inertial>>(
+            other_box) == deriv_spatial_metric);
+  CHECK(db::get<GeneralizedHarmonic::Tags::DerivLapse<3, Frame::Inertial>>(
+            other_box) == deriv_lapse);
+  CHECK(db::get<GeneralizedHarmonic::Tags::DerivShift<3, Frame::Inertial>>(
+            other_box) == deriv_shift);
+  CHECK(db::get<GeneralizedHarmonic::Tags::TimeDerivSpatialMetric<
+            3, Frame::Inertial>>(other_box) == dt_spatial_metric);
+  CHECK(db::get<GeneralizedHarmonic::Tags::TimeDerivLapse>(other_box) ==
+        dt_lapse);
+  CHECK(db::get<GeneralizedHarmonic::Tags::TimeDerivShift<3, Frame::Inertial>>(
+            other_box) == dt_shift);
 }

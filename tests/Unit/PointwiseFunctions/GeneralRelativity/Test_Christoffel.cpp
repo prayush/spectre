@@ -66,7 +66,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GeneralRelativity.Christoffel",
         "TraceSpatialChristoffelFirstKind");
 
   // Second, check that the compute items correctly compute their results
-  DataVector test_vector{5.0, 4.0};
+  const DataVector test_vector{5.0, 4.0};
   auto deriv_spacetime_metric =
       make_with_value<tnsr::abb<DataVector, 3, Frame::Inertial>>(test_vector,
                                                                  0.0);

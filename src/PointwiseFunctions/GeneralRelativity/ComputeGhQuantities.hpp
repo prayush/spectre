@@ -11,6 +11,7 @@
 #include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
+#include "PointwiseFunctions/GeneralRelativity/ComputeSpacetimeQuantities.hpp"
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 
@@ -454,7 +455,8 @@ template <size_t SpatialDim, typename Frame>
 struct PiCompute : Pi<SpatialDim, Frame>, db::ComputeTag {
   static constexpr auto function = &pi<SpatialDim, Frame, DataVector>;
   using argument_tags =
-      tmpl::list<TimeDerivLapse, gr::Tags::Shift<SpatialDim, Frame, DataVector>,
+      tmpl::list<gr::Tags::Lapse<DataVector>, TimeDerivLapse,
+                 gr::Tags::Shift<SpatialDim, Frame, DataVector>,
                  TimeDerivShift<SpatialDim, Frame>,
                  gr::Tags::SpatialMetric<SpatialDim, Frame, DataVector>,
                  TimeDerivSpatialMetric<SpatialDim, Frame>,
@@ -466,13 +468,8 @@ struct TraceExtrinsicCurvatureCompute
     : gr::Tags::TraceExtrinsicCurvature<DataVector>,
       db::ComputeTag {
   static constexpr Scalar<DataVector> (*function)(
-      const Tensor<DataVector, Symmetry<1, 1>,
-                   index_list<SpatialIndex<SpatialDim, UpLo::Lo, Frame>,
-                              SpatialIndex<SpatialDim, UpLo::Lo, Frame>>>&,
-      const Tensor<DataVector, Symmetry<1, 1>,
-                   index_list<SpatialIndex<SpatialDim, UpLo::Up, Frame>,
-                              SpatialIndex<SpatialDim, UpLo::Up, Frame>>>&) =
-      &trace<DataVector, SpatialIndex<SpatialDim, UpLo::Lo, Frame>>;
+      const tnsr::ii<DataVector, SpatialDim, Frame>&,
+      const tnsr::II<DataVector, SpatialDim, Frame>&) = &trace;
   using argument_tags =
       tmpl::list<gr::Tags::ExtrinsicCurvature<SpatialDim, Frame, DataVector>,
                  gr::Tags::InverseSpatialMetric<SpatialDim, Frame, DataVector>>;
@@ -482,7 +479,8 @@ template <size_t SpatialDim, typename Frame>
 struct GaugeHCompute : GaugeH<SpatialDim, Frame>, db::ComputeTag {
   static constexpr auto function = &gauge_source<SpatialDim, Frame, DataVector>;
   using argument_tags =
-      tmpl::list<TimeDerivLapse, DerivLapse<SpatialDim, Frame>,
+      tmpl::list<gr::Tags::Lapse<DataVector>, TimeDerivLapse,
+                 DerivLapse<SpatialDim, Frame>,
                  gr::Tags::Shift<SpatialDim, Frame, DataVector>,
                  TimeDerivShift<SpatialDim, Frame>,
                  DerivShift<SpatialDim, Frame>,
@@ -532,6 +530,7 @@ struct DerivShiftCompute : DerivShift<SpatialDim, Frame>, db::ComputeTag {
       const tnsr::iaa<DataVector, SpatialDim, Frame>&) =
       &spatial_deriv_of_shift<SpatialDim, Frame, DataVector>;
   using argument_tags = tmpl::list<
+      gr::Tags::Lapse<DataVector>,
       gr::Tags::InverseSpacetimeMetric<SpatialDim, Frame, DataVector>,
       gr::Tags::SpacetimeNormalVector<SpatialDim, Frame, DataVector>,
       Phi<SpatialDim, Frame>>;
@@ -584,6 +583,23 @@ struct TimeDerivShiftCompute : TimeDerivShift<SpatialDim, Frame>,
                  gr::Tags::InverseSpatialMetric<SpatialDim, Frame, DataVector>,
                  gr::Tags::SpacetimeNormalVector<SpatialDim, Frame, DataVector>,
                  Phi<SpatialDim, Frame>, Pi<SpatialDim, Frame>>;
+};
+
+template <size_t SpatialDim, typename Frame>
+struct DerivativesOfSpacetimeMetricCompute
+    : gr::Tags::DerivativesOfSpacetimeMetric<SpatialDim, Frame, DataVector>,
+      db::ComputeTag {
+  static constexpr auto function =
+      &gr::derivatives_of_spacetime_metric<SpatialDim, Frame, DataVector>;
+  using argument_tags =
+      tmpl::list<gr::Tags::Lapse<DataVector>, TimeDerivLapse,
+                 DerivLapse<SpatialDim, Frame>,
+                 gr::Tags::Shift<SpatialDim, Frame, DataVector>,
+                 TimeDerivShift<SpatialDim, Frame>,
+                 DerivShift<SpatialDim, Frame>,
+                 gr::Tags::SpatialMetric<SpatialDim, Frame, DataVector>,
+                 TimeDerivSpatialMetric<SpatialDim, Frame>,
+                 DerivSpatialMetric<SpatialDim, Frame>>;
 };
 
 }  // namespace Tags
