@@ -118,14 +118,6 @@ struct EvolvedFieldsFromCharacteristicFields : db::SimpleTag {
   }
 };
 
-template <size_t Dim, typename Frame>
-struct UnitNormalOneForm : db::SimpleTag {
-  using type = tnsr::i<DataVector, Dim, Frame>;
-  static std::string name() noexcept {
-    return "UnitNormalOneForm";
-  }
-};
-
 template <size_t SpatialDim, typename Frame>
 struct DerivSpatialMetric : db::SimpleTag {
   using type = tnsr::ijj<DataVector, SpatialDim, Frame>;

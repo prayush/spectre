@@ -365,7 +365,7 @@ void UpwindFlux<Dim>::package_data(
   get<::Tags::CharSpeed<Tags::UMinus<Dim, Frame::Inertial>>>(*packaged_data) =
       char_speed_u_minus;
   get<Tags::ConstraintGamma2>(*packaged_data) = gamma2;
-  get<Tags::UnitNormalOneForm<Dim, Frame::Inertial>>(*packaged_data) =
+  get<::Tags::UnitFaceNormal<Dim, Frame::Inertial>>(*packaged_data) =
       interface_unit_normal;
 }
 

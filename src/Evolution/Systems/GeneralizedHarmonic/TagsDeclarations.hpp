@@ -22,8 +22,6 @@ struct GaugeH;
 template <size_t Dim, typename Frame = Frame::Inertial>
 struct SpacetimeDerivGaugeH;
 template <size_t Dim, typename Frame = Frame::Inertial>
-struct UnitNormalOneForm;
-template <size_t Dim, typename Frame = Frame::Inertial>
 struct DerivSpatialMetric;
 template <size_t Dim, typename Frame = Frame::Inertial>
 struct TimeDerivSpatialMetric;

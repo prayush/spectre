@@ -205,7 +205,7 @@ struct UpwindFlux {
       ::Tags::CharSpeed<Tags::UZero<Dim, Frame::Inertial>>,
       ::Tags::CharSpeed<Tags::UPlus<Dim, Frame::Inertial>>,
       ::Tags::CharSpeed<Tags::UMinus<Dim, Frame::Inertial>>,
-      Tags::ConstraintGamma2, Tags::UnitNormalOneForm<Dim, Frame::Inertial>>;
+      Tags::ConstraintGamma2, ::Tags::UnitFaceNormal<Dim, Frame::Inertial>>;
 
   // These tags on the interface of the element are passed to
   // `package_data` to provide the data needed to compute the numerical fluxes.
@@ -216,7 +216,7 @@ struct UpwindFlux {
       ::Tags::CharSpeed<Tags::UZero<Dim, Frame::Inertial>>,
       ::Tags::CharSpeed<Tags::UPlus<Dim, Frame::Inertial>>,
       ::Tags::CharSpeed<Tags::UMinus<Dim, Frame::Inertial>>,
-      Tags::ConstraintGamma2, Tags::UnitNormalOneForm<Dim, Frame::Inertial>>;
+      Tags::ConstraintGamma2, ::Tags::UnitFaceNormal<Dim, Frame::Inertial>>;
 
   // pseudo-interface: used internally by Algorithm infrastructure, not
   // user-level code

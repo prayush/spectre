@@ -13,8 +13,10 @@
 #include <unordered_map>
 
 #include "DataStructures/DataBox/DataBoxTag.hpp"
+#include "DataStructures/Tensor/EagerMath/Magnitude.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "Domain/Tags.hpp"  // IWYU pragma: keep
+#include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "Utilities/TMPL.hpp"
 
 /// \cond
@@ -74,6 +76,34 @@ struct UnnormalizedFaceNormal : db::ComputeTag {
       tmpl::list<Mesh<VolumeDim - 1>, ElementMap<VolumeDim, Frame>,
                  Direction<VolumeDim>>;
   using volume_tags = tmpl::list<ElementMap<VolumeDim, Frame>>;
+};
+
+template <size_t Dim, typename Frame>
+struct UnitFaceNormal : db::SimpleTag {
+  using type = tnsr::i<DataVector, Dim, Frame>;
+  static std::string name() noexcept { return "UnitFaceNormal"; }
+};
+
+template <size_t Dim, typename Frame>
+struct Normalized<UnnormalizedFaceNormal<Dim, Frame>>
+    : UnitFaceNormal<Dim, Frame>, db::ComputeTag {
+  static std::string name() noexcept {
+    return "Normalized(UnnormalizedFaceNormal)";
+  }
+  static constexpr auto function(
+      const db::item_type<UnnormalizedFaceNormal<Dim, Frame>>&
+          vector_in,  // Compute items need to take const references
+      const db::item_type<Magnitude<UnnormalizedFaceNormal<Dim, Frame>>>&
+          magnitude) noexcept {
+    auto vector = vector_in;
+    for (size_t d = 0; d < vector.index_dim(0); ++d) {
+      vector.get(d) /= get(magnitude);
+    }
+    return vector;
+  }
+  using argument_tags =
+      tmpl::list<UnnormalizedFaceNormal<Dim, Frame>,
+                 Magnitude<UnnormalizedFaceNormal<Dim, Frame>>>;
 };
 
 /// \ingroup DataBoxTagsGroup
