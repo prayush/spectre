@@ -60,11 +60,7 @@ struct Initialize {
     using simple_tags = db::AddSimpleTags<
         variables_tag, GeneralizedHarmonic::Tags::ConstraintGamma0,
         GeneralizedHarmonic::Tags::ConstraintGamma1,
-        GeneralizedHarmonic::Tags::ConstraintGamma2,
-        ::Tags::Interface<::Tags::InternalDirections<Dim>,
-                          GeneralizedHarmonic::Tags::ConstraintGamma1>,
-        ::Tags::Interface<::Tags::InternalDirections<Dim>,
-                          GeneralizedHarmonic::Tags::ConstraintGamma2>>;
+        GeneralizedHarmonic::Tags::ConstraintGamma2>;
     using compute_tags = db::AddComputeTags<
         gr::Tags::SpatialMetricCompute<Dim, Frame::Inertial, DataVector>,
         gr::Tags::DetAndInverseSpatialMetricCompute<Dim, Frame::Inertial,

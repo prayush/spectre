@@ -87,11 +87,7 @@ struct UnitFaceNormal : db::SimpleTag {
 };
 
 template <size_t Dim, typename Frame>
-struct Normalized<UnnormalizedFaceNormal<Dim, Frame>>
-    : UnitFaceNormal<Dim, Frame>, db::ComputeTag {
-  static std::string name() noexcept {
-    return "Normalized(UnnormalizedFaceNormal)";
-  }
+struct UnitFaceNormalCompute : UnitFaceNormal<Dim, Frame>, db::ComputeTag {
   static constexpr auto function(
       const db::item_type<UnnormalizedFaceNormal<Dim, Frame>>&
           vector_in,  // Compute items need to take const references
