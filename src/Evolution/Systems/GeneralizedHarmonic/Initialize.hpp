@@ -57,10 +57,11 @@ struct Initialize {
     using system = typename Metavariables::system;
     using variables_tag = typename system::variables_tag;
 
-    using simple_tags = db::AddSimpleTags<
-        variables_tag, GeneralizedHarmonic::Tags::ConstraintGamma0,
-        GeneralizedHarmonic::Tags::ConstraintGamma1,
-        GeneralizedHarmonic::Tags::ConstraintGamma2>;
+    using simple_tags =
+        db::AddSimpleTags<variables_tag,
+                          GeneralizedHarmonic::Tags::ConstraintGamma0,
+                          GeneralizedHarmonic::Tags::ConstraintGamma1,
+                          GeneralizedHarmonic::Tags::ConstraintGamma2>;
     using compute_tags = db::AddComputeTags<
         gr::Tags::SpatialMetricCompute<Dim, Frame::Inertial, DataVector>,
         gr::Tags::DetAndInverseSpatialMetricCompute<Dim, Frame::Inertial,
