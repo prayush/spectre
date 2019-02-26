@@ -57,11 +57,11 @@ struct Initialize {
     using system = typename Metavariables::system;
     using variables_tag = typename system::variables_tag;
 
-    using simple_tags =
-        db::AddSimpleTags<variables_tag,
-                          GeneralizedHarmonic::Tags::ConstraintGamma0,
-                          GeneralizedHarmonic::Tags::ConstraintGamma1,
-                          GeneralizedHarmonic::Tags::ConstraintGamma2>;
+    using simple_tags = db::AddSimpleTags<
+        variables_tag, GeneralizedHarmonic::Tags::ConstraintGamma0,
+        GeneralizedHarmonic::Tags::ConstraintGamma1,
+        GeneralizedHarmonic::Tags::ConstraintGamma2,
+        GeneralizedHarmonic::Tags::TimeDerivGaugeH<Dim, Frame::Inertial>>;
     using compute_tags = db::AddComputeTags<
         gr::Tags::SpatialMetricCompute<Dim, Frame::Inertial, DataVector>,
         gr::Tags::DetAndInverseSpatialMetricCompute<Dim, Frame::Inertial,
@@ -101,7 +101,11 @@ struct Initialize {
                                                              Frame::Inertial>,
         GeneralizedHarmonic::Tags::TraceExtrinsicCurvatureCompute<
             Dim, Frame::Inertial>,
-        GeneralizedHarmonic::Tags::GaugeHCompute<Dim, Frame::Inertial>>;
+        GeneralizedHarmonic::Tags::GaugeHCompute<Dim, Frame::Inertial>,
+        ::Tags::deriv<GeneralizedHarmonic::Tags::GaugeH<Dim, Frame::Inertial>,
+                      tmpl::size_t<Dim>, Frame::Inertial>,
+        GeneralizedHarmonic::Tags::SpacetimeDerivGaugeHCompute<
+            Dim, Frame::Inertial>>;
 
     /* NOT YET ADDED BUT NEEDED BY ComputeDuDt
           ::Tags::deriv<Tags::Pi<Dim>, tmpl::size_t<Dim>, Frame::Inertial>,
@@ -203,9 +207,13 @@ struct Initialize {
 
       vars.assign_subset(solution_tuple);
 
+      // Set the time derivatives of GaugeH
+      const auto& dt_gauge_source =
+          make_with_value<tnsr::a<DataVector, 3, Frame::Inertial>>(gamma0, 0.0);
+
       return db::create_from<db::RemoveTags<>, simple_tags, compute_tags>(
           std::move(box), std::move(vars), std::move(gamma0), std::move(gamma1),
-          std::move(gamma2));
+          std::move(gamma2), std::move(dt_gauge_source));
     }
   };
 

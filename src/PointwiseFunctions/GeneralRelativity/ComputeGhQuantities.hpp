@@ -11,6 +11,7 @@
 #include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
+#include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"
 #include "PointwiseFunctions/GeneralRelativity/ComputeSpacetimeQuantities.hpp"
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
@@ -488,6 +489,30 @@ struct GaugeHCompute : GaugeH<SpatialDim, Frame>, db::ComputeTag {
                  gr::Tags::TraceExtrinsicCurvature<DataVector>,
                  gr::Tags::TraceSpatialChristoffelFirstKind<SpatialDim, Frame,
                                                             DataVector>>;
+};
+
+template <size_t SpatialDim, typename Frame>
+struct SpacetimeDerivGaugeHCompute : SpacetimeDerivGaugeH<SpatialDim, Frame>,
+                                     db::ComputeTag {
+  static constexpr tnsr::ab<DataVector, SpatialDim, Frame> function (
+      const tnsr::a<DataVector, SpatialDim, Frame>& time_deriv_gauge_source,
+      const tnsr::ia<DataVector, SpatialDim, Frame>& deriv_gauge_source) {
+    auto spacetime_deriv_gauge_source =
+        make_with_value<tnsr::ab<DataVector, SpatialDim, Frame>>(
+            time_deriv_gauge_source, 0.0);
+    for (size_t b = 0; b < SpatialDim + 1; ++b) {
+      spacetime_deriv_gauge_source.get(0, b) = time_deriv_gauge_source.get(b);
+      for (size_t a = 1; a < SpatialDim + 1; ++a) {
+        spacetime_deriv_gauge_source.get(a, b) =
+            deriv_gauge_source.get(a - 1, b);
+      }
+    }
+    return spacetime_deriv_gauge_source;
+  }
+  using argument_tags = tmpl::list<
+      GeneralizedHarmonic::Tags::TimeDerivGaugeH<SpatialDim, Frame>,
+      ::Tags::deriv<GeneralizedHarmonic::Tags::GaugeH<SpatialDim, Frame>,
+                    tmpl::size_t<SpatialDim>, Frame>>;
 };
 
 template <size_t SpatialDim, typename Frame>
