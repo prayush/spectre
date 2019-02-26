@@ -28,6 +28,7 @@
 #include "PointwiseFunctions/AnalyticData/Tags.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/KerrSchild.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/Tags.hpp"
+#include "PointwiseFunctions/GeneralRelativity/Christoffel.hpp"
 #include "PointwiseFunctions/GeneralRelativity/ComputeGhQuantities.hpp"
 #include "PointwiseFunctions/GeneralRelativity/ComputeSpacetimeQuantities.hpp"
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
@@ -55,6 +56,7 @@ struct Initialize {
   struct VariablesTags {
     using system = typename Metavariables::system;
     using variables_tag = typename system::variables_tag;
+
     using simple_tags = db::AddSimpleTags<
         variables_tag, GeneralizedHarmonic::Tags::ConstraintGamma0,
         GeneralizedHarmonic::Tags::ConstraintGamma1,
@@ -70,14 +72,60 @@ struct Initialize {
         gr::Tags::InverseSpatialMetricCompute<Dim, Frame::Inertial, DataVector>,
         gr::Tags::ShiftCompute<Dim, Frame::Inertial, DataVector>,
         gr::Tags::LapseCompute<Dim, Frame::Inertial, DataVector>,
-        ::Tags::Interface<::Tags::InternalDirections<Dim>,
-                          gr::Tags::Lapse<DataVector>>,
-        ::Tags::Interface<::Tags::InternalDirections<Dim>,
-                          gr::Tags::Shift<Dim, Frame::Inertial, DataVector>>,
-        ::Tags::Interface<
-            ::Tags::InternalDirections<Dim>,
-            gr::Tags::InverseSpatialMetric<Dim, Frame::Inertial, DataVector>>,
-        ::Tags::UnitFaceNormalVectorCompute<Dim, Frame::Inertial>>;
+        gr::Tags::SqrtDetSpatialMetricCompute<Dim, Frame::Inertial, DataVector>,
+        gr::Tags::SpacetimeNormalOneFormCompute<Dim, Frame::Inertial,
+                                                DataVector>,
+        gr::Tags::SpacetimeNormalVectorCompute<Dim, Frame::Inertial,
+                                               DataVector>,
+        gr::Tags::InverseSpacetimeMetricCompute<3, Frame::Inertial, DataVector>,
+        GeneralizedHarmonic::Tags::DerivSpatialMetricCompute<Dim,
+                                                             Frame::Inertial>,
+        GeneralizedHarmonic::Tags::DerivLapseCompute<Dim, Frame::Inertial>,
+        GeneralizedHarmonic::Tags::DerivShiftCompute<Dim, Frame::Inertial>,
+        GeneralizedHarmonic::Tags::TimeDerivSpatialMetricCompute<
+            Dim, Frame::Inertial>,
+        GeneralizedHarmonic::Tags::TimeDerivLapseCompute<Dim, Frame::Inertial>,
+        GeneralizedHarmonic::Tags::TimeDerivShiftCompute<Dim, Frame::Inertial>,
+        GeneralizedHarmonic::Tags::DerivativesOfSpacetimeMetricCompute<
+            Dim, Frame::Inertial>,
+        gr::Tags::SpacetimeChristoffelFirstKindCompute<Dim, Frame::Inertial,
+                                                       DataVector>,
+        gr::Tags::SpacetimeChristoffelSecondKindCompute<Dim, Frame::Inertial,
+                                                        DataVector>,
+        gr::Tags::TraceSpacetimeChristoffelFirstKindCompute<
+            Dim, Frame::Inertial, DataVector>,
+        gr::Tags::SpatialChristoffelFirstKindCompute<Dim, Frame::Inertial,
+                                                     DataVector>,
+        gr::Tags::SpatialChristoffelSecondKindCompute<Dim, Frame::Inertial,
+                                                      DataVector>,
+        gr::Tags::TraceSpatialChristoffelFirstKindCompute<Dim, Frame::Inertial,
+                                                          DataVector>,
+        GeneralizedHarmonic::Tags::ExtrinsicCurvatureCompute<Dim,
+                                                             Frame::Inertial>,
+        GeneralizedHarmonic::Tags::TraceExtrinsicCurvatureCompute<
+            Dim, Frame::Inertial>,
+        GeneralizedHarmonic::Tags::GaugeHCompute<Dim, Frame::Inertial>>;
+
+    /* NOT YET ADDED BUT NEEDED BY ComputeDuDt
+          ::Tags::deriv<Tags::Pi<Dim>, tmpl::size_t<Dim>, Frame::Inertial>,
+          ::Tags::deriv<Tags::Phi<Dim>, tmpl::size_t<Dim>, Frame::Inertial>,
+          Tags::SpacetimeDerivGaugeH<Dim>,
+
+      NEEDED BY ComputeNormalDotFluxes
+          gr::Tags::SpacetimeMetric<Dim>, Tags::Pi<Dim>, Tags::Phi<Dim>,
+      Tags::ConstraintGamma1, Tags::ConstraintGamma2, gr::Tags::Lapse<>,
+      gr::Tags::Shift<Dim>, gr::Tags::InverseSpatialMetric<Dim>,
+      ::Tags::Normalized<::Tags::UnnormalizedFaceNormal<Dim, Frame::Inertial>>
+
+      NEEDED BY UpwindFlux
+      Tags::UPsi<Dim, Frame::Inertial>, Tags::UZero<Dim, Frame::Inertial>,
+      Tags::UPlus<Dim, Frame::Inertial>, Tags::UMinus<Dim, Frame::Inertial>,
+      ::Tags::CharSpeed<Tags::UPsi<Dim, Frame::Inertial>>,
+      ::Tags::CharSpeed<Tags::UZero<Dim, Frame::Inertial>>,
+      ::Tags::CharSpeed<Tags::UPlus<Dim, Frame::Inertial>>,
+      ::Tags::CharSpeed<Tags::UMinus<Dim, Frame::Inertial>>,
+      Tags::ConstraintGamma2, ::Tags::UnitFaceNormal<Dim, Frame::Inertial>
+    */
 
     template <typename TagsList>
     static auto initialize(

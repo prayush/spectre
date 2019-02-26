@@ -47,6 +47,11 @@ struct NonConservativeInterface {
       Directions, Tags::InterfaceComputeItem<Directions, Tags::Direction<dim>>,
       Tags::InterfaceComputeItem<Directions, Tags::InterfaceMesh<dim>>,
       Tags::Slice<Directions, typename System::variables_tag>,
+      Tags::Interface<Directions, gr::Tags::InverseSpatialMetric<
+                                      dim, Frame::Inertial, DataVector>>,
+      Tags::Interface<Directions, gr::Tags::Lapse<DataVector>>,
+      Tags::Interface<Directions,
+                      gr::Tags::Shift<dim, Frame::Inertial, DataVector>>,
       Tags::InterfaceComputeItem<Directions, Tags::UnnormalizedFaceNormal<dim>>,
       Tags::InterfaceComputeItem<Directions,
                                  typename System::template magnitude_tag<
@@ -56,6 +61,8 @@ struct NonConservativeInterface {
 
   using ext_tags = tmpl::list<
       Tags::BoundaryDirectionsExterior<dim>,
+      Tags::Interface<Tags::BoundaryDirectionsExterior<dim>,
+                      gr::Tags::InverseSpatialMetric<dim, Frame::Inertial>>,
       Tags::InterfaceComputeItem<Tags::BoundaryDirectionsExterior<dim>,
                                  Tags::Direction<dim>>,
       Tags::InterfaceComputeItem<Tags::BoundaryDirectionsExterior<dim>,

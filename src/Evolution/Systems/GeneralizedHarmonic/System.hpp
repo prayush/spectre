@@ -6,7 +6,7 @@
 #include "DataStructures/Tensor/EagerMath/Magnitude.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/TagsDeclarations.hpp"
-#include "PointwiseFunctions/GeneralRelativity/TagsDeclarations.hpp"
+#include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "Utilities/TMPL.hpp"
 
 /// \cond
@@ -45,6 +45,7 @@ struct System {
       ComputeLargestCharacteristicSpeed<Dim, Frame::Inertial>;
 
   template <typename Tag>
-  using magnitude_tag = ::Tags::EuclideanMagnitude<Tag>;
+  using magnitude_tag = ::Tags::NonEuclideanMagnitude<
+      Tag, gr::Tags::InverseSpatialMetric<3, Frame::Inertial, DataVector>>;
 };
 }  // namespace GeneralizedHarmonic
