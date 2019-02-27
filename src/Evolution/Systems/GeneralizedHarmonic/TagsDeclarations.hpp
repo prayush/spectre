@@ -9,11 +9,9 @@
 
 namespace GeneralizedHarmonic {
 namespace Tags {
-template <size_t Dim, typename Frame = Frame::Inertial,
-          typename DataType = DataVector>
+template <size_t Dim, typename Frame = Frame::Inertial>
 struct Pi;
-template <size_t Dim, typename Frame = Frame::Inertial,
-          typename DataType = DataVector>
+template <size_t Dim, typename Frame = Frame::Inertial>
 struct Phi;
 
 struct ConstraintGamma0;

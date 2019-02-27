@@ -23,9 +23,9 @@ namespace Tags {
  * \f$ \Pi_{ab} = -\frac{1}{N} ( \partial_t \psi_{ab} + N^{i} \phi_{iab} ) \f$
  * where \f$\phi_{iab}\f$ is the variable defined by the tag Phi.
  */
-template <size_t Dim, typename Frame, typename DataType>
+template <size_t Dim, typename Frame>
 struct Pi : db::SimpleTag {
-  using type = tnsr::aa<DataType, Dim, Frame>;
+  using type = tnsr::aa<DataVector, Dim, Frame>;
   static std::string name() noexcept { return "Pi"; }
 };
 
@@ -35,9 +35,9 @@ struct Pi : db::SimpleTag {
  * \details If \f$\psi_{ab}\f$ is the spacetime metric then we define
  * \f$\phi_{iab} = \partial_i \psi_{ab}\f$
  */
-template <size_t Dim, typename Frame, typename DataType>
+template <size_t Dim, typename Frame>
 struct Phi : db::SimpleTag {
-  using type = tnsr::iaa<DataType, Dim, Frame>;
+  using type = tnsr::iaa<DataVector, Dim, Frame>;
   static std::string name() noexcept { return "Phi"; }
 };
 
