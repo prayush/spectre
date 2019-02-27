@@ -255,9 +255,6 @@ class KerrSchild {
                     tmpl::size_t<3>, Frame::Inertial>;
   template <typename DataType>
   using tags = tmpl::list<
-      gr::Tags::SpacetimeMetric<3, Frame::Inertial, DataType>,
-      GeneralizedHarmonic::Tags::Pi<3, Frame::Inertial, DataType>,
-      GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial, DataType>,
       gr::Tags::Lapse<DataType>, ::Tags::dt<gr::Tags::Lapse<DataType>>,
       DerivLapse<DataType>, gr::Tags::Shift<3, Frame::Inertial, DataType>,
       ::Tags::dt<gr::Tags::Shift<3, Frame::Inertial, DataType>>,
@@ -269,9 +266,20 @@ class KerrSchild {
       gr::Tags::InverseSpatialMetric<3, Frame::Inertial, DataType>>;
 
   template <typename DataType>
+  using evolved_variable_tags =
+      tmpl::list<gr::Tags::SpacetimeMetric<3, Frame::Inertial, DataType>,
+                 GeneralizedHarmonic::Tags::Pi<3, Frame::Inertial, DataType>,
+                 GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial, DataType>>;
+
+  template <typename DataType>
   tuples::tagged_tuple_from_typelist<tags<DataType>> variables(
       const tnsr::I<DataType, 3>& x, double t, tags<DataType> /*meta*/) const
       noexcept;
+
+  template <typename DataType>
+  tuples::tagged_tuple_from_typelist<evolved_variable_tags<DataType>> variables(
+      const tnsr::I<DataType, 3>& x, double t,
+      evolved_variable_tags<DataType> /*meta*/) const noexcept;
 
   // clang-tidy: no runtime references
   void pup(PUP::er& p) noexcept;  // NOLINT

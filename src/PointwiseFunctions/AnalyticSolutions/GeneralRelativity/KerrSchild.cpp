@@ -65,6 +65,45 @@ void KerrSchild::pup(PUP::er& p) noexcept {
 }
 
 template <typename DataType>
+tuples::tagged_tuple_from_typelist<KerrSchild::evolved_variable_tags<DataType>>
+KerrSchild::variables(
+    const tnsr::I<DataType, 3>& x, double t,
+    KerrSchild::evolved_variable_tags<DataType> /* meta */) const noexcept {
+  auto evolved_vars = make_with_value<tuples::tagged_tuple_from_typelist<
+      KerrSchild::evolved_variable_tags<DataType>>>(x, 0.0);
+
+  const tuples::tagged_tuple_from_typelist<KerrSchild::tags<DataType>>& vars =
+      variables(x, t);
+
+  get<gr::Tags::SpacetimeMetric<3, Frame::Inertial, DataType>>(evolved_vars) =
+      gr::spacetime_metric(
+          get<gr::Tags::Lapse<DataType>>(vars),
+          get<gr::Tags::Shift<3, Frame::Inertial, DataType>>(vars),
+          get<gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>(vars));
+  get<GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial, DataType>>(
+      evolved_vars) =
+      GeneralizedHarmonic::phi(
+          get<gr::Tags::Lapse<DataType>>(vars), get<DerivLapse<DataType>>(vars),
+          get<gr::Tags::Shift<3, Frame::Inertial, DataType>>(vars),
+          get<DerivShift<DataType>>(result),
+          get<gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>(vars),
+          get<DerivSpatialMetric<DataType>>(vars));
+  get<GeneralizedHarmonic::Tags::Pi<3, Frame::Inertial, DataType>>(
+      evolved_vars) = GeneralizedHarmonic::
+      pi(get<gr::Tags::Lapse<DataType>>(vars),
+         get<::Tags::dt<gr::Tags::Lapse<DataType>>>(vars),
+         get<gr::Tags::Shift<3, Frame::Inertial, DataType>>(vars),
+         get<::Tags::dt<gr::Tags::Shift<3, Frame::Inertial, DataType>>>(vars),
+         get<gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>(vars),
+         get<::Tags::dt<gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>>(
+             vars),
+         get<GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial, DataType>>(
+             vars));
+
+  return evolved_vars;
+}
+
+template <typename DataType>
 tuples::tagged_tuple_from_typelist<KerrSchild::tags<DataType>>
 KerrSchild::variables(const tnsr::I<DataType, 3>& x, const double /*t*/,
                       tags<DataType> /*meta*/) const noexcept {
@@ -304,34 +343,6 @@ KerrSchild::variables(const tnsr::I<DataType, 3>& x, const double /*t*/,
           get<::Tags::dt<
               gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>>(result),
           get<DerivSpatialMetric<DataType>>(result));
-
-  // Load spacetime metric, Pi, and Phi for using this analytic solution
-  // in evolutions. Use functions that compute these from the supplied
-  // ingredients.
-  get<gr::Tags::SpacetimeMetric<3, Frame::Inertial, DataType>>(result) =
-      gr::spacetime_metric(
-          get<gr::Tags::Lapse<DataType>>(result),
-          get<gr::Tags::Shift<3, Frame::Inertial, DataType>>(result),
-          get<gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>(result));
-  get<GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial, DataType>>(result) =
-      GeneralizedHarmonic::phi(
-          get<gr::Tags::Lapse<DataType>>(result),
-          get<DerivLapse<DataType>>(result),
-          get<gr::Tags::Shift<3, Frame::Inertial, DataType>>(result),
-          get<DerivShift<DataType>>(result),
-          get<gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>(result),
-          get<DerivSpatialMetric<DataType>>(result));
-  get<GeneralizedHarmonic::Tags::Pi<3, Frame::Inertial, DataType>>(
-      result) = GeneralizedHarmonic::
-      pi(get<gr::Tags::Lapse<DataType>>(result),
-         get<::Tags::dt<gr::Tags::Lapse<DataType>>>(result),
-         get<gr::Tags::Shift<3, Frame::Inertial, DataType>>(result),
-         get<::Tags::dt<gr::Tags::Shift<3, Frame::Inertial, DataType>>>(result),
-         get<gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>(result),
-         get<::Tags::dt<gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>>(
-             result),
-         get<GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial, DataType>>(
-             result));
 
   return result;
 }
