@@ -6,6 +6,7 @@
 #include <array>
 
 #include "DataStructures/Tensor/TypeAliases.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"
 #include "Options/Options.hpp"
 #include "PointwiseFunctions/GeneralRelativity/TagsDeclarations.hpp"
@@ -262,7 +263,10 @@ class KerrSchild {
       ::Tags::dt<gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>,
       DerivSpatialMetric<DataType>, gr::Tags::SqrtDetSpatialMetric<DataType>,
       gr::Tags::ExtrinsicCurvature<3, Frame::Inertial, DataType>,
-      gr::Tags::InverseSpatialMetric<3, Frame::Inertial, DataType>>;
+      gr::Tags::InverseSpatialMetric<3, Frame::Inertial, DataType>,
+      gr::Tags::SpacetimeMetric<3, Frame::Inertial, DataType>,
+      GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial, DataType>,
+      GeneralizedHarmonic::Tags::Pi<3, Frame::Inertial, DataType>>;
 
   template <typename DataType>
   tuples::tagged_tuple_from_typelist<tags<DataType>> variables(

@@ -18,6 +18,7 @@
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "DataStructures/Variables.hpp"
 #include "Parallel/PupStlCpp11.hpp"
+#include "PointwiseFunctions/GeneralRelativity/ComputeGhQuantities.hpp"
 #include "PointwiseFunctions/GeneralRelativity/ComputeSpacetimeQuantities.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "Utilities/ConstantExpressions.hpp"
@@ -303,6 +304,34 @@ KerrSchild::variables(const tnsr::I<DataType, 3>& x, const double /*t*/,
           get<::Tags::dt<
               gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>>(result),
           get<DerivSpatialMetric<DataType>>(result));
+
+  // Load spacetime metric, Pi, and Phi for using this analytic solution
+  // in evolutions. Use functions that compute these from the supplied
+  // ingredients.
+  get<gr::Tags::SpacetimeMetric<3, Frame::Inertial, DataType>>(result) =
+      gr::spacetime_metric(
+          get<gr::Tags::Lapse<DataType>>(result),
+          get<gr::Tags::Shift<3, Frame::Inertial, DataType>>(result),
+          get<gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>(result));
+  get<GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial, DataType>>(result) =
+      GeneralizedHarmonic::phi(
+          get<gr::Tags::Lapse<DataType>>(result),
+          get<DerivLapse<DataType>>(result),
+          get<gr::Tags::Shift<3, Frame::Inertial, DataType>>(result),
+          get<DerivShift<DataType>>(result),
+          get<gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>(result),
+          get<DerivSpatialMetric<DataType>>(result));
+  get<GeneralizedHarmonic::Tags::Pi<3, Frame::Inertial, DataType>>(
+      result) = GeneralizedHarmonic::
+      pi(get<gr::Tags::Lapse<DataType>>(result),
+         get<::Tags::dt<gr::Tags::Lapse<DataType>>>(result),
+         get<gr::Tags::Shift<3, Frame::Inertial, DataType>>(result),
+         get<::Tags::dt<gr::Tags::Shift<3, Frame::Inertial, DataType>>>(result),
+         get<gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>(result),
+         get<::Tags::dt<gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>>(
+             result),
+         get<GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial, DataType>>(
+             result));
 
   return result;
 }
