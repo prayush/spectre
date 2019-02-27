@@ -255,9 +255,6 @@ class KerrSchild {
                     tmpl::size_t<3>, Frame::Inertial>;
   template <typename DataType>
   using tags = tmpl::list<
-      gr::Tags::SpacetimeMetric<3, Frame::Inertial, DataType>,
-      GeneralizedHarmonic::Tags::Pi<3, Frame::Inertial, DataType>,
-      GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial, DataType>,
       gr::Tags::Lapse<DataType>, ::Tags::dt<gr::Tags::Lapse<DataType>>,
       DerivLapse<DataType>, gr::Tags::Shift<3, Frame::Inertial, DataType>,
       ::Tags::dt<gr::Tags::Shift<3, Frame::Inertial, DataType>>,
@@ -266,7 +263,10 @@ class KerrSchild {
       ::Tags::dt<gr::Tags::SpatialMetric<3, Frame::Inertial, DataType>>,
       DerivSpatialMetric<DataType>, gr::Tags::SqrtDetSpatialMetric<DataType>,
       gr::Tags::ExtrinsicCurvature<3, Frame::Inertial, DataType>,
-      gr::Tags::InverseSpatialMetric<3, Frame::Inertial, DataType>>;
+      gr::Tags::InverseSpatialMetric<3, Frame::Inertial, DataType>,
+      gr::Tags::SpacetimeMetric<3, Frame::Inertial, DataType>,
+      GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial, DataType>,
+      GeneralizedHarmonic::Tags::Pi<3, Frame::Inertial, DataType>>;
 
   template <typename DataType>
   tuples::tagged_tuple_from_typelist<tags<DataType>> variables(
