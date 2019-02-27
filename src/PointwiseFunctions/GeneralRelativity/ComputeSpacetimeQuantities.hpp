@@ -216,7 +216,6 @@ template <size_t SpatialDim, typename Frame, typename DataType>
 struct InverseSpacetimeMetricCompute
     : InverseSpacetimeMetric<SpatialDim, Frame, DataType>,
       db::ComputeTag {
-  using base = InverseSpacetimeMetric<SpatialDim, Frame, DataType>;
   static constexpr auto function =
       &inverse_spacetime_metric<SpatialDim, Frame, DataType>;
   using argument_tags =

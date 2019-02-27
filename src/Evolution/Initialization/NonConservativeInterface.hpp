@@ -49,9 +49,6 @@ struct NonConservativeInterface {
       Directions, Tags::InterfaceComputeItem<Directions, Tags::Direction<dim>>,
       Tags::InterfaceComputeItem<Directions, Tags::InterfaceMesh<dim>>,
       Tags::Slice<Directions, typename System::variables_tag>,
-      Tags::InterfaceComputeItem<Directions,
-                                 gr::Tags::InverseSpatialMetricCompute<
-                                     dim, Frame::Inertial, DataVector>>,
       Tags::Interface<Directions, gr::Tags::InverseSpatialMetric<
                                       dim, Frame::Inertial, DataVector>>,
       Tags::Interface<Directions, gr::Tags::Lapse<DataVector>>,
