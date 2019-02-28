@@ -18,7 +18,7 @@ set(LIBS_TO_LINK
     ${SPECTRE_LIBRARIES}
   )
 
-add_spectre_executable(
+add_spectre_parallel_executable(
   EvolveKerrSchild
   EvolveKerrSchild
   Evolution/Executables/GeneralizedHarmonic
