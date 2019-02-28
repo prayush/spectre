@@ -66,7 +66,9 @@ class Minkowski {
       DerivShift<DataType>,
       gr::Tags::SpatialMetric<Dim, Frame::Inertial, DataType>,
       ::Tags::dt<gr::Tags::SpatialMetric<Dim, Frame::Inertial, DataType>>,
-      DerivSpatialMetric<DataType>>;
+      DerivSpatialMetric<DataType>, gr::Tags::SqrtDetSpatialMetric<DataType>,
+      gr::Tags::ExtrinsicCurvature<Dim, Frame::Inertial, DataType>,
+      gr::Tags::InverseSpatialMetric<Dim, Frame::Inertial, DataType>>;
 
   template <typename DataType, typename... Tags>
   tuples::TaggedTuple<Tags...> variables(const tnsr::I<DataType, Dim>& x,
