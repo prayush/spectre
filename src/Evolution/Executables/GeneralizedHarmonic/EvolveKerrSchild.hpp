@@ -87,8 +87,11 @@ struct EvolutionMetavars {
                      local_time_stepping, LtsTimeStepper, TimeStepper>>>;
   using domain_creator_tag = OptionTags::DomainCreator<3, Frame::Inertial>;
 
-  using reduction_data_tags =
-      observers::get_reduction_data_tags_from_observing_actions<
+  struct ObservationType {};
+  using element_observation_type = ObservationType;
+
+  using observed_reduction_data_tags =
+      observers::collect_reduction_data_tags<
           tmpl::list<GeneralizedHarmonic::Actions::Observe>>;
 
   using step_choosers =

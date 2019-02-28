@@ -34,13 +34,7 @@ namespace GeneralizedHarmonic {
 namespace Actions {
 
 namespace observe_detail {
-using reduction_datum = Parallel::ReductionDatum<double, funcl::Plus<>,
-                                                 funcl::Sqrt<funcl::Divides<>>,
-                                                 std::index_sequence<1>>;
-using reduction_datums =
-    tmpl::list<Parallel::ReductionDatum<double, funcl::AssertEqual<>>,
-               Parallel::ReductionDatum<size_t, funcl::Plus<>>,
-               reduction_datum>;
+
 }  // namespace observe_detail
 
 /*!
@@ -52,6 +46,16 @@ using reduction_datums =
  * - The RMS error of \f$\Psi\f$ and \f$\Pi\f$ are written to disk.
  */
 struct Observe {
+ private:
+  using reduction_datum =
+      Parallel::ReductionDatum<double, funcl::Plus<>,
+                               funcl::Sqrt<funcl::Divides<>>,
+                               std::index_sequence<1>>;
+  using reduction_data = Parallel::ReductionData<
+      Parallel::ReductionDatum<double, funcl::AssertEqual<>>,
+      Parallel::ReductionDatum<size_t, funcl::Plus<>>, reduction_datum>;
+
+ public:
   struct ObserveNSlabs {
     using type = size_t;
     static constexpr OptionString help = {"Observe every Nth slab"};
@@ -63,8 +67,8 @@ struct Observe {
 
   using const_global_cache_tags = tmpl::list<ObserveNSlabs, ObserveAtT0>;
 
-  using reduction_data_tags =
-      ::observers::make_reduction_data_tags_t<observe_detail::reduction_datums>;
+  using observed_reduction_data_tags =
+      observers::make_reduction_data_tags<tmpl::list<reduction_data>>;
 
   template <typename... DbTags, typename... InboxTags, typename Metavariables,
             size_t Dim, typename ActionList, typename ParallelComponent>
@@ -145,7 +149,9 @@ struct Observe {
                cache)
                .ckLocalBranch();
       Parallel::simple_action<observers::Actions::ContributeVolumeData>(
-          local_observer, observers::ObservationId(time),
+          local_observer,
+          observers::ObservationId(
+              time, typename Metavariables::element_observation_type{}),
           std::string{"/element_data"},
           observers::ArrayComponentId(
               std::add_pointer_t<ParallelComponent>{nullptr},
@@ -153,15 +159,16 @@ struct Observe {
           std::move(components), extents);
 
       // Send data to reduction observer
-      using ReData =
-          ::observers::make_reduction_data_t<observe_detail::reduction_datums>;
       Parallel::simple_action<observers::Actions::ContributeReductionData>(
-          local_observer, observers::ObservationId(time),
+          local_observer,
+          observers::ObservationId(
+              time, typename Metavariables::element_observation_type{}),
           std::string{"/element_data"},
           std::vector<std::string>{"Time", "NumberOfPoints", "PsiError"},
-          ReData{time.value(),
-                 db::get<::Tags::Mesh<Dim>>(box).number_of_grid_points(),
-                 psi_error});
+          reduction_data{
+              time.value(),
+              db::get<::Tags::Mesh<Dim>>(box).number_of_grid_points(),
+              psi_error});
     }
     return std::forward_as_tuple(std::move(box));
   }
