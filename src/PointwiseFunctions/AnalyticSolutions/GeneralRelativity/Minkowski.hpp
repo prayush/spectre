@@ -40,13 +40,6 @@ class Minkowski {
   static constexpr OptionString help{
       "Minkowski solution to Einstein's Equations"};
 
-  Minkowski() = default;
-  Minkowski(const Minkowski& /*rhs*/) = delete;
-  Minkowski& operator=(const Minkowski& /*rhs*/) = delete;
-  Minkowski(Minkowski&& /*rhs*/) noexcept = default;
-  Minkowski& operator=(Minkowski&& /*rhs*/) noexcept = default;
-  ~Minkowski() = default;
-
   template <typename DataType>
   using DerivLapse = ::Tags::deriv<gr::Tags::Lapse<DataType>, tmpl::size_t<Dim>,
                                    Frame::Inertial>;

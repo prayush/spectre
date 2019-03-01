@@ -5,6 +5,7 @@ set(LIBRARY "Test_GeneralRelativitySolutions")
 
 set(LIBRARY_SOURCES
   Test_KerrHorizon.cpp
+  Test_GeneralizedHarmonicSolution.cpp
   Test_KerrSchild.cpp
   Test_Minkowski.cpp
   Test_Tov.cpp

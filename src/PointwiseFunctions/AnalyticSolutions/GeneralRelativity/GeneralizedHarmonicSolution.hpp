@@ -36,9 +36,10 @@ namespace Solutions {
  * and `GeneralizedHarmonic::Tags::Phi`
  */
 template <typename SolutionType>
-class GeneralizedHarmonicSolution : SolutionType {
+class GeneralizedHarmonicSolution : public SolutionType {
  public:
-  GeneralizedHarmonicSolution() = default;
+  template <typename... Args>
+  GeneralizedHarmonicSolution(Args&&... args) : SolutionType(args...) {}
   GeneralizedHarmonicSolution(const GeneralizedHarmonicSolution& /*rhs*/) =
       delete;
   GeneralizedHarmonicSolution& operator=(
@@ -91,90 +92,92 @@ class GeneralizedHarmonicSolution : SolutionType {
         get<Tags>(variables(x, t, tmpl::list<Tags>{}, intermediate_vars))...};
   }
 
+ private:
   tuples::TaggedTuple<gr::Tags::Lapse<DataVector>> variables(
       const tnsr::I<DataVector, 3>& /*x*/, double /*t*/,
       tmpl::list<gr::Tags::Lapse<DataVector>> /*meta*/,
-      const IntermediateVars&& intermediate_vars) const noexcept;
+      const IntermediateVars& intermediate_vars) const noexcept;
 
   tuples::TaggedTuple<TimeDerivLapse> variables(
       const tnsr::I<DataVector, 3>& /*x*/, double /*t*/,
       tmpl::list<TimeDerivLapse> /*meta*/,
-      const IntermediateVars&& intermediate_vars) const noexcept;
+      const IntermediateVars& intermediate_vars) const noexcept;
 
   tuples::TaggedTuple<DerivLapse> variables(
       const tnsr::I<DataVector, 3>& /*x*/, double /*t*/,
       tmpl::list<DerivLapse> /*meta*/,
-      const IntermediateVars&& intermediate_vars) const noexcept;
+      const IntermediateVars& intermediate_vars) const noexcept;
 
   tuples::TaggedTuple<gr::Tags::Shift<3, Frame::Inertial, DataVector>>
   variables(
       const tnsr::I<DataVector, 3>& /*x*/, double /*t*/,
       tmpl::list<gr::Tags::Shift<3, Frame::Inertial, DataVector>> /*meta*/,
-      const IntermediateVars&& intermediate_vars) const noexcept;
+      const IntermediateVars& intermediate_vars) const noexcept;
 
   tuples::TaggedTuple<TimeDerivShift> variables(
       const tnsr::I<DataVector, 3>& /*x*/, double /*t*/,
       tmpl::list<TimeDerivShift> /*meta*/,
-      const IntermediateVars&& intermediate_vars) const noexcept;
+      const IntermediateVars& intermediate_vars) const noexcept;
 
   tuples::TaggedTuple<DerivShift> variables(
       const tnsr::I<DataVector, 3>& /*x*/, double /*t*/,
       tmpl::list<DerivShift> /*meta*/,
-      const IntermediateVars&& intermediate_vars) const noexcept;
+      const IntermediateVars& intermediate_vars) const noexcept;
 
   tuples::TaggedTuple<gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>>
   variables(const tnsr::I<DataVector, 3>& /*x*/, double /*t*/,
             tmpl::list<gr::Tags::SpatialMetric<3, Frame::Inertial,
                                                DataVector>> /*meta*/,
-            const IntermediateVars&& intermediate_vars) const noexcept;
+            const IntermediateVars& intermediate_vars) const noexcept;
 
   tuples::TaggedTuple<TimeDerivSpatialMetric> variables(
       const tnsr::I<DataVector, 3>& /*x*/, double /*t*/,
       tmpl::list<TimeDerivSpatialMetric> /*meta*/,
-      const IntermediateVars&& intermediate_vars) const noexcept;
+      const IntermediateVars& intermediate_vars) const noexcept;
 
   tuples::TaggedTuple<DerivSpatialMetric> variables(
       const tnsr::I<DataVector, 3>& /*x*/, double /*t*/,
       tmpl::list<DerivSpatialMetric> /*meta*/,
-      const IntermediateVars&& intermediate_vars) const noexcept;
+      const IntermediateVars& intermediate_vars) const noexcept;
 
   tuples::TaggedTuple<
       gr::Tags::InverseSpatialMetric<3, Frame::Inertial, DataVector>>
   variables(const tnsr::I<DataVector, 3>& /*x*/, double /*t*/,
             tmpl::list<gr::Tags::InverseSpatialMetric<3, Frame::Inertial,
                                                       DataVector>> /*meta*/,
-            const IntermediateVars&& intermediate_vars) const noexcept;
+            const IntermediateVars& intermediate_vars) const noexcept;
 
   tuples::TaggedTuple<
       gr::Tags::ExtrinsicCurvature<3, Frame::Inertial, DataVector>>
   variables(const tnsr::I<DataVector, 3>& /*x*/, double /*t*/,
             tmpl::list<gr::Tags::ExtrinsicCurvature<3, Frame::Inertial,
                                                     DataVector>> /*meta*/,
-            const IntermediateVars&& intermediate_vars) const noexcept;
+            const IntermediateVars& intermediate_vars) const noexcept;
 
   tuples::TaggedTuple<gr::Tags::SqrtDetSpatialMetric<DataVector>> variables(
       const tnsr::I<DataVector, 3>& /*x*/, double /*t*/,
       tmpl::list<gr::Tags::SqrtDetSpatialMetric<DataVector>> /*meta*/,
-      const IntermediateVars&& intermediate_vars) const noexcept;
+      const IntermediateVars& intermediate_vars) const noexcept;
 
   tuples::TaggedTuple<gr::Tags::SpacetimeMetric<3, Frame::Inertial, DataVector>>
   variables(const tnsr::I<DataVector, 3>& /*x*/, double /*t*/,
             tmpl::list<gr::Tags::SpacetimeMetric<3, Frame::Inertial,
                                                  DataVector>> /*meta*/,
-            const IntermediateVars&& intermediate_vars) const noexcept;
+            const IntermediateVars& intermediate_vars) const noexcept;
 
   tuples::TaggedTuple<GeneralizedHarmonic::Tags::Pi<3, Frame::Inertial>>
   variables(
       const tnsr::I<DataVector, 3>& /*x*/, double /*t*/,
       tmpl::list<GeneralizedHarmonic::Tags::Pi<3, Frame::Inertial>> /*meta*/,
-      const IntermediateVars&& intermediate_vars) const noexcept;
+      const IntermediateVars& intermediate_vars) const noexcept;
 
   tuples::TaggedTuple<GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial>>
   variables(
       const tnsr::I<DataVector, 3>& /*x*/, double /*t*/,
       tmpl::list<GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial>> /*meta*/,
-      const IntermediateVars&& intermediate_vars) const noexcept;
+      const IntermediateVars& intermediate_vars) const noexcept;
 
+ public:
   // clang-tidy: google-runtime-references
   void pup(PUP::er& /*p*/) noexcept {}  // NOLINT
 };                                      // namespace Solutions
