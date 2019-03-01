@@ -71,7 +71,7 @@ class CProxy_ConstGlobalCache;
 
 struct EvolutionMetavars {
   // Customization/"input options" to simulation
-  static constexpr int dim = 3;
+  static constexpr int dim = 3; // Note: this assumes 3D
   using Inertial = Frame::Inertial;
   using system = GeneralizedHarmonic::System<dim>;
   using temporal_id = Tags::TimeId;
