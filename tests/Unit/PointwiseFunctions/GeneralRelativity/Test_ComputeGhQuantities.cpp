@@ -1,6 +1,5 @@
 // Distributed under the MIT License.
 // See LICENSE.txt for details.
-#include <iostream>
 
 #include "tests/Unit/TestingFramework.hpp"
 
@@ -10,7 +9,10 @@
 #include <memory>
 #include <pup.h>
 #include <random>
+#include <string>
+#include <utility>
 
+#include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/DataBox/Prefixes.hpp"  // IWYU pragma: keep
 #include "DataStructures/DataVector.hpp"
 #include "DataStructures/Tensor/EagerMath/DeterminantAndInverse.hpp"
@@ -30,6 +32,7 @@
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/MakeWithValue.hpp"
+#include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
 #include "tests/Unit/Pypp/CheckWithRandomValues.hpp"
 #include "tests/Unit/Pypp/SetupLocalPythonEnvironment.hpp"
@@ -46,15 +49,29 @@ using Affine3D = domain::CoordinateMaps::ProductOf3Maps<Affine, Affine, Affine>;
 template <size_t Dim, typename DataType>
 void test_compute_phi(const DataType& used_for_size) {
   pypp::check_with_random_values<1>(
-      &GeneralizedHarmonic::phi<Dim, Frame::Inertial, DataType>,
+      static_cast<tnsr::iaa<DataType, Dim, Frame::Inertial> (*)(
+          const Scalar<DataType>&,
+          const tnsr::i<DataType, Dim, Frame::Inertial>&,
+          const tnsr::I<DataType, Dim, Frame::Inertial>&,
+          const tnsr::iJ<DataType, Dim, Frame::Inertial>&,
+          const tnsr::ii<DataType, Dim, Frame::Inertial>&,
+          const tnsr::ijj<DataType, Dim, Frame::Inertial>&)>(
+          &::GeneralizedHarmonic::phi<Dim, Frame::Inertial, DataType>),
       "TestFunctions", "spatial_deriv_spacetime_metric", {{{-10., 10.}}},
       used_for_size);
 }
 template <size_t Dim, typename DataType>
 void test_compute_pi(const DataType& used_for_size) {
   pypp::check_with_random_values<1>(
-      &GeneralizedHarmonic::pi<Dim, Frame::Inertial, DataType>, "TestFunctions",
-      "gh_pi", {{{-10., 10.}}}, used_for_size);
+      static_cast<tnsr::aa<DataType, Dim, Frame::Inertial> (*)(
+          const Scalar<DataType>&, const Scalar<DataType>&,
+          const tnsr::I<DataType, Dim, Frame::Inertial>&,
+          const tnsr::I<DataType, Dim, Frame::Inertial>&,
+          const tnsr::ii<DataType, Dim, Frame::Inertial>&,
+          const tnsr::ii<DataType, Dim, Frame::Inertial>&,
+          const tnsr::iaa<DataType, Dim, Frame::Inertial>&)>(
+          &::GeneralizedHarmonic::pi<Dim, Frame::Inertial, DataType>),
+      "TestFunctions", "gh_pi", {{{-10., 10.}}}, used_for_size);
 }
 template <size_t Dim, typename DataType>
 void test_compute_gauge_source(const DataType& used_for_size) {

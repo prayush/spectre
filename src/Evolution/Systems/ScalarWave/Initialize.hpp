@@ -98,7 +98,7 @@ struct Initialize {
   using return_tag_list =
       tmpl::append<typename Initialization::Domain<Dim>::simple_tags,
                    typename VariablesTags<Metavariables>::simple_tags,
-                   typename Initialization::NonConservativeInterface<
+                   typename Initialization::InterfaceForNonConservativeSystem<
                        typename Metavariables::system>::simple_tags,
                    typename Initialization::Evolution<
                        typename Metavariables::system>::simple_tags,
@@ -107,7 +107,7 @@ struct Initialize {
                    typename Initialization::MinMod<Dim>::simple_tags,
                    typename Initialization::Domain<Dim>::compute_tags,
                    typename VariablesTags<Metavariables>::compute_tags,
-                   typename Initialization::NonConservativeInterface<
+                   typename Initialization::InterfaceForNonConservativeSystem<
                        typename Metavariables::system>::compute_tags,
                    typename Initialization::Evolution<
                        typename Metavariables::system>::compute_tags,
@@ -133,7 +133,7 @@ struct Initialize {
     auto variables_box = VariablesTags<Metavariables>::initialize(
         std::move(domain_box), cache, initial_time);
     auto domain_interface_box =
-        Initialization::NonConservativeInterface<system>::initialize(
+        Initialization::InterfaceForNonConservativeSystem<system>::initialize(
             std::move(variables_box));
     auto evolution_box = Initialization::Evolution<system>::initialize(
         std::move(domain_interface_box), cache, initial_time, initial_dt,

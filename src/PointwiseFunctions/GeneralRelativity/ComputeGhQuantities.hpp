@@ -11,19 +11,25 @@
 #include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
-#include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"
+#include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp" // IWYU pragma: keep
 #include "PointwiseFunctions/GeneralRelativity/ComputeSpacetimeQuantities.hpp"
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
+#include "Utilities/MakeWithValue.hpp"
+#include "Utilities/TMPL.hpp"
 
 /// \cond
 namespace gsl {
 template <class T>
 class not_null;
 }  // namespace gsl
+class DataVector;
+template <typename X, typename Symm, typename IndexList>
+class Tensor;
 /// \endcond
 
 namespace GeneralizedHarmonic {
+// @{
 /*!
  * \ingroup GeneralRelativityGroup
  * \brief Computes the auxiliary variable \f$\Phi_{iab}\f$ used by the
@@ -42,6 +48,16 @@ namespace GeneralizedHarmonic {
  * \f}
  */
 template <size_t SpatialDim, typename Frame, typename DataType>
+void phi(gsl::not_null<tnsr::iaa<DataType, SpatialDim, Frame>*> phi,
+         const Scalar<DataType>& lapse,
+         const tnsr::i<DataType, SpatialDim, Frame>& deriv_lapse,
+         const tnsr::I<DataType, SpatialDim, Frame>& shift,
+         const tnsr::iJ<DataType, SpatialDim, Frame>& deriv_shift,
+         const tnsr::ii<DataType, SpatialDim, Frame>& spatial_metric,
+         const tnsr::ijj<DataType, SpatialDim, Frame>&
+             deriv_spatial_metric) noexcept;
+
+template <size_t SpatialDim, typename Frame, typename DataType>
 tnsr::iaa<DataType, SpatialDim, Frame> phi(
     const Scalar<DataType>& lapse,
     const tnsr::i<DataType, SpatialDim, Frame>& deriv_lapse,
@@ -50,7 +66,9 @@ tnsr::iaa<DataType, SpatialDim, Frame> phi(
     const tnsr::ii<DataType, SpatialDim, Frame>& spatial_metric,
     const tnsr::ijj<DataType, SpatialDim, Frame>&
         deriv_spatial_metric) noexcept;
+// @}
 
+// @{
 /*!
  * \ingroup GeneralRelativityGroup
  * \brief Computes the conjugate momentum \f$\Pi_{ab}\f$ of the spacetime metric
@@ -72,6 +90,15 @@ tnsr::iaa<DataType, SpatialDim, Frame> phi(
  * \f}
  */
 template <size_t SpatialDim, typename Frame, typename DataType>
+void pi(gsl::not_null<tnsr::aa<DataType, SpatialDim, Frame>*> pi,
+        const Scalar<DataType>& lapse, const Scalar<DataType>& dt_lapse,
+        const tnsr::I<DataType, SpatialDim, Frame>& shift,
+        const tnsr::I<DataType, SpatialDim, Frame>& dt_shift,
+        const tnsr::ii<DataType, SpatialDim, Frame>& spatial_metric,
+        const tnsr::ii<DataType, SpatialDim, Frame>& dt_spatial_metric,
+        const tnsr::iaa<DataType, SpatialDim, Frame>& phi) noexcept;
+
+template <size_t SpatialDim, typename Frame, typename DataType>
 tnsr::aa<DataType, SpatialDim, Frame> pi(
     const Scalar<DataType>& lapse, const Scalar<DataType>& dt_lapse,
     const tnsr::I<DataType, SpatialDim, Frame>& shift,
@@ -79,6 +106,7 @@ tnsr::aa<DataType, SpatialDim, Frame> pi(
     const tnsr::ii<DataType, SpatialDim, Frame>& spatial_metric,
     const tnsr::ii<DataType, SpatialDim, Frame>& dt_spatial_metric,
     const tnsr::iaa<DataType, SpatialDim, Frame>& phi) noexcept;
+// @}
 
 /*!
  * \ingroup GeneralRelativityGroup
@@ -443,7 +471,13 @@ tnsr::a<DataType, SpatialDim, Frame> spacetime_deriv_of_norm_of_shift(
 namespace Tags {
 template <size_t SpatialDim, typename Frame>
 struct PhiCompute : Phi<SpatialDim, Frame>, db::ComputeTag {
-  static constexpr auto function = &phi<SpatialDim, Frame, DataVector>;
+  static constexpr tnsr::iaa<DataVector, SpatialDim, Frame> (*function)(
+      const Scalar<DataVector>&, const tnsr::i<DataVector, SpatialDim, Frame>&,
+      const tnsr::I<DataVector, SpatialDim, Frame>&,
+      const tnsr::iJ<DataVector, SpatialDim, Frame>&,
+      const tnsr::ii<DataVector, SpatialDim, Frame>&,
+      const tnsr::ijj<DataVector, SpatialDim, Frame>&) =
+      &phi<SpatialDim, Frame, DataVector>;
   using argument_tags =
       tmpl::list<gr::Tags::Lapse<DataVector>, DerivLapse<SpatialDim, Frame>,
                  gr::Tags::Shift<SpatialDim, Frame, DataVector>,
@@ -454,7 +488,14 @@ struct PhiCompute : Phi<SpatialDim, Frame>, db::ComputeTag {
 
 template <size_t SpatialDim, typename Frame>
 struct PiCompute : Pi<SpatialDim, Frame>, db::ComputeTag {
-  static constexpr auto function = &pi<SpatialDim, Frame, DataVector>;
+  static constexpr tnsr::aa<DataVector, SpatialDim, Frame> (*function)(
+      const Scalar<DataVector>&, const Scalar<DataVector>&,
+      const tnsr::I<DataVector, SpatialDim, Frame>&,
+      const tnsr::I<DataVector, SpatialDim, Frame>&,
+      const tnsr::ii<DataVector, SpatialDim, Frame>&,
+      const tnsr::ii<DataVector, SpatialDim, Frame>&,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>&) =
+      &pi<SpatialDim, Frame, DataVector>;
   using argument_tags =
       tmpl::list<gr::Tags::Lapse<DataVector>, TimeDerivLapse,
                  gr::Tags::Shift<SpatialDim, Frame, DataVector>,
@@ -494,7 +535,7 @@ struct GaugeHCompute : GaugeH<SpatialDim, Frame>, db::ComputeTag {
 template <size_t SpatialDim, typename Frame>
 struct SpacetimeDerivGaugeHCompute : SpacetimeDerivGaugeH<SpatialDim, Frame>,
                                      db::ComputeTag {
-  static constexpr tnsr::ab<DataVector, SpatialDim, Frame> function (
+  static constexpr tnsr::ab<DataVector, SpatialDim, Frame> function(
       const tnsr::a<DataVector, SpatialDim, Frame>& time_deriv_gauge_source,
       const tnsr::ia<DataVector, SpatialDim, Frame>& deriv_gauge_source) {
     auto spacetime_deriv_gauge_source =
