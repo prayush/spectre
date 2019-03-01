@@ -19,8 +19,8 @@ set(LIBS_TO_LINK
   )
 
 add_spectre_parallel_executable(
-  EvolveKerrSchild
-  EvolveKerrSchild
+  EvolveGeneralizedHarmonic
+  EvolveGeneralizedHarmonic
   Evolution/Executables/GeneralizedHarmonic
   EvolutionMetavars
   "${LIBS_TO_LINK}"
