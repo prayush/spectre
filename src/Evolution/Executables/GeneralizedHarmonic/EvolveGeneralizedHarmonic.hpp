@@ -72,7 +72,7 @@ class CProxy_ConstGlobalCache;
 struct EvolutionMetavars {
   // Customization/"input options" to simulation
   static constexpr int dim = 3;
-  using frame = Frame::Inertial;
+  using Inertial = Frame::Inertial;
   using system = GeneralizedHarmonic::System<dim>;
   using temporal_id = Tags::TimeId;
   static constexpr bool local_time_stepping = false;
@@ -87,19 +87,17 @@ struct EvolutionMetavars {
       tmpl::list<analytic_solution_tag,
                  OptionTags::TypedTimeStepper<tmpl::conditional_t<
                      local_time_stepping, LtsTimeStepper, TimeStepper>>>;
-  using domain_creator_tag = OptionTags::DomainCreator<dim, frame>;
+  using domain_creator_tag = OptionTags::DomainCreator<dim, Inertial>;
 
   struct ObservationType {};
   using element_observation_type = ObservationType;
 
-  using observed_reduction_data_tags =
-      observers::collect_reduction_data_tags<
-          tmpl::list<GeneralizedHarmonic::Actions::Observe>>;
+  using observed_reduction_data_tags = observers::collect_reduction_data_tags<
+      tmpl::list<GeneralizedHarmonic::Actions::Observe>>;
 
-  using step_choosers =
-      tmpl::list<StepChoosers::Registrars::Cfl<dim, frame>,
-                 StepChoosers::Registrars::Constant,
-                 StepChoosers::Registrars::Increase>;
+  using step_choosers = tmpl::list<StepChoosers::Registrars::Cfl<dim, Inertial>,
+                                   StepChoosers::Registrars::Constant,
+                                   StepChoosers::Registrars::Increase>;
 
   using compute_rhs = tmpl::flatten<tmpl::list<
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
