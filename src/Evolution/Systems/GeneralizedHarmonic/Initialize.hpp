@@ -54,7 +54,7 @@ template <size_t Dim>
 struct Initialize {
   template <typename Metavariables>
   struct VariablesTags {
-    using frame = Frame::Inertial;
+    using Inertial = Frame::Inertial;
     using system = typename Metavariables::system;
     using variables_tag = typename system::variables_tag;
 
@@ -62,71 +62,63 @@ struct Initialize {
         variables_tag, GeneralizedHarmonic::Tags::ConstraintGamma0,
         GeneralizedHarmonic::Tags::ConstraintGamma1,
         GeneralizedHarmonic::Tags::ConstraintGamma2,
-        GeneralizedHarmonic::Tags::TimeDerivGaugeH<Dim, frame>>;
+        GeneralizedHarmonic::Tags::TimeDerivGaugeH<Dim, Inertial>>;
     using compute_tags = db::AddComputeTags<
-        gr::Tags::SpatialMetricCompute<Dim, frame, DataVector>,
-        gr::Tags::DetAndInverseSpatialMetricCompute<Dim, frame,
-                                                    DataVector>,
-        gr::Tags::InverseSpatialMetricCompute<Dim, frame, DataVector>,
-        gr::Tags::ShiftCompute<Dim, frame, DataVector>,
-        gr::Tags::LapseCompute<Dim, frame, DataVector>,
-        gr::Tags::SqrtDetSpatialMetricCompute<Dim, frame, DataVector>,
-        gr::Tags::SpacetimeNormalOneFormCompute<Dim, frame,
-                                                DataVector>,
-        gr::Tags::SpacetimeNormalVectorCompute<Dim, frame,
-                                               DataVector>,
-        gr::Tags::InverseSpacetimeMetricCompute<3, frame, DataVector>,
-        GeneralizedHarmonic::Tags::DerivSpatialMetricCompute<Dim,
-                                                             frame>,
-        GeneralizedHarmonic::Tags::DerivLapseCompute<Dim, frame>,
-        GeneralizedHarmonic::Tags::DerivShiftCompute<Dim, frame>,
-        GeneralizedHarmonic::Tags::TimeDerivSpatialMetricCompute<
-            Dim, frame>,
-        GeneralizedHarmonic::Tags::TimeDerivLapseCompute<Dim, frame>,
-        GeneralizedHarmonic::Tags::TimeDerivShiftCompute<Dim, frame>,
+        gr::Tags::SpatialMetricCompute<Dim, Inertial, DataVector>,
+        gr::Tags::DetAndInverseSpatialMetricCompute<Dim, Inertial, DataVector>,
+        gr::Tags::InverseSpatialMetricCompute<Dim, Inertial, DataVector>,
+        gr::Tags::ShiftCompute<Dim, Inertial, DataVector>,
+        gr::Tags::LapseCompute<Dim, Inertial, DataVector>,
+        gr::Tags::SqrtDetSpatialMetricCompute<Dim, Inertial, DataVector>,
+        gr::Tags::SpacetimeNormalOneFormCompute<Dim, Inertial, DataVector>,
+        gr::Tags::SpacetimeNormalVectorCompute<Dim, Inertial, DataVector>,
+        gr::Tags::InverseSpacetimeMetricCompute<3, Inertial, DataVector>,
+        GeneralizedHarmonic::Tags::DerivSpatialMetricCompute<Dim, Inertial>,
+        GeneralizedHarmonic::Tags::DerivLapseCompute<Dim, Inertial>,
+        GeneralizedHarmonic::Tags::DerivShiftCompute<Dim, Inertial>,
+        GeneralizedHarmonic::Tags::TimeDerivSpatialMetricCompute<Dim, Inertial>,
+        GeneralizedHarmonic::Tags::TimeDerivLapseCompute<Dim, Inertial>,
+        GeneralizedHarmonic::Tags::TimeDerivShiftCompute<Dim, Inertial>,
         GeneralizedHarmonic::Tags::DerivativesOfSpacetimeMetricCompute<
-            Dim, frame>,
-        gr::Tags::SpacetimeChristoffelFirstKindCompute<Dim, frame,
+            Dim, Inertial>,
+        gr::Tags::SpacetimeChristoffelFirstKindCompute<Dim, Inertial,
                                                        DataVector>,
-        gr::Tags::SpacetimeChristoffelSecondKindCompute<Dim, frame,
+        gr::Tags::SpacetimeChristoffelSecondKindCompute<Dim, Inertial,
                                                         DataVector>,
-        gr::Tags::TraceSpacetimeChristoffelFirstKindCompute<
-            Dim, frame, DataVector>,
-        gr::Tags::SpatialChristoffelFirstKindCompute<Dim, frame,
-                                                     DataVector>,
-        gr::Tags::SpatialChristoffelSecondKindCompute<Dim, frame,
+        gr::Tags::TraceSpacetimeChristoffelFirstKindCompute<Dim, Inertial,
+                                                            DataVector>,
+        gr::Tags::SpatialChristoffelFirstKindCompute<Dim, Inertial, DataVector>,
+        gr::Tags::SpatialChristoffelSecondKindCompute<Dim, Inertial,
                                                       DataVector>,
-        gr::Tags::TraceSpatialChristoffelFirstKindCompute<Dim, frame,
+        gr::Tags::TraceSpatialChristoffelFirstKindCompute<Dim, Inertial,
                                                           DataVector>,
-        GeneralizedHarmonic::Tags::ExtrinsicCurvatureCompute<Dim,
-                                                             frame>,
-        GeneralizedHarmonic::Tags::TraceExtrinsicCurvatureCompute<
-            Dim, frame>,
-        GeneralizedHarmonic::Tags::GaugeHCompute<Dim, frame>,
-        ::Tags::deriv<GeneralizedHarmonic::Tags::GaugeH<Dim, frame>,
-                      tmpl::size_t<Dim>, frame>,
-        GeneralizedHarmonic::Tags::SpacetimeDerivGaugeHCompute<
-            Dim, frame>>;
+        GeneralizedHarmonic::Tags::ExtrinsicCurvatureCompute<Dim, Inertial>,
+        GeneralizedHarmonic::Tags::TraceExtrinsicCurvatureCompute<Dim,
+                                                                  Inertial>,
+        GeneralizedHarmonic::Tags::GaugeHCompute<Dim, Inertial>,
+        ::Tags::deriv<GeneralizedHarmonic::Tags::GaugeH<Dim, Inertial>,
+                      tmpl::size_t<Dim>, Inertial>,
+        GeneralizedHarmonic::Tags::SpacetimeDerivGaugeHCompute<Dim, Inertial>>;
 
     /* NOT YET ADDED BUT NEEDED BY ComputeDuDt
-          ::Tags::deriv<Tags::Pi<Dim>, tmpl::size_t<Dim>, frame>,
-          ::Tags::deriv<Tags::Phi<Dim>, tmpl::size_t<Dim>, frame>,
+          ::Tags::deriv<Tags::Pi<Dim>, tmpl::size_t<Dim>, Inertial>,
+          ::Tags::deriv<Tags::Phi<Dim>, tmpl::size_t<Dim>, Inertial>,
           Tags::SpacetimeDerivGaugeH<Dim>,
 
       NEEDED BY ComputeNormalDotFluxes
           gr::Tags::SpacetimeMetric<Dim>, Tags::Pi<Dim>, Tags::Phi<Dim>,
       Tags::ConstraintGamma1, Tags::ConstraintGamma2, gr::Tags::Lapse<>,
       gr::Tags::Shift<Dim>, gr::Tags::InverseSpatialMetric<Dim>,
-      ::Tags::Normalized<::Tags::UnnormalizedFaceNormal<Dim, frame>>
+      ::Tags::Normalized<::Tags::UnnormalizedFaceNormal<Dim, Inertial>>
 
       NEEDED BY UpwindFlux
-      Tags::UPsi<Dim, frame>, Tags::UZero<Dim, frame>,
-      Tags::UPlus<Dim, frame>, Tags::UMinus<Dim, frame>,
-      ::Tags::CharSpeed<Tags::UPsi<Dim, frame>>,
-      ::Tags::CharSpeed<Tags::UZero<Dim, frame>>,
-      ::Tags::CharSpeed<Tags::UPlus<Dim, frame>>,
-      ::Tags::CharSpeed<Tags::UMinus<Dim, frame>>,
-      Tags::ConstraintGamma2, ::Tags::UnitFaceNormal<Dim, frame>
+      Tags::UPsi<Dim, Inertial>, Tags::UZero<Dim, Inertial>,
+      Tags::UPlus<Dim, Inertial>, Tags::UMinus<Dim, Inertial>,
+      ::Tags::CharSpeed<Tags::UPsi<Dim, Inertial>>,
+      ::Tags::CharSpeed<Tags::UZero<Dim, Inertial>>,
+      ::Tags::CharSpeed<Tags::UPlus<Dim, Inertial>>,
+      ::Tags::CharSpeed<Tags::UMinus<Dim, Inertial>>,
+      Tags::ConstraintGamma2, ::Tags::UnitFaceNormal<Dim, Inertial>
     */
 
     template <typename TagsList>
@@ -140,7 +132,7 @@ struct Initialize {
           db::get<::Tags::Mesh<Dim>>(box).number_of_grid_points();
 
       const auto& inertial_coords =
-          db::get<::Tags::Coordinates<Dim, frame>>(box);
+          db::get<::Tags::Coordinates<Dim, Inertial>>(box);
 
       // Set constraint damping parameters
       // For now, hard code these; later, make these options / AnalyticData
@@ -160,7 +152,7 @@ struct Initialize {
       Vars vars{num_grid_points};
       make_overloader([ initial_time, &inertial_coords ](
                           std::true_type /*is_analytic_solution*/,
-                          const gsl::not_null<Vars*> local_gh_vars,
+                          const gsl::not_null<Vars*> local_vars,
                           const auto& local_cache) noexcept {
         using analytic_solution_tag = OptionTags::AnalyticSolutionBase;
         /*
@@ -183,50 +175,51 @@ struct Initialize {
         const auto& deriv_lapse =
 
             get<::Tags::deriv<gr::Tags::Lapse<DataVector>, tmpl::size_t<Dim>,
-                              frame>>(solution_vars);
+                              Inertial>>(solution_vars);
 
         const auto& shift =
-            get<gr::Tags::Shift<Dim, frame, DataVector>>(solution_vars);
+            get<gr::Tags::Shift<Dim, Inertial, DataVector>>(solution_vars);
         const auto& dt_shift =
-            get<::Tags::dt<gr::Tags::Shift<Dim, frame, DataVector>>>(
+            get<::Tags::dt<gr::Tags::Shift<Dim, Inertial, DataVector>>>(
                 solution_vars);
         const auto& deriv_shift =
-            get<::Tags::deriv<gr::Tags::Shift<Dim, frame, DataVector>,
-                              tmpl::size_t<Dim>, frame>>(solution_vars);
+            get<::Tags::deriv<gr::Tags::Shift<Dim, Inertial, DataVector>,
+                              tmpl::size_t<Dim>, Inertial>>(solution_vars);
 
         const auto& spatial_metric =
-            get<gr::Tags::SpatialMetric<Dim, frame, DataVector>>(solution_vars);
-        const auto& dt_spatial_metric =
-            get<::Tags::dt<gr::Tags::SpatialMetric<Dim, frame, DataVector>>>(
+            get<gr::Tags::SpatialMetric<Dim, Inertial, DataVector>>(
                 solution_vars);
-        const auto& deriv_spatial_metric =
-            get<::Tags::deriv<gr::Tags::SpatialMetric<Dim, frame, DataVector>,
-                              tmpl::size_t<Dim>, frame>>(solution_vars);
+        const auto& dt_spatial_metric =
+            get<::Tags::dt<gr::Tags::SpatialMetric<Dim, Inertial, DataVector>>>(
+                solution_vars);
+        const auto& deriv_spatial_metric = get<
+            ::Tags::deriv<gr::Tags::SpatialMetric<Dim, Inertial, DataVector>,
+                          tmpl::size_t<Dim>, Inertial>>(solution_vars);
 
         // Next, compute Gh evolution variables from them
         const auto& spacetime_metric =
-            ::gr::spacetime_metric<Dim, frame, DataVector>(lapse, shift,
-                                                           spatial_metric);
-        const auto& phi = GeneralizedHarmonic::phi<Dim, frame, DataVector>(
+            ::gr::spacetime_metric<Dim, Inertial, DataVector>(lapse, shift,
+                                                              spatial_metric);
+        const auto& phi = GeneralizedHarmonic::phi<Dim, Inertial, DataVector>(
             lapse, deriv_lapse, shift, deriv_shift, spatial_metric,
             deriv_spatial_metric);
-        const auto& pi = GeneralizedHarmonic::pi<Dim, frame, DataVector>(
+        const auto& pi = GeneralizedHarmonic::pi<Dim, Inertial, DataVector>(
             lapse, dt_lapse, shift, dt_shift, spatial_metric, dt_spatial_metric,
             phi);
 
         const tuples::TaggedTuple<gr::Tags::SpacetimeMetric<Dim>,
                                   GeneralizedHarmonic::Tags::Phi<Dim>,
                                   GeneralizedHarmonic::Tags::Pi<Dim>>
-            gh_solution_tuple(spacetime_metric, phi, pi);
+            solution_tuple(spacetime_metric, phi, pi);
 
-        local_gh_vars->assign_subset(gh_solution_tuple);
+        local_vars->assign_subset(solution_tuple);
       },
                       [&inertial_coords](
                           std::false_type /*is_analytic_solution*/,
-                          const gsl::not_null<Vars*> local_gh_vars,
+                          const gsl::not_null<Vars*> local_vars,
                           const auto& local_cache) noexcept {
                         using analytic_data_tag = OptionTags::AnalyticDataBase;
-                        local_gh_vars->assign_subset(
+                        local_vars->assign_subset(
                             Parallel::get<analytic_data_tag>(local_cache)
                                 .variables(inertial_coords,
                                            typename Vars::tags_list{}));
@@ -235,7 +228,7 @@ struct Initialize {
 
       // Set the time derivatives of GaugeH
       const auto& dt_gauge_source =
-          make_with_value<tnsr::a<DataVector, Dim, frame>>(gamma0, 0.0);
+          make_with_value<tnsr::a<DataVector, Dim, Inertial>>(gamma0, 0.0);
 
       return db::create_from<db::RemoveTags<>, simple_tags, compute_tags>(
           std::move(box), std::move(vars), std::move(gamma0), std::move(gamma1),
