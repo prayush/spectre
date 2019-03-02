@@ -33,34 +33,44 @@ void test_generalized_harmonic_solution(
         SolutionType>
         wrapped_solution) {
   const DataVector data_vector{5.0, 4.0};
-  const tnsr::I<DataVector, 3, Frame::Inertial> x{data_vector};
+  const tnsr::I<DataVector, wrapped_solution.volume_dim, Frame::Inertial> x{
+      data_vector};
   const double t = std::numeric_limits<double>::signaling_NaN();
 
-  // Get quantities from a 3D analytic solution of Einstein's equations
+  // Get quantities from an analytic solution of Einstein's equations
   const auto vars = solution.variables(
       x, t, typename SolutionType::template tags<DataVector>{});
   const auto lapse = get<gr::Tags::Lapse<DataVector>>(vars);
   const auto dt_lapse = get<Tags::dt<gr::Tags::Lapse<DataVector>>>(vars);
-  const auto d_lapse = get<Tags::deriv<gr::Tags::Lapse<DataVector>,
-                                       tmpl::size_t<3>, Frame::Inertial>>(vars);
-  const auto shift = get<gr::Tags::Shift<3, Frame::Inertial, DataVector>>(vars);
+  const auto d_lapse = get<
+      Tags::deriv<gr::Tags::Lapse<DataVector>,
+                  tmpl::size_t<wrapped_solution.volume_dim>, Frame::Inertial>>(
+      vars);
+  const auto shift = get<gr::Tags::Shift<wrapped_solution.volume_dim,
+                                         Frame::Inertial, DataVector>>(vars);
   const auto dt_shift =
-      get<Tags::dt<gr::Tags::Shift<3, Frame::Inertial, DataVector>>>(vars);
-  const auto d_shift =
-      get<Tags::deriv<gr::Tags::Shift<3, Frame::Inertial, DataVector>,
-                      tmpl::size_t<3>, Frame::Inertial>>(vars);
+      get<Tags::dt<gr::Tags::Shift<wrapped_solution.volume_dim, Frame::Inertial,
+                                   DataVector>>>(vars);
+  const auto d_shift = get<Tags::deriv<
+      gr::Tags::Shift<wrapped_solution.volume_dim, Frame::Inertial, DataVector>,
+      tmpl::size_t<wrapped_solution.volume_dim>, Frame::Inertial>>(vars);
   const auto g =
-      get<gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>>(vars);
+      get<gr::Tags::SpatialMetric<wrapped_solution.volume_dim, Frame::Inertial,
+                                  DataVector>>(vars);
   const auto dt_g =
-      get<Tags::dt<gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>>>(
-          vars);
-  const auto d_g =
-      get<Tags::deriv<gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>,
-                      tmpl::size_t<3>, Frame::Inertial>>(vars);
+      get<Tags::dt<gr::Tags::SpatialMetric<wrapped_solution.volume_dim,
+                                           Frame::Inertial, DataVector>>>(vars);
+  const auto d_g = get<
+      Tags::deriv<gr::Tags::SpatialMetric<wrapped_solution.volume_dim,
+                                          Frame::Inertial, DataVector>,
+                  tmpl::size_t<wrapped_solution.volume_dim>, Frame::Inertial>>(
+      vars);
   const auto inv_g =
-      get<gr::Tags::InverseSpatialMetric<3, Frame::Inertial, DataVector>>(vars);
+      get<gr::Tags::InverseSpatialMetric<wrapped_solution.volume_dim,
+                                         Frame::Inertial, DataVector>>(vars);
   const auto extrinsic_curvature =
-      get<gr::Tags::ExtrinsicCurvature<3, Frame::Inertial, DataVector>>(vars);
+      get<gr::Tags::ExtrinsicCurvature<wrapped_solution.volume_dim,
+                                       Frame::Inertial, DataVector>>(vars);
   const auto sqrt_det_g = get<gr::Tags::SqrtDetSpatialMetric<DataVector>>(vars);
 
   // Get quantities from the same solution, wrapped in a
@@ -71,64 +81,69 @@ void test_generalized_harmonic_solution(
   const auto wrapped_dt_lapse =
       get<Tags::dt<gr::Tags::Lapse<DataVector>>>(wrapped_solution.variables(
           x, t, tmpl::list<Tags::dt<gr::Tags::Lapse<DataVector>>>{}));
-  const auto wrapped_d_lapse =
-      get<Tags::deriv<gr::Tags::Lapse<DataVector>, tmpl::size_t<3>,
-                      Frame::Inertial>>(
-          wrapped_solution.variables(
-              x, t,
-              tmpl::list<Tags::deriv<gr::Tags::Lapse<DataVector>,
-                                     tmpl::size_t<3>, Frame::Inertial>>{}));
-  const auto wrapped_shift =
-      get<gr::Tags::Shift<3, Frame::Inertial, DataVector>>(
-          wrapped_solution.variables(
-              x, t,
-              tmpl::list<gr::Tags::Shift<3, Frame::Inertial, DataVector>>{}));
-  const auto wrapped_dt_shift =
-      get<Tags::dt<gr::Tags::Shift<3, Frame::Inertial, DataVector>>>(
-          wrapped_solution.variables(
-              x, t,
-              tmpl::list<Tags::dt<
-                  gr::Tags::Shift<3, Frame::Inertial, DataVector>>>{}));
-  const auto wrapped_d_shift =
-      get<Tags::deriv<gr::Tags::Shift<3, Frame::Inertial, DataVector>,
-                      tmpl::size_t<3>, Frame::Inertial>>(
-          wrapped_solution.variables(
-              x, t,
-              tmpl::list<
-                  Tags::deriv<gr::Tags::Shift<3, Frame::Inertial, DataVector>,
-                              tmpl::size_t<3>, Frame::Inertial>>{}));
-  const auto wrapped_g =
-      get<gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>>(
-          wrapped_solution.variables(
-              x, t,
-              tmpl::list<
-                  gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>>{}));
-  const auto wrapped_dt_g =
-      get<Tags::dt<gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>>>(
-          wrapped_solution.variables(
-              x, t,
-              tmpl::list<Tags::dt<
-                  gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>>>{}));
-  const auto wrapped_d_g =
-      get<Tags::deriv<gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>,
-                      tmpl::size_t<3>, Frame::Inertial>>(
-          wrapped_solution.variables(
-              x, t,
-              tmpl::list<Tags::deriv<
-                  gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>,
-                  tmpl::size_t<3>, Frame::Inertial>>{}));
-  const auto wrapped_inv_g =
-      get<gr::Tags::InverseSpatialMetric<3, Frame::Inertial, DataVector>>(
-          wrapped_solution.variables(
-              x, t,
-              tmpl::list<gr::Tags::InverseSpatialMetric<3, Frame::Inertial,
-                                                        DataVector>>{}));
-  const auto wrapped_extrinsic_curvature =
-      get<gr::Tags::ExtrinsicCurvature<3, Frame::Inertial, DataVector>>(
-          wrapped_solution.variables(
-              x, t,
-              tmpl::list<gr::Tags::ExtrinsicCurvature<3, Frame::Inertial,
-                                                      DataVector>>{}));
+  const auto wrapped_d_lapse = get<
+      Tags::deriv<gr::Tags::Lapse<DataVector>,
+                  tmpl::size_t<wrapped_solution.volume_dim>, Frame::Inertial>>(
+      wrapped_solution.variables(
+          x, t,
+          tmpl::list<Tags::deriv<gr::Tags::Lapse<DataVector>,
+                                 tmpl::size_t<wrapped_solution.volume_dim>,
+                                 Frame::Inertial>>{}));
+  const auto wrapped_shift = get<gr::Tags::Shift<wrapped_solution.volume_dim,
+                                                 Frame::Inertial, DataVector>>(
+      wrapped_solution.variables(
+          x, t,
+          tmpl::list<gr::Tags::Shift<wrapped_solution.volume_dim,
+                                     Frame::Inertial, DataVector>>{}));
+  const auto wrapped_dt_shift = get<Tags::dt<gr::Tags::Shift<
+      wrapped_solution.volume_dim, Frame::Inertial, DataVector>>>(
+      wrapped_solution.variables(
+          x, t,
+          tmpl::list<Tags::dt<gr::Tags::Shift<
+              wrapped_solution.volume_dim, Frame::Inertial, DataVector>>>{}));
+  const auto wrapped_d_shift = get<Tags::deriv<
+      gr::Tags::Shift<wrapped_solution.volume_dim, Frame::Inertial, DataVector>,
+      tmpl::size_t<wrapped_solution.volume_dim>, Frame::Inertial>>(
+      wrapped_solution.variables(
+          x, t,
+          tmpl::list<Tags::deriv<gr::Tags::Shift<wrapped_solution.volume_dim,
+                                                 Frame::Inertial, DataVector>,
+                                 tmpl::size_t<wrapped_solution.volume_dim>,
+                                 Frame::Inertial>>{}));
+  const auto wrapped_g = get<gr::Tags::SpatialMetric<
+      wrapped_solution.volume_dim, Frame::Inertial, DataVector>>(
+      wrapped_solution.variables(
+          x, t,
+          tmpl::list<gr::Tags::SpatialMetric<wrapped_solution.volume_dim,
+                                             Frame::Inertial, DataVector>>{}));
+  const auto wrapped_dt_g = get<Tags::dt<gr::Tags::SpatialMetric<
+      wrapped_solution.volume_dim, Frame::Inertial, DataVector>>>(
+      wrapped_solution.variables(
+          x, t,
+          tmpl::list<Tags::dt<gr::Tags::SpatialMetric<
+              wrapped_solution.volume_dim, Frame::Inertial, DataVector>>>{}));
+  const auto wrapped_d_g = get<
+      Tags::deriv<gr::Tags::SpatialMetric<wrapped_solution.volume_dim,
+                                          Frame::Inertial, DataVector>,
+                  tmpl::size_t<wrapped_solution.volume_dim>, Frame::Inertial>>(
+      wrapped_solution.variables(
+          x, t,
+          tmpl::list<Tags::deriv<
+              gr::Tags::SpatialMetric<wrapped_solution.volume_dim,
+                                      Frame::Inertial, DataVector>,
+              tmpl::size_t<wrapped_solution.volume_dim>, Frame::Inertial>>{}));
+  const auto wrapped_inv_g = get<gr::Tags::InverseSpatialMetric<
+      wrapped_solution.volume_dim, Frame::Inertial, DataVector>>(
+      wrapped_solution.variables(
+          x, t,
+          tmpl::list<gr::Tags::InverseSpatialMetric<
+              wrapped_solution.volume_dim, Frame::Inertial, DataVector>>{}));
+  const auto wrapped_extrinsic_curvature = get<gr::Tags::ExtrinsicCurvature<
+      wrapped_solution.volume_dim, Frame::Inertial, DataVector>>(
+      wrapped_solution.variables(
+          x, t,
+          tmpl::list<gr::Tags::ExtrinsicCurvature<
+              wrapped_solution.volume_dim, Frame::Inertial, DataVector>>{}));
   const auto wrapped_sqrt_det_g =
       get<gr::Tags::SqrtDetSpatialMetric<DataVector>>(
           wrapped_solution.variables(
@@ -157,15 +172,21 @@ void test_generalized_harmonic_solution(
 
   const auto wrapped_gh_vars = wrapped_solution.variables(
       x, t,
-      tmpl::list<gr::Tags::SpacetimeMetric<3, Frame::Inertial, DataVector>,
-                 GeneralizedHarmonic::Tags::Pi<3, Frame::Inertial>,
-                 GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial>>{});
-  CHECK(psi == get<gr::Tags::SpacetimeMetric<3, Frame::Inertial, DataVector>>(
+      tmpl::list<gr::Tags::SpacetimeMetric<wrapped_solution.volume_dim,
+                                           Frame::Inertial, DataVector>,
+                 GeneralizedHarmonic::Tags::Pi<wrapped_solution.volume_dim,
+                                               Frame::Inertial>,
+                 GeneralizedHarmonic::Tags::Phi<wrapped_solution.volume_dim,
+                                                Frame::Inertial>>{});
+  CHECK(psi == get<gr::Tags::SpacetimeMetric<wrapped_solution.volume_dim,
+                                             Frame::Inertial, DataVector>>(
                    wrapped_gh_vars));
-  CHECK(pi == get<GeneralizedHarmonic::Tags::Pi<3, Frame::Inertial>>(
-                  wrapped_gh_vars));
-  CHECK(phi == get<GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial>>(
-                   wrapped_gh_vars));
+  CHECK(pi ==
+        get<GeneralizedHarmonic::Tags::Pi<wrapped_solution.volume_dim,
+                                          Frame::Inertial>>(wrapped_gh_vars));
+  CHECK(phi ==
+        get<GeneralizedHarmonic::Tags::Phi<wrapped_solution.volume_dim,
+                                           Frame::Inertial>>(wrapped_gh_vars));
 
   test_serialization(wrapped_solution);
   // test operator !=
@@ -200,7 +221,9 @@ void test_construct_from_options() {
 SPECTRE_TEST_CASE(
     "Unit.PointwiseFunctions.AnalyticSolutions.Gr.GeneralizedHarmonicSolution",
     "[PointwiseFunctions][Unit]") {
-  gr::Solutions::Minkowski<3> minkowski{};
+  gr::Solutions::Minkowski<1> minkowski1{};
+  gr::Solutions::Minkowski<2> minkowski2{};
+  gr::Solutions::Minkowski<3> minkowski3{};
 
   const double mass = 0.5;
   const std::array<double, 3> spin{{0.1, 0.2, 0.3}};
@@ -208,14 +231,24 @@ SPECTRE_TEST_CASE(
   gr::Solutions::KerrSchild kerr_schild(mass, spin, center);
 
   GeneralizedHarmonic::Solutions::GeneralizedHarmonicSolution<
+      gr::Solutions::Minkowski<1>>
+      wrapped_minkowski1{};
+  GeneralizedHarmonic::Solutions::GeneralizedHarmonicSolution<
+      gr::Solutions::Minkowski<2>>
+      wrapped_minkowski2{};
+  GeneralizedHarmonic::Solutions::GeneralizedHarmonicSolution<
       gr::Solutions::Minkowski<3>>
-      wrapped_minkowski{};
+      wrapped_minkowski3{};
   GeneralizedHarmonic::Solutions::GeneralizedHarmonicSolution<
       gr::Solutions::KerrSchild>
       wrapped_kerr_schild(mass, spin, center);
 
+  test_generalized_harmonic_solution<gr::Solutions::Minkowski<1>>(
+      minkowski1, wrapped_minkowski1);
+  test_generalized_harmonic_solution<gr::Solutions::Minkowski<2>>(
+      minkowski2, wrapped_minkowski2);
   test_generalized_harmonic_solution<gr::Solutions::Minkowski<3>>(
-      minkowski, wrapped_minkowski);
+      minkowski3, wrapped_minkowski3);
   test_generalized_harmonic_solution<gr::Solutions::KerrSchild>(
       kerr_schild, wrapped_kerr_schild);
 

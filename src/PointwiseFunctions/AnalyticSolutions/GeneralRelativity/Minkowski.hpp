@@ -39,6 +39,7 @@ class Minkowski {
   using options = tmpl::list<>;
   static constexpr OptionString help{
       "Minkowski solution to Einstein's Equations"};
+  static constexpr size_t volume_dim = Dim;
 
   template <typename DataType>
   using DerivLapse = ::Tags::deriv<gr::Tags::Lapse<DataType>, tmpl::size_t<Dim>,
