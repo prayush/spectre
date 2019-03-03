@@ -57,11 +57,13 @@ struct Initialize {
     using Inertial = Frame::Inertial;
     using system = typename Metavariables::system;
     using variables_tag = typename system::variables_tag;
+    using damping_tag = ::Tags::Variables<
+        tmpl::list<GeneralizedHarmonic::Tags::ConstraintGamma0,
+                   GeneralizedHarmonic::Tags::ConstraintGamma1,
+                   GeneralizedHarmonic::Tags::ConstraintGamma2>>;
 
     using simple_tags = db::AddSimpleTags<
-        variables_tag, GeneralizedHarmonic::Tags::ConstraintGamma0,
-        GeneralizedHarmonic::Tags::ConstraintGamma1,
-        GeneralizedHarmonic::Tags::ConstraintGamma2,
+        variables_tag, damping_tag,
         GeneralizedHarmonic::Tags::TimeDerivGaugeH<Dim, Inertial>>;
     using compute_tags = db::AddComputeTags<
         gr::Tags::SpatialMetricCompute<Dim, Inertial, DataVector>,
@@ -127,6 +129,7 @@ struct Initialize {
         const Parallel::ConstGlobalCache<Metavariables>& cache,
         const double initial_time) noexcept {
       using Vars = typename variables_tag::type;
+      using DampingVars = typename damping_tag::type;
 
       const size_t num_grid_points =
           db::get<::Tags::Mesh<Dim>>(box).number_of_grid_points();
@@ -150,9 +153,11 @@ struct Initialize {
 
       // Set initial data from analytic solution
       Vars vars{num_grid_points};
+      DampingVars damping_vars{num_grid_points};
       make_overloader([ initial_time, &inertial_coords ](
                           std::true_type /*is_analytic_solution*/,
                           const gsl::not_null<Vars*> local_vars,
+                          const gsl::not_null<DampingVars*> local_damping_vars,
                           const auto& local_cache) noexcept {
         using analytic_solution_tag = OptionTags::AnalyticSolutionBase;
         /*
@@ -213,26 +218,42 @@ struct Initialize {
             solution_tuple(spacetime_metric, phi, pi);
 
         local_vars->assign_subset(solution_tuple);
+
+        const tuples::TaggedTuple<GeneralizedHarmonic::Tags::ConstraintGamma0,
+                                  GeneralizedHarmonic::Tags::ConstraintGamma1,
+                                  GeneralizedHarmonic::Tags::ConstraintGamma2>
+            damping_tuple(gamma0, gamma1, gamma2);
+
+        local_damping_vars->assign_subset(damping_tuple);
       },
                       [&inertial_coords](
                           std::false_type /*is_analytic_solution*/,
                           const gsl::not_null<Vars*> local_vars,
+                          const gsl::not_null<DampingVars*> local_damping_vars,
                           const auto& local_cache) noexcept {
                         using analytic_data_tag = OptionTags::AnalyticDataBase;
                         local_vars->assign_subset(
                             Parallel::get<analytic_data_tag>(local_cache)
                                 .variables(inertial_coords,
                                            typename Vars::tags_list{}));
+                        const tuples::TaggedTuple<
+                            GeneralizedHarmonic::Tags::ConstraintGamma0,
+                            GeneralizedHarmonic::Tags::ConstraintGamma1,
+                            GeneralizedHarmonic::Tags::ConstraintGamma2>
+                            damping_tuple(gamma0, gamma1, gamma2);
+
+                        local_damping_vars->assign_subset(damping_tuple);
                       })(detail::has_analytic_solution_alias<Metavariables>{},
-                         make_not_null(&vars), cache);
+                         make_not_null(&vars), make_not_null(&damping_vars),
+                         cache);
 
       // Set the time derivatives of GaugeH
       const auto& dt_gauge_source =
           make_with_value<tnsr::a<DataVector, Dim, Inertial>>(gamma0, 0.0);
 
       return db::create_from<db::RemoveTags<>, simple_tags, compute_tags>(
-          std::move(box), std::move(vars), std::move(gamma0), std::move(gamma1),
-          std::move(gamma2), std::move(dt_gauge_source));
+          std::move(box), std::move(vars), std::move(damping_vars),
+          std::move(dt_gauge_source));
     }
   };
 

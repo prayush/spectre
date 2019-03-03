@@ -102,6 +102,7 @@ struct UnitFaceNormalCompute : UnitFaceNormal<Dim, Frame>, db::ComputeTag {
   using argument_tags =
       tmpl::list<UnnormalizedFaceNormal<Dim, Frame>,
                  Magnitude<UnnormalizedFaceNormal<Dim, Frame>>>;
+  using base = UnitFaceNormal<Dim, Frame>;
 };
 
 template <size_t Dim, typename Frame>
@@ -121,6 +122,7 @@ struct UnitFaceNormalVectorCompute : UnitFaceNormalVector<SpatialDim, Frame>,
   using argument_tags =
       tmpl::list<UnitFaceNormal<SpatialDim, Frame>,
                  gr::Tags::InverseSpatialMetric<SpatialDim, Frame, DataVector>>;
+  using base = UnitFaceNormalVector<SpatialDim, Frame>;
 };
 
 /// \ingroup DataBoxTagsGroup
