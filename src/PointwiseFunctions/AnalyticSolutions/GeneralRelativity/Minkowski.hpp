@@ -41,6 +41,13 @@ class Minkowski {
       "Minkowski solution to Einstein's Equations"};
   static constexpr size_t volume_dim = Dim;
 
+  Minkowski() = default;
+  Minkowski(const Minkowski& /*rhs*/) = default;
+  Minkowski& operator=(const Minkowski& /*rhs*/) = default;
+  Minkowski(Minkowski&& /*rhs*/) noexcept = default;
+  Minkowski& operator=(Minkowski&& /*rhs*/) noexcept = default;
+  ~Minkowski() = default;
+
   template <typename DataType>
   using DerivLapse = ::Tags::deriv<gr::Tags::Lapse<DataType>, tmpl::size_t<Dim>,
                                    Frame::Inertial>;

@@ -38,19 +38,11 @@ namespace Solutions {
 template <typename SolutionType>
 class GeneralizedHarmonicSolution : public SolutionType {
  public:
-  template <typename... Args>
-  GeneralizedHarmonicSolution(Args&&... args) : SolutionType(args...) {}
-  GeneralizedHarmonicSolution(const GeneralizedHarmonicSolution& /*rhs*/) =
-      delete;
-  GeneralizedHarmonicSolution& operator=(
-      const GeneralizedHarmonicSolution& /*rhs*/) = delete;
-  GeneralizedHarmonicSolution(GeneralizedHarmonicSolution&& /*rhs*/) noexcept =
-      default;
-  GeneralizedHarmonicSolution& operator=(
-      GeneralizedHarmonicSolution&& /*rhs*/) noexcept = default;
-  ~GeneralizedHarmonicSolution() = default;
+  using SolutionType::SolutionType;
 
   static constexpr size_t volume_dim = SolutionType::volume_dim;
+  using options = typename SolutionType::options;
+  static constexpr OptionString help = SolutionType::help;
 
   using DerivLapse = ::Tags::deriv<gr::Tags::Lapse<DataVector>,
                                    tmpl::size_t<volume_dim>, Frame::Inertial>;

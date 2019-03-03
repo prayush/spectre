@@ -193,29 +193,35 @@ void test_generalized_harmonic_solution(
   CHECK_FALSE(wrapped_solution != wrapped_solution);
 }
 
-template <typename SolutionType>
-struct GeneralizedHarmonicSolution {
-  using type =
-      GeneralizedHarmonic::Solutions::GeneralizedHarmonicSolution<SolutionType>;
+struct GhSolution {
+  using type = GeneralizedHarmonic::Solutions::GeneralizedHarmonicSolution<
+      gr::Solutions::KerrSchild>;
   static constexpr OptionString help{"A wrapped generalized harmonic solution"};
 };
 
-/*
 void test_construct_from_options() {
-  Options<tmpl::list<GeneralizedHarmonicSolution<gr::Solutions::KerrSchild>>>
-      opts("");
+  Options<tmpl::list<GhSolution>> opts("");
   opts.parse(
-      "GeneralizedHarmonicSolution<KerrSchild>:\n"
+      "GhSolution:\n"
       "  Mass: 0.5\n"
       "  Spin: [0.1,0.2,0.3]\n"
       "  Center: [1.0,3.0,2.0]");
   const double mass = 0.5;
   const std::array<double, 3> spin{{0.1, 0.2, 0.3}};
   const std::array<double, 3> center{{1.0, 3.0, 2.0}};
-  CHECK(opts.get<GeneralizedHarmonicSolution<gr::Solutions::KerrSchild>>() ==
+  CHECK(opts.get<GhSolution>() ==
         GeneralizedHarmonic::Solutions::GeneralizedHarmonicSolution<
             gr::Solutions::KerrSchild>(mass, spin, center));
-} */
+}
+
+template <typename SolutionType>
+void test_copy_and_move(const SolutionType& solution) noexcept {
+  test_copy_semantics(solution);
+  auto solution_copy = solution;
+  auto solution_copy2 = solution;
+  // clang-tidy: std::move of trivially copyable type
+  test_move_semantics(std::move(solution_copy2), solution_copy);  // NOLINT
+}
 }  // namespace
 
 SPECTRE_TEST_CASE(
@@ -252,5 +258,15 @@ SPECTRE_TEST_CASE(
   test_generalized_harmonic_solution<gr::Solutions::KerrSchild>(
       kerr_schild, wrapped_kerr_schild);
 
-  // test_construct_from_options();
+  test_serialization(wrapped_minkowski1);
+  test_serialization(wrapped_minkowski2);
+  test_serialization(wrapped_minkowski3);
+  test_serialization(wrapped_kerr_schild);
+
+  test_copy_and_move(wrapped_minkowski1);
+  test_copy_and_move(wrapped_minkowski2);
+  test_copy_and_move(wrapped_minkowski3);
+  test_copy_and_move(wrapped_kerr_schild);
+
+  test_construct_from_options();
 }
