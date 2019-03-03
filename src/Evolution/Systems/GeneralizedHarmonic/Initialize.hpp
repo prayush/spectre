@@ -141,8 +141,9 @@ struct Initialize {
       // For now, hard code these; later, make these options / AnalyticData
       // The values here are the same as in SpEC standard input files for
       // evolving a single black hole.
-      const auto& r_squared = dot_product(inertial_coords, inertial_coords);
-      const auto& one = exp(r_squared - r_squared);
+      const DataVector r_squared =
+          get(dot_product(inertial_coords, inertial_coords));
+      const DataVector one = exp(0.0 * r_squared);
       const typename GeneralizedHarmonic::Tags::ConstraintGamma0::type gamma0{
           3.0 * exp(-0.5 * r_squared / 64.0) + 0.001 * one};
       const auto& gamma1 = make_with_value<
@@ -154,98 +155,100 @@ struct Initialize {
       // Set initial data from analytic solution
       Vars vars{num_grid_points};
       DampingVars damping_vars{num_grid_points};
-      make_overloader([ initial_time, &inertial_coords ](
-                          std::true_type /*is_analytic_solution*/,
-                          const gsl::not_null<Vars*> local_vars,
-                          const gsl::not_null<DampingVars*> local_damping_vars,
-                          const auto& local_cache) noexcept {
-        using analytic_solution_tag = OptionTags::AnalyticSolutionBase;
-        /*
-         * It is assumed here that the analytic solution makes available the
-         * following foliation-related variables (only):
-         * 1. Lapse,
-         * 2. Shift,
-         * 3. SpatialMetric,
-         * and their spatial + temporal derivatives.
-         */
-        const auto& solution_vars =
-            Parallel::get<analytic_solution_tag>(local_cache)
-                .variables(inertial_coords, initial_time,
-                           typename gr::Solutions::KerrSchild::template tags<
-                               DataVector>{});
-        // First fetch lapse, shift, spatial metric and their derivs
-        const auto& lapse = get<gr::Tags::Lapse<DataVector>>(solution_vars);
-        const auto& dt_lapse =
-            get<::Tags::dt<gr::Tags::Lapse<DataVector>>>(solution_vars);
-        const auto& deriv_lapse =
+      make_overloader(
+          [ initial_time, &inertial_coords, &gamma0, &gamma1, &gamma2 ](
+              std::true_type /*is_analytic_solution*/,
+              const gsl::not_null<Vars*> local_vars,
+              const gsl::not_null<DampingVars*> local_damping_vars,
+              const auto& local_cache) noexcept {
+            using analytic_solution_tag = OptionTags::AnalyticSolutionBase;
+            /*
+             * It is assumed here that the analytic solution makes available the
+             * following foliation-related variables (only):
+             * 1. Lapse,
+             * 2. Shift,
+             * 3. SpatialMetric,
+             * and their spatial + temporal derivatives.
+             */
+            const auto& solution_vars =
+                Parallel::get<analytic_solution_tag>(local_cache)
+                    .variables(
+                        inertial_coords, initial_time,
+                        typename gr::Solutions::KerrSchild::template tags<
+                            DataVector>{});
+            // First fetch lapse, shift, spatial metric and their derivs
+            const auto& lapse = get<gr::Tags::Lapse<DataVector>>(solution_vars);
+            const auto& dt_lapse =
+                get<::Tags::dt<gr::Tags::Lapse<DataVector>>>(solution_vars);
+            const auto& deriv_lapse =
 
-            get<::Tags::deriv<gr::Tags::Lapse<DataVector>, tmpl::size_t<Dim>,
-                              Inertial>>(solution_vars);
+                get<::Tags::deriv<gr::Tags::Lapse<DataVector>,
+                                  tmpl::size_t<Dim>, Inertial>>(solution_vars);
 
-        const auto& shift =
-            get<gr::Tags::Shift<Dim, Inertial, DataVector>>(solution_vars);
-        const auto& dt_shift =
-            get<::Tags::dt<gr::Tags::Shift<Dim, Inertial, DataVector>>>(
+            const auto& shift =
+                get<gr::Tags::Shift<Dim, Inertial, DataVector>>(solution_vars);
+            const auto& dt_shift =
+                get<::Tags::dt<gr::Tags::Shift<Dim, Inertial, DataVector>>>(
+                    solution_vars);
+            const auto& deriv_shift =
+                get<::Tags::deriv<gr::Tags::Shift<Dim, Inertial, DataVector>,
+                                  tmpl::size_t<Dim>, Inertial>>(solution_vars);
+
+            const auto& spatial_metric =
+                get<gr::Tags::SpatialMetric<Dim, Inertial, DataVector>>(
+                    solution_vars);
+            const auto& dt_spatial_metric = get<
+                ::Tags::dt<gr::Tags::SpatialMetric<Dim, Inertial, DataVector>>>(
                 solution_vars);
-        const auto& deriv_shift =
-            get<::Tags::deriv<gr::Tags::Shift<Dim, Inertial, DataVector>,
-                              tmpl::size_t<Dim>, Inertial>>(solution_vars);
+            const auto& deriv_spatial_metric = get<::Tags::deriv<
+                gr::Tags::SpatialMetric<Dim, Inertial, DataVector>,
+                tmpl::size_t<Dim>, Inertial>>(solution_vars);
 
-        const auto& spatial_metric =
-            get<gr::Tags::SpatialMetric<Dim, Inertial, DataVector>>(
-                solution_vars);
-        const auto& dt_spatial_metric =
-            get<::Tags::dt<gr::Tags::SpatialMetric<Dim, Inertial, DataVector>>>(
-                solution_vars);
-        const auto& deriv_spatial_metric = get<
-            ::Tags::deriv<gr::Tags::SpatialMetric<Dim, Inertial, DataVector>,
-                          tmpl::size_t<Dim>, Inertial>>(solution_vars);
+            // Next, compute Gh evolution variables from them
+            const auto& spacetime_metric =
+                ::gr::spacetime_metric<Dim, Inertial, DataVector>(
+                    lapse, shift, spatial_metric);
+            const auto& phi =
+                GeneralizedHarmonic::phi<Dim, Inertial, DataVector>(
+                    lapse, deriv_lapse, shift, deriv_shift, spatial_metric,
+                    deriv_spatial_metric);
+            const auto& pi = GeneralizedHarmonic::pi<Dim, Inertial, DataVector>(
+                lapse, dt_lapse, shift, dt_shift, spatial_metric,
+                dt_spatial_metric, phi);
 
-        // Next, compute Gh evolution variables from them
-        const auto& spacetime_metric =
-            ::gr::spacetime_metric<Dim, Inertial, DataVector>(lapse, shift,
-                                                              spatial_metric);
-        const auto& phi = GeneralizedHarmonic::phi<Dim, Inertial, DataVector>(
-            lapse, deriv_lapse, shift, deriv_shift, spatial_metric,
-            deriv_spatial_metric);
-        const auto& pi = GeneralizedHarmonic::pi<Dim, Inertial, DataVector>(
-            lapse, dt_lapse, shift, dt_shift, spatial_metric, dt_spatial_metric,
-            phi);
+            const tuples::TaggedTuple<gr::Tags::SpacetimeMetric<Dim>,
+                                      GeneralizedHarmonic::Tags::Phi<Dim>,
+                                      GeneralizedHarmonic::Tags::Pi<Dim>>
+                solution_tuple(spacetime_metric, phi, pi);
 
-        const tuples::TaggedTuple<gr::Tags::SpacetimeMetric<Dim>,
-                                  GeneralizedHarmonic::Tags::Phi<Dim>,
-                                  GeneralizedHarmonic::Tags::Pi<Dim>>
-            solution_tuple(spacetime_metric, phi, pi);
+            local_vars->assign_subset(solution_tuple);
 
-        local_vars->assign_subset(solution_tuple);
+            const tuples::TaggedTuple<
+                GeneralizedHarmonic::Tags::ConstraintGamma0,
+                GeneralizedHarmonic::Tags::ConstraintGamma1,
+                GeneralizedHarmonic::Tags::ConstraintGamma2>
+                damping_tuple(gamma0, gamma1, gamma2);
 
-        const tuples::TaggedTuple<GeneralizedHarmonic::Tags::ConstraintGamma0,
-                                  GeneralizedHarmonic::Tags::ConstraintGamma1,
-                                  GeneralizedHarmonic::Tags::ConstraintGamma2>
-            damping_tuple(gamma0, gamma1, gamma2);
+            local_damping_vars->assign_subset(damping_tuple);
+          },
+          [&inertial_coords, &gamma0, &gamma1, &gamma2 ](
+              std::false_type /*is_analytic_solution*/,
+              const gsl::not_null<Vars*> local_vars,
+              const gsl::not_null<DampingVars*> local_damping_vars,
+              const auto& local_cache) noexcept {
+            using analytic_data_tag = OptionTags::AnalyticDataBase;
+            local_vars->assign_subset(
+                Parallel::get<analytic_data_tag>(local_cache)
+                    .variables(inertial_coords, typename Vars::tags_list{}));
+            const tuples::TaggedTuple<
+                GeneralizedHarmonic::Tags::ConstraintGamma0,
+                GeneralizedHarmonic::Tags::ConstraintGamma1,
+                GeneralizedHarmonic::Tags::ConstraintGamma2>
+                damping_tuple(gamma0, gamma1, gamma2);
 
-        local_damping_vars->assign_subset(damping_tuple);
-      },
-                      [&inertial_coords](
-                          std::false_type /*is_analytic_solution*/,
-                          const gsl::not_null<Vars*> local_vars,
-                          const gsl::not_null<DampingVars*> local_damping_vars,
-                          const auto& local_cache) noexcept {
-                        using analytic_data_tag = OptionTags::AnalyticDataBase;
-                        local_vars->assign_subset(
-                            Parallel::get<analytic_data_tag>(local_cache)
-                                .variables(inertial_coords,
-                                           typename Vars::tags_list{}));
-                        const tuples::TaggedTuple<
-                            GeneralizedHarmonic::Tags::ConstraintGamma0,
-                            GeneralizedHarmonic::Tags::ConstraintGamma1,
-                            GeneralizedHarmonic::Tags::ConstraintGamma2>
-                            damping_tuple(gamma0, gamma1, gamma2);
-
-                        local_damping_vars->assign_subset(damping_tuple);
-                      })(detail::has_analytic_solution_alias<Metavariables>{},
-                         make_not_null(&vars), make_not_null(&damping_vars),
-                         cache);
+            local_damping_vars->assign_subset(damping_tuple);
+          })(detail::has_analytic_solution_alias<Metavariables>{},
+             make_not_null(&vars), make_not_null(&damping_vars), cache);
 
       // Set the time derivatives of GaugeH
       const auto& dt_gauge_source =
