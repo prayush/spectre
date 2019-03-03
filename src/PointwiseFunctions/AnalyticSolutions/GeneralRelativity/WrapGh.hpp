@@ -36,7 +36,7 @@ namespace Solutions {
  * and `GeneralizedHarmonic::Tags::Phi`
  */
 template <typename SolutionType>
-class GeneralizedHarmonicSolution : public SolutionType {
+class WrapGh : public SolutionType {
  public:
   using SolutionType::SolutionType;
 
@@ -182,16 +182,14 @@ class GeneralizedHarmonicSolution : public SolutionType {
 };                                      // namespace Solutions
 
 template <typename SolutionType>
-inline constexpr bool operator==(
-    const GeneralizedHarmonicSolution<SolutionType>& /*lhs*/,
-    const GeneralizedHarmonicSolution<SolutionType>& /*rhs*/) noexcept {
+inline constexpr bool operator==(const WrapGh<SolutionType>& /*lhs*/,
+                                 const WrapGh<SolutionType>& /*rhs*/) noexcept {
   return true;
 }
 
 template <typename SolutionType>
-inline constexpr bool operator!=(
-    const GeneralizedHarmonicSolution<SolutionType>& /*lhs*/,
-    const GeneralizedHarmonicSolution<SolutionType>& /*rhs*/) noexcept {
+inline constexpr bool operator!=(const WrapGh<SolutionType>& /*lhs*/,
+                                 const WrapGh<SolutionType>& /*rhs*/) noexcept {
   return false;
 }
 }  // namespace Solutions

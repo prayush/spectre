@@ -4,7 +4,7 @@
 set(LIBRARY GeneralRelativitySolutions)
 
 set(LIBRARY_SOURCES
-    GeneralizedHarmonicSolution.cpp
+    WrapGh.cpp
     KerrHorizon.cpp
     KerrSchild.cpp
     Minkowski.cpp

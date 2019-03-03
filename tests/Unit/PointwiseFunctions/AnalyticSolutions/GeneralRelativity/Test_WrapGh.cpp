@@ -11,9 +11,9 @@
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"
-#include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/GeneralizedHarmonicSolution.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/KerrSchild.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/Minkowski.hpp"
+#include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/WrapGh.hpp"
 #include "PointwiseFunctions/GeneralRelativity/ComputeGhQuantities.hpp"
 #include "PointwiseFunctions/GeneralRelativity/ComputeSpacetimeQuantities.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
@@ -29,8 +29,7 @@ namespace {
 template <typename SolutionType>
 void test_generalized_harmonic_solution(
     const SolutionType& solution,
-    const GeneralizedHarmonic::Solutions::GeneralizedHarmonicSolution<
-        SolutionType>
+    const GeneralizedHarmonic::Solutions::WrapGh<SolutionType>
         wrapped_solution) {
   const DataVector data_vector{5.0, 4.0};
   const tnsr::I<DataVector, wrapped_solution.volume_dim, Frame::Inertial> x{
@@ -74,7 +73,7 @@ void test_generalized_harmonic_solution(
   const auto sqrt_det_g = get<gr::Tags::SqrtDetSpatialMetric<DataVector>>(vars);
 
   // Get quantities from the same solution, wrapped in a
-  // GeneralizedHarmonicSolution
+  // WrapGh
   const auto wrapped_lapse =
       get<gr::Tags::Lapse<DataVector>>(wrapped_solution.variables(
           x, t, tmpl::list<gr::Tags::Lapse<DataVector>>{}));
@@ -193,25 +192,25 @@ void test_generalized_harmonic_solution(
   CHECK_FALSE(wrapped_solution != wrapped_solution);
 }
 
-struct GhSolution {
-  using type = GeneralizedHarmonic::Solutions::GeneralizedHarmonicSolution<
-      gr::Solutions::KerrSchild>;
+struct WrapGh {
+  using type =
+      GeneralizedHarmonic::Solutions::WrapGh<gr::Solutions::KerrSchild>;
   static constexpr OptionString help{"A wrapped generalized harmonic solution"};
 };
 
 void test_construct_from_options() {
-  Options<tmpl::list<GhSolution>> opts("");
+  Options<tmpl::list<WrapGh>> opts("");
   opts.parse(
-      "GhSolution:\n"
+      "WrapGh:\n"
       "  Mass: 0.5\n"
       "  Spin: [0.1,0.2,0.3]\n"
       "  Center: [1.0,3.0,2.0]");
   const double mass = 0.5;
   const std::array<double, 3> spin{{0.1, 0.2, 0.3}};
   const std::array<double, 3> center{{1.0, 3.0, 2.0}};
-  CHECK(opts.get<GhSolution>() ==
-        GeneralizedHarmonic::Solutions::GeneralizedHarmonicSolution<
-            gr::Solutions::KerrSchild>(mass, spin, center));
+  CHECK(opts.get<WrapGh>() ==
+        GeneralizedHarmonic::Solutions::WrapGh<gr::Solutions::KerrSchild>(
+            mass, spin, center));
 }
 
 template <typename SolutionType>
@@ -224,9 +223,8 @@ void test_copy_and_move(const SolutionType& solution) noexcept {
 }
 }  // namespace
 
-SPECTRE_TEST_CASE(
-    "Unit.PointwiseFunctions.AnalyticSolutions.Gr.GeneralizedHarmonicSolution",
-    "[PointwiseFunctions][Unit]") {
+SPECTRE_TEST_CASE("Unit.PointwiseFunctions.AnalyticSolutions.Gr.WrapGh",
+                  "[PointwiseFunctions][Unit]") {
   gr::Solutions::Minkowski<1> minkowski1{};
   gr::Solutions::Minkowski<2> minkowski2{};
   gr::Solutions::Minkowski<3> minkowski3{};
@@ -236,17 +234,13 @@ SPECTRE_TEST_CASE(
   const std::array<double, 3> center{{1.0, 3.0, 2.0}};
   gr::Solutions::KerrSchild kerr_schild(mass, spin, center);
 
-  GeneralizedHarmonic::Solutions::GeneralizedHarmonicSolution<
-      gr::Solutions::Minkowski<1>>
+  GeneralizedHarmonic::Solutions::WrapGh<gr::Solutions::Minkowski<1>>
       wrapped_minkowski1{};
-  GeneralizedHarmonic::Solutions::GeneralizedHarmonicSolution<
-      gr::Solutions::Minkowski<2>>
+  GeneralizedHarmonic::Solutions::WrapGh<gr::Solutions::Minkowski<2>>
       wrapped_minkowski2{};
-  GeneralizedHarmonic::Solutions::GeneralizedHarmonicSolution<
-      gr::Solutions::Minkowski<3>>
+  GeneralizedHarmonic::Solutions::WrapGh<gr::Solutions::Minkowski<3>>
       wrapped_minkowski3{};
-  GeneralizedHarmonic::Solutions::GeneralizedHarmonicSolution<
-      gr::Solutions::KerrSchild>
+  GeneralizedHarmonic::Solutions::WrapGh<gr::Solutions::KerrSchild>
       wrapped_kerr_schild(mass, spin, center);
 
   test_generalized_harmonic_solution<gr::Solutions::Minkowski<1>>(
