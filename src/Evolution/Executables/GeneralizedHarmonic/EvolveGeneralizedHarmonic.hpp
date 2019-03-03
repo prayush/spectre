@@ -33,6 +33,7 @@
 #include "Parallel/Reduction.hpp"
 #include "Parallel/RegisterDerivedClassesWithCharm.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/KerrSchild.hpp"  // IWYU pragma: keep
+#include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/WrapGh.hpp"  // IWYU pragma: keep
 #include "PointwiseFunctions/AnalyticSolutions/Tags.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/WaveEquation/PlaneWave.hpp"  // IWYU pragma: keep
 #include "PointwiseFunctions/GeneralRelativity/Christoffel.hpp"
@@ -76,8 +77,8 @@ struct EvolutionMetavars {
   using system = GeneralizedHarmonic::System<dim>;
   using temporal_id = Tags::TimeId;
   static constexpr bool local_time_stepping = false;
-  using analytic_solution_tag =
-      OptionTags::AnalyticSolution<gr::Solutions::KerrSchild>;
+  using analytic_solution_tag = OptionTags::AnalyticSolution<
+      GeneralizedHarmonic::Solutions::WrapGh<gr::Solutions::KerrSchild>>;
   using boundary_condition_tag = analytic_solution_tag;
   using normal_dot_numerical_flux =
       OptionTags::NumericalFluxParams<GeneralizedHarmonic::UpwindFlux<dim>>;
