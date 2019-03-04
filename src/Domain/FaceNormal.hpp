@@ -88,8 +88,6 @@ struct UnitFaceNormal : db::SimpleTag {
 
 template <size_t Dim, typename Frame>
 struct UnitFaceNormalCompute : UnitFaceNormal<Dim, Frame>, db::ComputeTag {
-  using base = UnitFaceNormal<Dim, Frame>;
-  using type = typename base::type;
   static constexpr auto function(
       const db::item_type<UnnormalizedFaceNormal<Dim, Frame>>&
           vector_in,  // Compute items need to take const references
@@ -105,6 +103,7 @@ struct UnitFaceNormalCompute : UnitFaceNormal<Dim, Frame>, db::ComputeTag {
       tmpl::list<UnnormalizedFaceNormal<Dim, Frame>,
                  Magnitude<UnnormalizedFaceNormal<Dim, Frame>>>;
   using base = UnitFaceNormal<Dim, Frame>;
+  using type = typename base::type;
 };
 
 template <size_t Dim, typename Frame>
@@ -116,8 +115,6 @@ struct UnitFaceNormalVector : db::SimpleTag {
 template <size_t SpatialDim, typename Frame>
 struct UnitFaceNormalVectorCompute : UnitFaceNormalVector<SpatialDim, Frame>,
                                      db::ComputeTag {
-  using base = UnitFaceNormalVector<SpatialDim, Frame>;
-  using type = typename base::type;
   static constexpr tnsr::I<DataVector, SpatialDim, Frame> (*function)(
       const tnsr::i<DataVector, SpatialDim, Frame>&,
       const tnsr::II<DataVector, SpatialDim, Frame>&) =
@@ -127,6 +124,7 @@ struct UnitFaceNormalVectorCompute : UnitFaceNormalVector<SpatialDim, Frame>,
       tmpl::list<UnitFaceNormal<SpatialDim, Frame>,
                  gr::Tags::InverseSpatialMetric<SpatialDim, Frame, DataVector>>;
   using base = UnitFaceNormalVector<SpatialDim, Frame>;
+  using type = typename base::type;
 };
 
 /// \ingroup DataBoxTagsGroup

@@ -145,12 +145,12 @@ struct Initialize {
           get(dot_product(inertial_coords, inertial_coords));
       const DataVector one = exp(0.0 * r_squared);
       const typename GeneralizedHarmonic::Tags::ConstraintGamma0::type gamma0{
-          3.0 * exp(-0.5 * get(r_squared) / 64.0) + 0.001 * one};
+          3.0 * exp(-0.5 * r_squared / 64.0) + 0.001 * one};
       const auto& gamma1 = make_with_value<
           typename GeneralizedHarmonic::Tags::ConstraintGamma1::type>(
           inertial_coords, -1.);
       const typename GeneralizedHarmonic::Tags::ConstraintGamma2::type gamma2{
-          exp(-0.5 * get(r_squared) / 64.0) + 0.001 * one};
+          exp(-0.5 * r_squared / 64.0) + 0.001 * one};
       const tuples::TaggedTuple<GeneralizedHarmonic::Tags::ConstraintGamma0,
                                 GeneralizedHarmonic::Tags::ConstraintGamma1,
                                 GeneralizedHarmonic::Tags::ConstraintGamma2>

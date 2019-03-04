@@ -205,8 +205,6 @@ namespace Tags {
 template <size_t SpatialDim, typename Frame, typename DataType>
 struct SpacetimeMetricCompute : SpacetimeMetric<SpatialDim, Frame, DataType>,
                                 db::ComputeTag {
-  using base = SpacetimeMetric<SpatialDim, Frame, DataType>;
-  using type = typename base::type;
   static constexpr tnsr::aa<DataType, SpatialDim, Frame> (*function)(
       const Scalar<DataType>&, const tnsr::I<DataType, SpatialDim, Frame>&,
       const tnsr::ii<DataType, SpatialDim, Frame>&) =
@@ -215,6 +213,7 @@ struct SpacetimeMetricCompute : SpacetimeMetric<SpatialDim, Frame, DataType>,
       tmpl::list<Lapse<DataType>, Shift<SpatialDim, Frame, DataType>,
                  SpatialMetric<SpatialDim, Frame, DataType>>;
   using base = SpacetimeMetric<SpatialDim, Frame, DataType>;
+  using type = typename base::type;
 };
 
 /// Compute item for spatial metric \f$g_{ij}\f$ from the
@@ -224,12 +223,11 @@ struct SpacetimeMetricCompute : SpacetimeMetric<SpatialDim, Frame, DataType>,
 template <size_t SpatialDim, typename Frame, typename DataType>
 struct SpatialMetricCompute : SpatialMetric<SpatialDim, Frame, DataType>,
                               db::ComputeTag {
-  using base = SpatialMetric<SpatialDim, Frame, DataType>;
-  using type = typename base::type;
   static constexpr auto function = &spatial_metric<SpatialDim, Frame, DataType>;
   using argument_tags =
       tmpl::list<SpacetimeMetric<SpatialDim, Frame, DataType>>;
   using base = SpatialMetric<SpatialDim, Frame, DataType>;
+  using type = typename base::type;
 };
 
 /// Compute item for inverse spacetime metric \f$\psi^{ab}\f$
@@ -241,14 +239,13 @@ template <size_t SpatialDim, typename Frame, typename DataType>
 struct InverseSpacetimeMetricCompute
     : InverseSpacetimeMetric<SpatialDim, Frame, DataType>,
       db::ComputeTag {
-  using base = InverseSpacetimeMetric<SpatialDim, Frame, DataType>;
-  using type = typename base::type;
   static constexpr auto function =
       &inverse_spacetime_metric<SpatialDim, Frame, DataType>;
   using argument_tags =
       tmpl::list<Lapse<DataType>, Shift<SpatialDim, Frame, DataType>,
                  InverseSpatialMetric<SpatialDim, Frame, DataType>>;
   using base = InverseSpacetimeMetric<SpatialDim, Frame, DataType>;
+  using type = typename base::type;
 };
 
 /// Compute item for spatial metric determinant \f$\g\f$
@@ -276,8 +273,6 @@ struct DetAndInverseSpatialMetricCompute
 template <size_t SpatialDim, typename Frame, typename DataType>
 struct SqrtDetSpatialMetricCompute : SqrtDetSpatialMetric<DataType>,
                                      db::ComputeTag {
-  using base = SqrtDetSpatialMetric<DataType>;
-  using type = typename base::type;
   static Scalar<DataType> function(
       const std::pair<Scalar<DataType>, tnsr::II<DataType, SpatialDim, Frame>>&
           det_and_inverse_spatial_metric) {
@@ -286,6 +281,7 @@ struct SqrtDetSpatialMetricCompute : SqrtDetSpatialMetric<DataType>,
   using argument_tags =
       tmpl::list<DetAndInverseSpatialMetric<SpatialDim, Frame, DataType>>;
   using base = SqrtDetSpatialMetric<DataType>;
+  using type = typename base::type;
 };
 
 /// Compute item for inverse spatial metric \f$\g^{ij}\f$
@@ -296,8 +292,6 @@ template <size_t SpatialDim, typename Frame, typename DataType>
 struct InverseSpatialMetricCompute
     : InverseSpatialMetric<SpatialDim, Frame, DataType>,
       db::ComputeTag {
-  using base = InverseSpatialMetric<SpatialDim, Frame, DataType>;
-  using type = typename base::type;
   static const auto& function(
       const std::pair<Scalar<DataType>, tnsr::II<DataType, SpatialDim, Frame>>&
           det_and_inverse_spatial_metric) {
@@ -306,6 +300,7 @@ struct InverseSpatialMetricCompute
   using argument_tags =
       tmpl::list<DetAndInverseSpatialMetric<SpatialDim, Frame, DataType>>;
   using base = InverseSpatialMetric<SpatialDim, Frame, DataType>;
+  using type = typename base::type;
 };
 
 /// Compute item for shift \f$N^i\f$ from the spacetime metric
@@ -314,13 +309,12 @@ struct InverseSpatialMetricCompute
 /// Can be retrieved using `gr::Tags::Shift`
 template <size_t SpatialDim, typename Frame, typename DataType>
 struct ShiftCompute : Shift<SpatialDim, Frame, DataType>, db::ComputeTag {
-  using base = Shift<SpatialDim, Frame, DataType>;
-  using type = typename base::type;
   static constexpr auto function = &shift<SpatialDim, Frame, DataType>;
   using argument_tags =
       tmpl::list<SpacetimeMetric<SpatialDim, Frame, DataType>,
                  InverseSpatialMetric<SpatialDim, Frame, DataType>>;
   using base = Shift<SpatialDim, Frame, DataType>;
+  using type = typename base::type;
 };
 
 /// Compute item for lapse \f$N\f$ from the spacetime metric
@@ -329,13 +323,12 @@ struct ShiftCompute : Shift<SpatialDim, Frame, DataType>, db::ComputeTag {
 /// Can be retrieved using `gr::Tags::Lapse`
 template <size_t SpatialDim, typename Frame, typename DataType>
 struct LapseCompute : Lapse<DataType>, db::ComputeTag {
-  using base = Lapse<DataType>;
-  using type = typename base::type;
   static constexpr auto function = &lapse<SpatialDim, Frame, DataType>;
   using argument_tags =
       tmpl::list<Shift<SpatialDim, Frame, DataType>,
                  SpacetimeMetric<SpatialDim, Frame, DataType>>;
   using base = Lapse<DataType>;
+  using type = typename base::type;
 };
 
 /// Compute item for spacetime normal oneform \f$n_a\f$ from
@@ -346,12 +339,11 @@ template <size_t SpatialDim, typename Frame, typename DataType>
 struct SpacetimeNormalOneFormCompute
     : SpacetimeNormalOneForm<SpatialDim, Frame, DataType>,
       db::ComputeTag {
-  using base = SpacetimeNormalOneForm<SpatialDim, Frame, DataType>;
-  using type = typename base::type;
   static constexpr auto function =
       &spacetime_normal_one_form<SpatialDim, Frame, DataType>;
   using argument_tags = tmpl::list<Lapse<DataType>>;
   using base = SpacetimeNormalOneForm<SpatialDim, Frame, DataType>;
+  using type = typename base::type;
 };
 
 /// Compute item for spacetime normal vector \f$n^a\f$ from
@@ -362,13 +354,12 @@ template <size_t SpatialDim, typename Frame, typename DataType>
 struct SpacetimeNormalVectorCompute
     : SpacetimeNormalVector<SpatialDim, Frame, DataType>,
       db::ComputeTag {
-  using base = SpacetimeNormalVector<SpatialDim, Frame, DataType>;
-  using type = typename base::type;
   static constexpr auto function =
       &spacetime_normal_vector<SpatialDim, Frame, DataType>;
   using argument_tags =
       tmpl::list<Lapse<DataType>, Shift<SpatialDim, Frame, DataType>>;
   using base = SpacetimeNormalVector<SpatialDim, Frame, DataType>;
+  using type = typename base::type;
 };
 }  // namespace Tags
 }  // namespace gr
