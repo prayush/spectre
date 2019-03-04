@@ -141,8 +141,9 @@ struct Initialize {
       // For now, hard code these; later, make these options / AnalyticData
       // The values here are the same as in SpEC standard input files for
       // evolving a single black hole.
-      const auto& r_squared = dot_product(inertial_coords, inertial_coords);
-      const auto& one = exp(get(r_squared) - get(r_squared));
+      const DataVector r_squared =
+          get(dot_product(inertial_coords, inertial_coords));
+      const DataVector one = exp(0.0 * r_squared);
       const typename GeneralizedHarmonic::Tags::ConstraintGamma0::type gamma0{
           3.0 * exp(-0.5 * get(r_squared) / 64.0) + 0.001 * one};
       const auto& gamma1 = make_with_value<
@@ -185,9 +186,8 @@ struct Initialize {
         const auto& dt_lapse =
             get<::Tags::dt<gr::Tags::Lapse<DataVector>>>(solution_vars);
         const auto& deriv_lapse =
-
-            get<::Tags::deriv<gr::Tags::Lapse<DataVector>, tmpl::size_t<Dim>,
-                              Inertial>>(solution_vars);
+            get<::Tags::deriv<gr::Tags::Lapse<DataVector>,
+                              tmpl::size_t<Dim>, Inertial>>(solution_vars);
 
         const auto& shift =
             get<gr::Tags::Shift<Dim, Inertial, DataVector>>(solution_vars);
@@ -201,23 +201,24 @@ struct Initialize {
         const auto& spatial_metric =
             get<gr::Tags::SpatialMetric<Dim, Inertial, DataVector>>(
                 solution_vars);
-        const auto& dt_spatial_metric =
-            get<::Tags::dt<gr::Tags::SpatialMetric<Dim, Inertial, DataVector>>>(
+        const auto& dt_spatial_metric = get<
+            ::Tags::dt<gr::Tags::SpatialMetric<Dim, Inertial, DataVector>>>(
                 solution_vars);
-        const auto& deriv_spatial_metric = get<
-            ::Tags::deriv<gr::Tags::SpatialMetric<Dim, Inertial, DataVector>,
-                          tmpl::size_t<Dim>, Inertial>>(solution_vars);
+        const auto& deriv_spatial_metric = get<::Tags::deriv<
+            gr::Tags::SpatialMetric<Dim, Inertial, DataVector>,
+            tmpl::size_t<Dim>, Inertial>>(solution_vars);
 
         // Next, compute Gh evolution variables from them
         const auto& spacetime_metric =
-            ::gr::spacetime_metric<Dim, Inertial, DataVector>(lapse, shift,
-                                                              spatial_metric);
-        const auto& phi = GeneralizedHarmonic::phi<Dim, Inertial, DataVector>(
-            lapse, deriv_lapse, shift, deriv_shift, spatial_metric,
-            deriv_spatial_metric);
+            ::gr::spacetime_metric<Dim, Inertial, DataVector>(
+                lapse, shift, spatial_metric);
+        const auto& phi =
+            GeneralizedHarmonic::phi<Dim, Inertial, DataVector>(
+                lapse, deriv_lapse, shift, deriv_shift, spatial_metric,
+                deriv_spatial_metric);
         const auto& pi = GeneralizedHarmonic::pi<Dim, Inertial, DataVector>(
-            lapse, dt_lapse, shift, dt_shift, spatial_metric, dt_spatial_metric,
-            phi);
+            lapse, dt_lapse, shift, dt_shift, spatial_metric,
+            dt_spatial_metric, phi);
 
         const tuples::TaggedTuple<gr::Tags::SpacetimeMetric<Dim>,
                                   GeneralizedHarmonic::Tags::Phi<Dim>,

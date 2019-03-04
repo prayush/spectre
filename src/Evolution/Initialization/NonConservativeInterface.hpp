@@ -95,6 +95,12 @@ struct InterfaceForNonConservativeSystem {
       Tags::InterfaceComputeItem<
           Tags::BoundaryDirectionsExterior<dim>,
           gr::Tags::InverseSpatialMetricCompute<dim, Inertial, DataVector>>,
+      Tags::InterfaceComputeItem<
+          Tags::BoundaryDirectionsExterior<dim>,
+          gr::Tags::ShiftCompute<dim, Inertial, DataVector>>,
+      Tags::InterfaceComputeItem<
+          Tags::BoundaryDirectionsExterior<dim>,
+          gr::Tags::LapseCompute<dim, Inertial, DataVector>>,
       Tags::InterfaceComputeItem<Tags::BoundaryDirectionsExterior<dim>,
                                  Tags::Direction<dim>>,
       Tags::InterfaceComputeItem<Tags::BoundaryDirectionsExterior<dim>,
@@ -116,7 +122,13 @@ struct InterfaceForNonConservativeSystem {
           Tags::UnitFaceNormalVectorCompute<dim, Frame::Inertial>>,
       Tags::InterfaceComputeItem<
           Tags::BoundaryDirectionsExterior<dim>,
-          Tags::Normalized<Tags::UnnormalizedFaceNormal<dim>>>>;
+          Tags::Normalized<Tags::UnnormalizedFaceNormal<dim>>>,
+      Tags::InterfaceComputeItem<
+          Tags::BoundaryDirectionsExterior<dim>,
+          GeneralizedHarmonic::CharacteristicFieldsCompute<dim, Inertial>>,
+      Tags::InterfaceComputeItem<
+          Tags::BoundaryDirectionsExterior<dim>,
+          GeneralizedHarmonic::CharacteristicSpeedsCompute<dim, Inertial>>>;
 
   /* Not added because their ComputeItems above duplicate them */
   // Tags::Interface<Tags::BoundaryDirectionsExterior<dim>,

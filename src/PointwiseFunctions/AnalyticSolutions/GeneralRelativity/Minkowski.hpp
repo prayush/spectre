@@ -39,10 +39,11 @@ class Minkowski {
   using options = tmpl::list<>;
   static constexpr OptionString help{
       "Minkowski solution to Einstein's Equations"};
+  static constexpr size_t volume_dim = Dim;
 
   Minkowski() = default;
-  Minkowski(const Minkowski& /*rhs*/) = delete;
-  Minkowski& operator=(const Minkowski& /*rhs*/) = delete;
+  Minkowski(const Minkowski& /*rhs*/) = default;
+  Minkowski& operator=(const Minkowski& /*rhs*/) = default;
   Minkowski(Minkowski&& /*rhs*/) noexcept = default;
   Minkowski& operator=(Minkowski&& /*rhs*/) noexcept = default;
   ~Minkowski() = default;
