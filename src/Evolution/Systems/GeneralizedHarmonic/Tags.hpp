@@ -59,6 +59,11 @@ struct GaugeH : db::SimpleTag {
   static std::string name() noexcept { return "GaugeH"; }
 };
 template <size_t Dim, typename Frame>
+struct GaugeHInVariables : db::SimpleTag {
+  using type = Variables<tmpl::list<tnsr::a<DataVector, Dim, Frame>>>;
+  static std::string name() noexcept { return "GaugeHInVariables"; }
+};
+template <size_t Dim, typename Frame>
 struct TimeDerivGaugeH : db::SimpleTag {
   using type = tnsr::a<DataVector, Dim, Frame>;
   static std::string name() noexcept { return "GaugeH"; }

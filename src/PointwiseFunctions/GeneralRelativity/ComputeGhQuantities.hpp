@@ -11,7 +11,7 @@
 #include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
-#include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp" // IWYU pragma: keep
+#include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"  // IWYU pragma: keep
 #include "PointwiseFunctions/GeneralRelativity/ComputeSpacetimeQuantities.hpp"
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
@@ -471,6 +471,8 @@ tnsr::a<DataType, SpatialDim, Frame> spacetime_deriv_of_norm_of_shift(
 namespace Tags {
 template <size_t SpatialDim, typename Frame>
 struct PhiCompute : Phi<SpatialDim, Frame>, db::ComputeTag {
+  using base = Phi<SpatialDim, Frame>;
+  using type = typename base::type;
   static constexpr tnsr::iaa<DataVector, SpatialDim, Frame> (*function)(
       const Scalar<DataVector>&, const tnsr::i<DataVector, SpatialDim, Frame>&,
       const tnsr::I<DataVector, SpatialDim, Frame>&,
@@ -488,6 +490,8 @@ struct PhiCompute : Phi<SpatialDim, Frame>, db::ComputeTag {
 
 template <size_t SpatialDim, typename Frame>
 struct PiCompute : Pi<SpatialDim, Frame>, db::ComputeTag {
+  using base = Pi<SpatialDim, Frame>;
+  using type = typename base::type;
   static constexpr tnsr::aa<DataVector, SpatialDim, Frame> (*function)(
       const Scalar<DataVector>&, const Scalar<DataVector>&,
       const tnsr::I<DataVector, SpatialDim, Frame>&,
@@ -509,6 +513,8 @@ template <size_t SpatialDim, typename Frame>
 struct TraceExtrinsicCurvatureCompute
     : gr::Tags::TraceExtrinsicCurvature<DataVector>,
       db::ComputeTag {
+  using base = gr::Tags::TraceExtrinsicCurvature<DataVector>;
+  using type = typename base::type;
   static constexpr Scalar<DataVector> (*function)(
       const tnsr::ii<DataVector, SpatialDim, Frame>&,
       const tnsr::II<DataVector, SpatialDim, Frame>&) = &trace;
@@ -519,6 +525,8 @@ struct TraceExtrinsicCurvatureCompute
 
 template <size_t SpatialDim, typename Frame>
 struct GaugeHCompute : GaugeH<SpatialDim, Frame>, db::ComputeTag {
+  using base = GaugeH<SpatialDim, Frame>;
+  using type = typename base::type;
   static constexpr auto function = &gauge_source<SpatialDim, Frame, DataVector>;
   using argument_tags =
       tmpl::list<gr::Tags::Lapse<DataVector>, TimeDerivLapse,
@@ -533,8 +541,24 @@ struct GaugeHCompute : GaugeH<SpatialDim, Frame>, db::ComputeTag {
 };
 
 template <size_t SpatialDim, typename Frame>
+struct GaugeHInVariablesCompute : GaugeHInVariables<SpatialDim, Frame>,
+                                  db::ComputeTag {
+  using base = GaugeHInVariables<SpatialDim, Frame>;
+  using type = typename base::type;
+  using argument_tags = tmpl::list<GaugeH<SpatialDim, Frame>>;
+  static constexpr Variables<argument_tags> function(
+      const tnsr::a<DataVector, SpatialDim, Frame>& gauge_source) noexcept {
+    Variables<argument_tags> vars_gauge_source{get_size(get<0>(gauge_source))};
+    get<base>(vars_gauge_source) = gauge_source;
+    return vars_gauge_source;
+  };
+};
+
+template <size_t SpatialDim, typename Frame>
 struct SpacetimeDerivGaugeHCompute : SpacetimeDerivGaugeH<SpatialDim, Frame>,
                                      db::ComputeTag {
+  using base = SpacetimeDerivGaugeH<SpatialDim, Frame>;
+  using type = typename base::type;
   static constexpr tnsr::ab<DataVector, SpatialDim, Frame> function(
       const tnsr::a<DataVector, SpatialDim, Frame>& time_deriv_gauge_source,
       const tnsr::ia<DataVector, SpatialDim, Frame>& deriv_gauge_source) {
@@ -560,6 +584,8 @@ template <size_t SpatialDim, typename Frame>
 struct ExtrinsicCurvatureCompute
     : gr::Tags::ExtrinsicCurvature<SpatialDim, Frame, DataVector>,
       db::ComputeTag {
+  using base = gr::Tags::ExtrinsicCurvature<SpatialDim, Frame, DataVector>;
+  using type = typename base::type;
   static constexpr auto function =
       &extrinsic_curvature<SpatialDim, Frame, DataVector>;
   using argument_tags =
@@ -570,6 +596,8 @@ struct ExtrinsicCurvatureCompute
 template <size_t SpatialDim, typename Frame>
 struct DerivSpatialMetricCompute : DerivSpatialMetric<SpatialDim, Frame>,
                                    db::ComputeTag {
+  using base = DerivSpatialMetric<SpatialDim, Frame>;
+  using type = typename base::type;
   static constexpr tnsr::ijj<DataVector, SpatialDim, Frame> (*function)(
       const tnsr::iaa<DataVector, SpatialDim, Frame>&) =
       &deriv_spatial_metric<SpatialDim, Frame>;
@@ -578,6 +606,8 @@ struct DerivSpatialMetricCompute : DerivSpatialMetric<SpatialDim, Frame>,
 
 template <size_t SpatialDim, typename Frame>
 struct DerivLapseCompute : DerivLapse<SpatialDim, Frame>, db::ComputeTag {
+  using base = DerivLapse<SpatialDim, Frame>;
+  using type = typename base::type;
   static constexpr tnsr::i<DataVector, SpatialDim, Frame> (*function)(
       const Scalar<DataVector>&, const tnsr::A<DataVector, SpatialDim, Frame>&,
       const tnsr::iaa<DataVector, SpatialDim, Frame>&) =
@@ -590,6 +620,8 @@ struct DerivLapseCompute : DerivLapse<SpatialDim, Frame>, db::ComputeTag {
 
 template <size_t SpatialDim, typename Frame>
 struct DerivShiftCompute : DerivShift<SpatialDim, Frame>, db::ComputeTag {
+  using base = DerivShift<SpatialDim, Frame>;
+  using type = typename base::type;
   static constexpr tnsr::iJ<DataVector, SpatialDim, Frame> (*function)(
       const Scalar<DataVector>&, const tnsr::AA<DataVector, SpatialDim, Frame>&,
       const tnsr::A<DataVector, SpatialDim, Frame>&,
@@ -606,6 +638,8 @@ template <size_t SpatialDim, typename Frame>
 struct TimeDerivSpatialMetricCompute
     : TimeDerivSpatialMetric<SpatialDim, Frame>,
       db::ComputeTag {
+  using base = TimeDerivSpatialMetric<SpatialDim, Frame>;
+  using type = typename base::type;
   static constexpr tnsr::ii<DataVector, SpatialDim, Frame> (*function)(
       const Scalar<DataVector>&, const tnsr::I<DataVector, SpatialDim, Frame>&,
       const tnsr::iaa<DataVector, SpatialDim, Frame>&,
@@ -619,6 +653,8 @@ struct TimeDerivSpatialMetricCompute
 
 template <size_t SpatialDim, typename Frame>
 struct TimeDerivLapseCompute : TimeDerivLapse, db::ComputeTag {
+  using base = TimeDerivLapse;
+  using type = typename base::type;
   static constexpr Scalar<DataVector> (*function)(
       const Scalar<DataVector>&, const tnsr::I<DataVector, SpatialDim, Frame>&,
       const tnsr::A<DataVector, SpatialDim, Frame>&,
@@ -635,6 +671,8 @@ struct TimeDerivLapseCompute : TimeDerivLapse, db::ComputeTag {
 template <size_t SpatialDim, typename Frame>
 struct TimeDerivShiftCompute : TimeDerivShift<SpatialDim, Frame>,
                                db::ComputeTag {
+  using base = TimeDerivShift<SpatialDim, Frame>;
+  using type = typename base::type;
   static constexpr tnsr::I<DataVector, SpatialDim, Frame> (*function)(
       const Scalar<DataVector>& lapse,
       const tnsr::I<DataVector, SpatialDim, Frame>&,
@@ -655,6 +693,9 @@ template <size_t SpatialDim, typename Frame>
 struct DerivativesOfSpacetimeMetricCompute
     : gr::Tags::DerivativesOfSpacetimeMetric<SpatialDim, Frame, DataVector>,
       db::ComputeTag {
+  using base =
+      gr::Tags::DerivativesOfSpacetimeMetric<SpatialDim, Frame, DataVector>;
+  using type = typename base::type;
   static constexpr auto function =
       &gr::derivatives_of_spacetime_metric<SpatialDim, Frame, DataVector>;
   using argument_tags =

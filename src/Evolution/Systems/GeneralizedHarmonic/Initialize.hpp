@@ -13,9 +13,10 @@
 #include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "DataStructures/DataBox/Prefixes.hpp"
 #include "DataStructures/Tensor/EagerMath/DotProduct.hpp"
-#include "DataStructures/Variables.hpp"  // IWYU pragma: keep
+#include "DataStructures/Variables.hpp"
 #include "Domain/Mesh.hpp"
 #include "Domain/Tags.hpp"
+#include "ErrorHandling/Assert.hpp"
 #include "Evolution/Initialization/DiscontinuousGalerkin.hpp"
 #include "Evolution/Initialization/Domain.hpp"
 #include "Evolution/Initialization/Evolution.hpp"
@@ -57,11 +58,11 @@ struct Initialize {
     using Inertial = Frame::Inertial;
     using system = typename Metavariables::system;
     using variables_tag = typename system::variables_tag;
+    using constraints_tag = typename system::constraints_tag;
+    using extras_tag = typename system::extras_tag;
 
     using simple_tags = db::AddSimpleTags<
-        variables_tag, GeneralizedHarmonic::Tags::ConstraintGamma0,
-        GeneralizedHarmonic::Tags::ConstraintGamma1,
-        GeneralizedHarmonic::Tags::ConstraintGamma2,
+        variables_tag, constraints_tag, extras_tag,
         GeneralizedHarmonic::Tags::TimeDerivGaugeH<Dim, Inertial>>;
     using compute_tags = db::AddComputeTags<
         gr::Tags::SpatialMetricCompute<Dim, Inertial, DataVector>,
@@ -95,9 +96,14 @@ struct Initialize {
         GeneralizedHarmonic::Tags::ExtrinsicCurvatureCompute<Dim, Inertial>,
         GeneralizedHarmonic::Tags::TraceExtrinsicCurvatureCompute<Dim,
                                                                   Inertial>,
-        GeneralizedHarmonic::Tags::GaugeHCompute<Dim, Inertial>,
-        ::Tags::deriv<GeneralizedHarmonic::Tags::GaugeH<Dim, Inertial>,
-                      tmpl::size_t<Dim>, Inertial>,
+        // Because DerivCompute<GaugeH> operates on GaugeH wrapped in a
+        // Variables container, we insert GaugeH that way into the box (below),
+        // instead of directly adding GaugeHCompute tag here.
+        ::Tags::DerivCompute<
+            ::Tags::Variables<
+                tmpl::list<GeneralizedHarmonic::Tags::GaugeH<Dim, Inertial>>>,
+            ::Tags::InverseJacobian<::Tags::ElementMap<Dim, Inertial>,
+                                    ::Tags::LogicalCoordinates<Dim>>>,
         GeneralizedHarmonic::Tags::SpacetimeDerivGaugeHCompute<Dim, Inertial>>;
 
     /* NOT YET ADDED BUT NEEDED BY ComputeDuDt
@@ -126,11 +132,8 @@ struct Initialize {
         db::DataBox<TagsList>&& box,
         const Parallel::ConstGlobalCache<Metavariables>& cache,
         const double initial_time) noexcept {
-      using Vars = typename variables_tag::type;
-
       const size_t num_grid_points =
           db::get<::Tags::Mesh<Dim>>(box).number_of_grid_points();
-
       const auto& inertial_coords =
           db::get<::Tags::Coordinates<Dim, Inertial>>(box);
 
@@ -139,18 +142,27 @@ struct Initialize {
       // The values here are the same as in SpEC standard input files for
       // evolving a single black hole.
       const auto& r_squared = dot_product(inertial_coords, inertial_coords);
-      const auto& one = exp(r_squared - r_squared);
+      const auto& one = exp(get(r_squared) - get(r_squared));
       const typename GeneralizedHarmonic::Tags::ConstraintGamma0::type gamma0{
-          3.0 * exp(-0.5 * r_squared / 64.0) + 0.001 * one};
+          3.0 * exp(-0.5 * get(r_squared) / 64.0) + 0.001 * one};
       const auto& gamma1 = make_with_value<
           typename GeneralizedHarmonic::Tags::ConstraintGamma1::type>(
           inertial_coords, -1.);
       const typename GeneralizedHarmonic::Tags::ConstraintGamma2::type gamma2{
-          exp(-0.5 * r_squared / 64.0) + 0.001 * one};
+          exp(-0.5 * get(r_squared) / 64.0) + 0.001 * one};
+      const tuples::TaggedTuple<GeneralizedHarmonic::Tags::ConstraintGamma0,
+                                GeneralizedHarmonic::Tags::ConstraintGamma1,
+                                GeneralizedHarmonic::Tags::ConstraintGamma2>
+          constraints_tuple(gamma0, gamma1, gamma2);
+      typename constraints_tag::type constraints_vars{num_grid_points};
+      constraints_vars.assign_subset(constraints_tuple);
 
       // Set initial data from analytic solution
+      using Vars = typename variables_tag::type;
       Vars vars{num_grid_points};
-      make_overloader([ initial_time, &inertial_coords ](
+      typename GeneralizedHarmonic::Tags::GaugeH<Dim, Inertial>::type
+          gauge_source{num_grid_points};
+      make_overloader([ initial_time, &inertial_coords, &gauge_source ](
                           std::true_type /*is_analytic_solution*/,
                           const gsl::not_null<Vars*> local_vars,
                           const auto& local_cache) noexcept {
@@ -213,11 +225,38 @@ struct Initialize {
             solution_tuple(spacetime_metric, phi, pi);
 
         local_vars->assign_subset(solution_tuple);
+
+        // Compute the initial gauge source function
+        // 1. Trace of extrinsic curvature
+        const auto& extrinsic_curvature =
+            get<gr::Tags::ExtrinsicCurvature<Dim, Inertial, DataVector>>(
+                solution_vars);
+        const auto& inverse_spatial_metric =
+            get<gr::Tags::InverseSpatialMetric<Dim, Inertial, DataVector>>(
+                solution_vars);
+        const auto& trace_extrinsic_curvature =
+            trace(extrinsic_curvature, inverse_spatial_metric);
+        // 2. Trace of Christoffel
+        const auto& spatial_christoffel_first_kind =
+            gr::Tags::SpatialChristoffelFirstKindCompute<
+                Dim, Inertial, DataVector>::function(deriv_spatial_metric);
+        const auto& trace_christoffel_last_indices =
+            gr::Tags::TraceSpatialChristoffelFirstKindCompute<
+                Dim, Inertial,
+                DataVector>::function(spatial_christoffel_first_kind,
+                                      inverse_spatial_metric);
+        // 3. Call the compute item for the gauge source function
+        gauge_source =
+            GeneralizedHarmonic::Tags::GaugeHCompute<Dim, Inertial>::function(
+                lapse, dt_lapse, deriv_lapse, shift, dt_shift, deriv_shift,
+                spatial_metric, trace_extrinsic_curvature,
+                trace_christoffel_last_indices);
       },
                       [&inertial_coords](
                           std::false_type /*is_analytic_solution*/,
                           const gsl::not_null<Vars*> local_vars,
                           const auto& local_cache) noexcept {
+                        ASSERT(false, "Analytic Solution does not work yet.");
                         using analytic_data_tag = OptionTags::AnalyticDataBase;
                         local_vars->assign_subset(
                             Parallel::get<analytic_data_tag>(local_cache)
@@ -230,9 +269,14 @@ struct Initialize {
       const auto& dt_gauge_source =
           make_with_value<tnsr::a<DataVector, Dim, Inertial>>(gamma0, 0.0);
 
+      using ExtraVars = typename extras_tag::type;
+      ExtraVars extra_vars{num_grid_points};
+      get<GeneralizedHarmonic::Tags::GaugeH<Dim, Inertial>>(extra_vars) =
+          gauge_source;
+
       return db::create_from<db::RemoveTags<>, simple_tags, compute_tags>(
-          std::move(box), std::move(vars), std::move(gamma0), std::move(gamma1),
-          std::move(gamma2), std::move(dt_gauge_source));
+          std::move(box), std::move(vars), std::move(constraints_vars),
+          std::move(extra_vars), std::move(dt_gauge_source));
     }
   };
 
