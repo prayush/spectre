@@ -3,13 +3,39 @@
 
 #include "tests/Unit/TestingFramework.hpp"
 
+#include <array>
 #include <cstddef>
+#include <utility>
 
+#include "DataStructures/DataBox/DataBox.hpp"
+#include "DataStructures/DataBox/Prefixes.hpp"
 #include "DataStructures/DataVector.hpp"
+#include "DataStructures/Tensor/EagerMath/DeterminantAndInverse.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
+#include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Christoffel.hpp"
+#include "PointwiseFunctions/GeneralRelativity/ComputeSpacetimeQuantities.hpp"
+#include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
+#include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
+#include "Utilities/MakeWithValue.hpp"
+#include "Utilities/TMPL.hpp"
 #include "tests/Unit/Pypp/CheckWithRandomValues.hpp"
 #include "tests/Unit/Pypp/SetupLocalPythonEnvironment.hpp"
+
+/// \cond
+namespace GeneralizedHarmonic {
+namespace Tags {
+template <size_t SpatialDim, typename Frame>
+struct DerivativesOfSpacetimeMetricCompute;
+}  // namespace Tags
+}  // namespace GeneralizedHarmonic
+namespace Tags {
+template <typename Tag, typename Dim, typename Frame, typename>
+struct deriv;
+}  // namespace Tags
+template <typename X, typename Symm, typename IndexList>
+class Tensor;
+/// \endcond
 
 namespace {
 template <size_t Dim, IndexType Index, typename DataType>

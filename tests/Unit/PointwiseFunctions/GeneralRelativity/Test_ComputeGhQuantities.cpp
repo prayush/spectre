@@ -9,7 +9,10 @@
 #include <memory>
 #include <pup.h>
 #include <random>
+#include <string>
+#include <utility>
 
+#include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/DataBox/Prefixes.hpp"  // IWYU pragma: keep
 #include "DataStructures/DataVector.hpp"
 #include "DataStructures/Tensor/EagerMath/DeterminantAndInverse.hpp"
@@ -20,6 +23,7 @@
 #include "Domain/LogicalCoordinates.hpp"
 #include "Domain/Mesh.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
+#include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"
 #include "NumericalAlgorithms/Spectral/Spectral.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/KerrSchild.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Christoffel.hpp"
@@ -37,6 +41,13 @@
 #include "tests/Utilities/MakeWithRandomValues.hpp"
 
 // IWYU pragma: no_forward_declare Tensor
+
+/// \cond
+namespace Tags {
+template <typename Tag, typename Dim, typename Frame, typename>
+struct deriv;
+}  // namespace Tags
+/// \endcond
 
 namespace {
 using Affine = domain::CoordinateMaps::Affine;
