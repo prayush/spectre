@@ -3,13 +3,39 @@
 
 #include "tests/Unit/TestingFramework.hpp"
 
+#include <array>
 #include <cstddef>
+#include <utility>
 
+#include "DataStructures/DataBox/DataBox.hpp"
+#include "DataStructures/DataBox/Prefixes.hpp"
 #include "DataStructures/DataVector.hpp"
+#include "DataStructures/Tensor/EagerMath/DeterminantAndInverse.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
+#include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Christoffel.hpp"
+#include "PointwiseFunctions/GeneralRelativity/ComputeSpacetimeQuantities.hpp"
+#include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
+#include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
+#include "Utilities/MakeWithValue.hpp"
+#include "Utilities/TMPL.hpp"
 #include "tests/Unit/Pypp/CheckWithRandomValues.hpp"
 #include "tests/Unit/Pypp/SetupLocalPythonEnvironment.hpp"
+
+/// \cond
+namespace GeneralizedHarmonic {
+namespace Tags {
+template <size_t SpatialDim, typename Frame>
+struct DerivativesOfSpacetimeMetricCompute;
+}  // namespace Tags
+}  // namespace GeneralizedHarmonic
+namespace Tags {
+template <typename Tag, typename Dim, typename Frame, typename>
+struct deriv;
+}  // namespace Tags
+template <typename X, typename Symm, typename IndexList>
+class Tensor;
+/// \endcond
 
 namespace {
 template <size_t Dim, IndexType Index, typename DataType>
@@ -18,7 +44,7 @@ void test_christoffel(const DataType& used_for_size) {
       const tnsr::abb<DataType, Dim, Frame::Inertial, Index>&) =
       &gr::christoffel_first_kind<Dim, Frame::Inertial, Index, DataType>;
   pypp::check_with_random_values<1>(f, "Christoffel", "christoffel_first_kind",
-                                    {{{-10.0, 10.0}}}, used_for_size);
+                                    {{{-10., 10.}}}, used_for_size);
 }
 }  // namespace
 
@@ -39,4 +65,170 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GeneralRelativity.Christoffel.",
   test_christoffel<1, IndexType::Spacetime>(0.);
   test_christoffel<2, IndexType::Spacetime>(0.);
   test_christoffel<3, IndexType::Spacetime>(0.);
+
+  // Check that compute items work correctly in the DataBox
+  // First, check that the names are correct
+  CHECK(gr::Tags::SpacetimeChristoffelFirstKindCompute<3, Frame::Inertial,
+                                                       DataVector>::name() ==
+        "SpacetimeChristoffelFirstKind");
+  CHECK(
+      gr::Tags::TraceSpacetimeChristoffelFirstKindCompute<3, Frame::Inertial,
+                                                          DataVector>::name() ==
+      "TraceSpacetimeChristoffelFirstKind");
+  CHECK(gr::Tags::SpacetimeChristoffelSecondKindCompute<3, Frame::Inertial,
+                                                        DataVector>::name() ==
+        "SpacetimeChristoffelSecondKind");
+  CHECK(gr::Tags::SpatialChristoffelFirstKindCompute<3, Frame::Inertial,
+                                                     DataVector>::name() ==
+        "SpatialChristoffelFirstKind");
+  CHECK(gr::Tags::TraceSpatialChristoffelFirstKindCompute<3, Frame::Inertial,
+                                                          DataVector>::name() ==
+        "TraceSpatialChristoffelFirstKind");
+  CHECK(gr::Tags::SpatialChristoffelSecondKindCompute<3, Frame::Inertial,
+                                                      DataVector>::name() ==
+        "SpatialChristoffelSecondKind");
+
+  // Check that the compute items return correct values
+  const DataVector test_vector{5., 4.};
+  auto spacetime_metric =
+      make_with_value<tnsr::aa<DataVector, 3, Frame::Inertial>>(test_vector,
+                                                                0.);
+  get<0, 0>(spacetime_metric) = -1.5;
+  get<0, 1>(spacetime_metric) = 0.1;
+  get<0, 2>(spacetime_metric) = 0.2;
+  get<0, 3>(spacetime_metric) = 0.3;
+  get<1, 1>(spacetime_metric) = 1.4;
+  get<1, 2>(spacetime_metric) = 0.2;
+  get<1, 3>(spacetime_metric) = 0.1;
+  get<2, 2>(spacetime_metric) = 1.3;
+  get<2, 3>(spacetime_metric) = 0.1;
+  get<3, 3>(spacetime_metric) = 1.2;
+
+  auto dt_spatial_metric =
+      make_with_value<tnsr::ii<DataVector, 3, Frame::Inertial>>(test_vector,
+                                                                0.);
+  get<0, 0>(dt_spatial_metric) = 0.05;
+  get<0, 1>(dt_spatial_metric) = 0.01;
+  get<0, 2>(dt_spatial_metric) = 0.02;
+  get<1, 1>(dt_spatial_metric) = 0.04;
+  get<1, 2>(dt_spatial_metric) = 0.02;
+  get<2, 2>(dt_spatial_metric) = 0.03;
+
+  auto dt_lapse = make_with_value<Scalar<DataVector>>(test_vector, 0.);
+  get(dt_lapse) = 0.04;
+
+  auto dt_shift =
+      make_with_value<tnsr::I<DataVector, 3, Frame::Inertial>>(test_vector, 0.);
+  get<0>(dt_shift) = 0.05;
+  get<1>(dt_shift) = 0.06;
+  get<2>(dt_shift) = 0.07;
+
+  auto deriv_spatial_metric =
+      make_with_value<tnsr::ijj<DataVector, 3, Frame::Inertial>>(test_vector,
+                                                                 0.);
+  get<0, 0, 0>(deriv_spatial_metric) = 0.1;
+  get<0, 0, 1>(deriv_spatial_metric) = 0.2;
+  get<0, 0, 2>(deriv_spatial_metric) = 0.3;
+  get<0, 1, 1>(deriv_spatial_metric) = 0.2;
+  get<0, 1, 2>(deriv_spatial_metric) = 0.1;
+  get<0, 2, 2>(deriv_spatial_metric) = 0.2;
+  get<1, 0, 0>(deriv_spatial_metric) = 0.3;
+  get<1, 0, 1>(deriv_spatial_metric) = 0.2;
+  get<1, 0, 2>(deriv_spatial_metric) = 0.1;
+  get<1, 1, 1>(deriv_spatial_metric) = 0.2;
+  get<1, 1, 2>(deriv_spatial_metric) = 0.3;
+  get<1, 2, 2>(deriv_spatial_metric) = 0.2;
+  get<2, 0, 0>(deriv_spatial_metric) = -0.1;
+  get<2, 0, 1>(deriv_spatial_metric) = -0.2;
+  get<2, 0, 2>(deriv_spatial_metric) = -0.3;
+  get<2, 1, 1>(deriv_spatial_metric) = -0.2;
+  get<2, 1, 2>(deriv_spatial_metric) = -0.1;
+  get<2, 2, 2>(deriv_spatial_metric) = -0.2;
+
+  auto deriv_lapse =
+      make_with_value<tnsr::i<DataVector, 3, Frame::Inertial>>(test_vector, 0.);
+  get<0>(deriv_lapse) = -0.1;
+  get<1>(deriv_lapse) = -0.2;
+  get<2>(deriv_lapse) = -0.3;
+
+  auto deriv_shift = make_with_value<tnsr::iJ<DataVector, 3, Frame::Inertial>>(
+      test_vector, 0.);
+  get<0, 0>(deriv_shift) = -0.05;
+  get<0, 1>(deriv_shift) = 0.06;
+  get<0, 2>(deriv_shift) = 0.07;
+  get<1, 0>(deriv_shift) = -0.03;
+  get<1, 1>(deriv_shift) = 0.04;
+  get<1, 2>(deriv_shift) = 0.03;
+  get<2, 0>(deriv_shift) = 0.01;
+  get<2, 1>(deriv_shift) = 0.02;
+  get<2, 2>(deriv_shift) = -0.01;
+
+  const auto& spatial_metric = gr::spatial_metric(spacetime_metric);
+  const auto& det_and_inverse_spatial_metric =
+      determinant_and_inverse(spatial_metric);
+  const auto& inverse_spatial_metric = det_and_inverse_spatial_metric.second;
+  const auto& shift = gr::shift(spacetime_metric, inverse_spatial_metric);
+  const auto& lapse = gr::lapse(shift, spacetime_metric);
+  const auto& inverse_spacetime_metric =
+      gr::inverse_spacetime_metric(lapse, shift, inverse_spatial_metric);
+
+  const auto& derivatives_of_spacetime_metric =
+      gr::derivatives_of_spacetime_metric(
+          lapse, dt_lapse, deriv_lapse, shift, dt_shift, deriv_shift,
+          spatial_metric, dt_spatial_metric, deriv_spatial_metric);
+
+  const auto& spacetime_christoffel_first_kind =
+      gr::christoffel_first_kind(derivatives_of_spacetime_metric);
+  const auto& trace_spacetime_christoffel_first_kind = trace_last_indices(
+      spacetime_christoffel_first_kind, inverse_spacetime_metric);
+  const auto& spatial_christoffel_first_kind =
+      gr::christoffel_first_kind(deriv_spatial_metric);
+  const auto& trace_spatial_christoffel_first_kind = trace_last_indices(
+      spatial_christoffel_first_kind, inverse_spatial_metric);
+  const auto& spacetime_christoffel_second_kind = raise_or_lower_first_index(
+      spacetime_christoffel_first_kind, inverse_spacetime_metric);
+  const auto& spatial_christoffel_second_kind = raise_or_lower_first_index(
+      spatial_christoffel_first_kind, inverse_spatial_metric);
+
+  const auto box = db::create<
+      db::AddSimpleTags<
+          gr::Tags::InverseSpatialMetric<3, Frame::Inertial, DataVector>,
+          ::Tags::deriv<gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>,
+                        tmpl::size_t<3>, Frame::Inertial>,
+          gr::Tags::InverseSpacetimeMetric<3, Frame::Inertial, DataVector>,
+          gr::Tags::DerivativesOfSpacetimeMetric<3, Frame::Inertial,
+                                                 DataVector>>,
+      db::AddComputeTags<gr::Tags::SpacetimeChristoffelFirstKindCompute<
+                             3, Frame::Inertial, DataVector>,
+                         gr::Tags::TraceSpacetimeChristoffelFirstKindCompute<
+                             3, Frame::Inertial, DataVector>,
+                         gr::Tags::SpacetimeChristoffelSecondKindCompute<
+                             3, Frame::Inertial, DataVector>,
+                         gr::Tags::SpatialChristoffelFirstKindCompute<
+                             3, Frame::Inertial, DataVector>,
+                         gr::Tags::TraceSpatialChristoffelFirstKindCompute<
+                             3, Frame::Inertial, DataVector>,
+                         gr::Tags::SpatialChristoffelSecondKindCompute<
+                             3, Frame::Inertial, DataVector>>>(
+      inverse_spatial_metric, deriv_spatial_metric, inverse_spacetime_metric,
+      derivatives_of_spacetime_metric);
+
+  CHECK(db::get<gr::Tags::SpacetimeChristoffelFirstKind<3, Frame::Inertial,
+                                                        DataVector>>(box) ==
+        spacetime_christoffel_first_kind);
+  CHECK(db::get<gr::Tags::TraceSpacetimeChristoffelFirstKind<3, Frame::Inertial,
+                                                             DataVector>>(
+            box) == trace_spacetime_christoffel_first_kind);
+  CHECK(db::get<gr::Tags::SpacetimeChristoffelSecondKind<3, Frame::Inertial,
+                                                         DataVector>>(box) ==
+        spacetime_christoffel_second_kind);
+  CHECK(db::get<gr::Tags::SpatialChristoffelFirstKind<3, Frame::Inertial,
+                                                      DataVector>>(box) ==
+        spatial_christoffel_first_kind);
+  CHECK(db::get<gr::Tags::TraceSpatialChristoffelFirstKind<3, Frame::Inertial,
+                                                           DataVector>>(box) ==
+        trace_spatial_christoffel_first_kind);
+  CHECK(db::get<gr::Tags::SpatialChristoffelSecondKind<3, Frame::Inertial,
+                                                       DataVector>>(box) ==
+        spatial_christoffel_second_kind);
 }
