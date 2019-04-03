@@ -31,7 +31,9 @@ template <size_t Dim, typename Frame = Frame::Inertial,
 struct Shift;
 template <typename DataType = DataVector>
 struct Lapse;
-
+template <size_t Dim, typename Frame = Frame::Inertial,
+          typename DataType = DataVector>
+struct DerivativesOfSpacetimeMetric;
 template <size_t Dim, typename Frame = Frame::Inertial,
           typename DataType = DataVector>
 struct SpacetimeChristoffelFirstKind;
