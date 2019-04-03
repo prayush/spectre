@@ -598,20 +598,6 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GeneralRelativity.GhQuantities",
             3, Frame::Inertial>::name() == "TraceExtrinsicCurvature");
   CHECK(GeneralizedHarmonic::Tags::ExtrinsicCurvatureCompute<
             3, Frame::Inertial>::name() == "ExtrinsicCurvature");
-  CHECK(GeneralizedHarmonic::Tags::DerivSpatialMetricCompute<
-            3, Frame::Inertial>::name() == "deriv(SpatialMetric)");
-  CHECK(GeneralizedHarmonic::Tags::DerivLapseCompute<3,
-                                                     Frame::Inertial>::name() ==
-        "deriv(Lapse)");
-  CHECK(GeneralizedHarmonic::Tags::DerivShiftCompute<3,
-                                                     Frame::Inertial>::name() ==
-        "deriv(Shift)");
-  CHECK(GeneralizedHarmonic::Tags::TimeDerivSpatialMetricCompute<
-            3, Frame::Inertial>::name() == "dt(SpatialMetric)");
-  CHECK(GeneralizedHarmonic::Tags::TimeDerivLapseCompute<
-            3, Frame::Inertial>::name() == "dt(Lapse)");
-  CHECK(GeneralizedHarmonic::Tags::TimeDerivShiftCompute<
-            3, Frame::Inertial>::name() == "dt(Shift)");
   CHECK(GeneralizedHarmonic::Tags::DerivativesOfSpacetimeMetricCompute<
             3, Frame::Inertial>::name() == "DerivativesOfSpacetimeMetric");
   CHECK(GeneralizedHarmonic::Tags::DerivSpacetimeMetricCompute<
@@ -708,8 +694,6 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GeneralRelativity.GhQuantities",
       gr::spacetime_normal_vector(lapse, shift);
   const auto& inverse_spatial_metric =
       determinant_and_inverse(spatial_metric).second;
-  const auto& inverse_spacetime_metric =
-      gr::inverse_spacetime_metric(lapse, shift, inverse_spatial_metric);
 
   const auto& phi =
       GeneralizedHarmonic::phi(lapse, deriv_lapse, shift, deriv_shift,
@@ -768,44 +752,4 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GeneralRelativity.GhQuantities",
   CHECK(db::get<::Tags::deriv<
             gr::Tags::SpacetimeMetric<3, Frame::Inertial, DataVector>,
             tmpl::size_t<3>, Frame::Inertial>>(box) == deriv_spacetime_metric);
-
-  const auto other_box = db::create<
-      db::AddSimpleTags<
-          gr::Tags::Lapse<DataVector>,
-          gr::Tags::Shift<3, Frame::Inertial, DataVector>,
-          gr::Tags::SpacetimeNormalVector<3, Frame::Inertial, DataVector>,
-          gr::Tags::InverseSpacetimeMetric<3, Frame::Inertial, DataVector>,
-          gr::Tags::InverseSpatialMetric<3, Frame::Inertial, DataVector>,
-          GeneralizedHarmonic::Tags::Phi<3, Frame::Inertial>,
-          GeneralizedHarmonic::Tags::Pi<3, Frame::Inertial>>,
-      db::AddComputeTags<
-          GeneralizedHarmonic::Tags::DerivSpatialMetricCompute<3,
-                                                               Frame::Inertial>,
-          GeneralizedHarmonic::Tags::DerivLapseCompute<3, Frame::Inertial>,
-          GeneralizedHarmonic::Tags::DerivShiftCompute<3, Frame::Inertial>,
-          GeneralizedHarmonic::Tags::TimeDerivSpatialMetricCompute<
-              3, Frame::Inertial>,
-          GeneralizedHarmonic::Tags::TimeDerivLapseCompute<3, Frame::Inertial>,
-          GeneralizedHarmonic::Tags::TimeDerivShiftCompute<3,
-                                                           Frame::Inertial>>>(
-      lapse, shift, spacetime_normal_vector, inverse_spacetime_metric,
-      inverse_spatial_metric, phi, pi);
-  CHECK(
-      db::get<
-          ::Tags::deriv<gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>,
-                        tmpl::size_t<3>, Frame::Inertial>>(other_box) ==
-      deriv_spatial_metric);
-  CHECK(db::get<::Tags::deriv<gr::Tags::Lapse<DataVector>, tmpl::size_t<3>,
-                              Frame::Inertial>>(other_box) == deriv_lapse);
-  CHECK(db::get<::Tags::deriv<gr::Tags::Shift<3, Frame::Inertial, DataVector>,
-                              tmpl::size_t<3>, Frame::Inertial>>(other_box) ==
-        deriv_shift);
-  CHECK(
-      db::get<
-          ::Tags::dt<gr::Tags::SpatialMetric<3, Frame::Inertial, DataVector>>>(
-          other_box) == dt_spatial_metric);
-  CHECK(db::get<::Tags::dt<gr::Tags::Lapse<DataVector>>>(other_box) ==
-        dt_lapse);
-  CHECK(db::get<::Tags::dt<gr::Tags::Shift<3, Frame::Inertial, DataVector>>>(
-            other_box) == dt_shift);
 }
