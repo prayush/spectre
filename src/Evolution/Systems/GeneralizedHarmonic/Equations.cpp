@@ -290,15 +290,13 @@ void ComputeNormalDotFluxes<Dim>::apply(
     const tnsr::i<DataVector, Dim>& unit_normal) noexcept {
   const auto shift_dot_normal = get(dot_product(shift, unit_normal));
 
-  auto normal_dot_phi =
-      make_with_value<tnsr::aa<DataVector, Dim>>(gamma1, 0.);
+  auto normal_dot_phi = make_with_value<tnsr::aa<DataVector, Dim>>(gamma1, 0.);
   for (size_t mu = 0; mu < Dim + 1; ++mu) {
     for (size_t nu = mu; nu < Dim + 1; ++nu) {
       for (size_t i = 0; i < Dim; ++i) {
         for (size_t j = 0; j < Dim; ++j) {
           normal_dot_phi.get(mu, nu) += inverse_spatial_metric.get(i, j) *
-                                              unit_normal.get(j) *
-                                              phi.get(i, mu, nu);
+                                        unit_normal.get(j) * phi.get(i, mu, nu);
         }
       }
     }
@@ -363,8 +361,8 @@ void UpwindFlux<Dim>::package_data(
       *packaged_data) = inverse_spatial_metric;
   get<Tags::ConstraintGamma1>(*packaged_data) = gamma1;
   get<Tags::ConstraintGamma2>(*packaged_data) = gamma2;
-  get<::Tags::UnitFaceNormal<Dim, Frame::Inertial>>(*packaged_data) =
-      interface_unit_normal;
+  get<::Tags::Normalized<::Tags::UnnormalizedFaceNormal<Dim, Frame::Inertial>>>(
+      *packaged_data) = interface_unit_normal;
 }
 
 template <size_t Dim>
