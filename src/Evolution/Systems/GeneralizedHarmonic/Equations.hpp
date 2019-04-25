@@ -209,7 +209,7 @@ struct UpwindFlux {
       gr::Tags::Shift<Dim, Frame::Inertial, DataVector>,
       gr::Tags::InverseSpatialMetric<Dim, Frame::Inertial, DataVector>,
       Tags::ConstraintGamma1, Tags::ConstraintGamma2,
-      ::Tags::UnitFaceNormal<Dim, Frame::Inertial>>;
+      ::Tags::Normalized<::Tags::UnnormalizedFaceNormal<Dim, Frame::Inertial>>>;
 
   // These tags on the interface of the element are passed to
   // `package_data` to provide the data needed to compute the numerical fluxes.
@@ -220,7 +220,7 @@ struct UpwindFlux {
       gr::Tags::Shift<Dim, Frame::Inertial, DataVector>,
       gr::Tags::InverseSpatialMetric<Dim, Frame::Inertial, DataVector>,
       Tags::ConstraintGamma1, Tags::ConstraintGamma2,
-      ::Tags::UnitFaceNormal<Dim, Frame::Inertial>>;
+      ::Tags::Normalized<::Tags::UnnormalizedFaceNormal<Dim, Frame::Inertial>>>;
 
   // pseudo-interface: used internally by Algorithm infrastructure, not
   // user-level code
