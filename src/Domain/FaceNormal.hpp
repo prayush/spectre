@@ -65,7 +65,7 @@ namespace Tags {
 /// \ingroup ComputationalDomainGroup
 /// The unnormalized face normal one form
 template <size_t VolumeDim, typename Frame = ::Frame::Inertial>
-struct UnnormalizedFaceNormal : db::ComputeTag {
+struct UnnormalizedFaceNormal : db::SimpleTag, db::ComputeTag {
   static std::string name() noexcept { return "UnnormalizedFaceNormal"; }
   static constexpr tnsr::i<DataVector, VolumeDim, Frame> (*function)(
       const ::Mesh<VolumeDim - 1>&, const ::ElementMap<VolumeDim, Frame>&,
