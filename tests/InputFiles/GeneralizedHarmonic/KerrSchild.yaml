@@ -1,0 +1,38 @@
+# Distributed under the MIT License.
+# See LICENSE.txt for details.
+
+# Executable: EvolveGeneralizedHarmonic
+# Check: execute
+
+Evolution:
+  InitialTime: 0.0
+  InitialTimeStep: 0.01
+  TimeStepper: RungeKutta3
+
+DomainCreator:
+    Brick:
+      LowerBound: [4.0, -0.5, -0.5]
+      UpperBound: [5.0, 0.5, 0.5]
+      InitialRefinement: [1, 1, 1]
+      InitialGridPoints: [5, 5, 5]
+      IsPeriodicIn: [false, false, false]
+
+AnalyticSolution:
+  WrappedGr:
+    Mass: 1.0
+    Spin: [0.0, 0.0, 0.4]
+    Center: [0.0, 0.0, 0.0]
+
+
+NumericalFlux:
+  UpwindFlux:
+
+EventsAndTriggers:
+  ? PastTime: 1.0
+  : - Completion
+
+ObserveNSlabs: 2
+ObserveAtT0: true
+Observers:
+  ReductionFileName: ReductionData
+  VolumeFileName: VolumeData
