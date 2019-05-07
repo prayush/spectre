@@ -34,7 +34,6 @@
 #include "Parallel/Reduction.hpp"
 #include "Parallel/RegisterDerivedClassesWithCharm.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/KerrSchild.hpp"  // IWYU pragma: keep
-#include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/Minkowski.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/WrapGh.hpp"  // IWYU pragma: keep
 #include "PointwiseFunctions/AnalyticSolutions/Tags.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/WaveEquation/PlaneWave.hpp"  // IWYU pragma: keep
@@ -139,7 +138,7 @@ struct EvolutionMetavars {
 
   static constexpr OptionString help{
       "Evolve a generalized harmonic analytic solution.\n\n"
-      "The analytic solution is: Minkowski\n"
+      "The analytic solution is: KerrSchild\n"
       "The numerical flux is:    UpwindFlux\n"};
 
   enum class Phase { Initialization, RegisterWithObserver, Evolve, Exit };
