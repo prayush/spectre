@@ -45,6 +45,14 @@ struct System {
       tmpl::list<gr::Tags::SpacetimeMetric<Dim, Frame::Inertial, DataVector>,
                  Tags::Pi<Dim, Frame::Inertial>,
                  Tags::Phi<Dim, Frame::Inertial>>;
+
+  // `constraints_tag` can be used with
+  // `dg::Events::ObserveFields` to observe constraint violations in volume
+  using constraints_tag = ::Tags::Variables<
+      tmpl::list<Tags::GaugeConstraint<Dim, Frame::Inertial>,
+                 Tags::ThreeIndexConstraint<Dim, Frame::Inertial>,
+                 Tags::ConstraintEnergy<Dim, Frame::Inertial>>>;
+
   // `extras_tag` can be used with `Tags::DerivCompute` to get spatial
   // derivatives of quantities that are otherwise not available within
   // a `Variables<>` container.

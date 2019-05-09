@@ -6,12 +6,19 @@
 #include <cstddef>
 #include <vector>
 
+#include "DataStructures/DataVector.hpp"
 #include "Domain/Creators/RegisterDerivedWithCharm.hpp"
 #include "Domain/Tags.hpp"
 #include "ErrorHandling/Error.hpp"
 #include "ErrorHandling/FloatingPointExceptions.hpp"
 #include "Evolution/Actions/ComputeTimeDerivative.hpp"  // IWYU pragma: keep
 #include "Evolution/DiscontinuousGalerkin/DgElementArray.hpp"  // IWYU pragma: keep
+#include "Evolution/DiscontinuousGalerkin/ObserveErrorNorms.hpp"
+#include "Evolution/DiscontinuousGalerkin/ObserveFields.hpp"
+#include "Evolution/DiscontinuousGalerkin/ObserveNorms.hpp"
+#include "Evolution/EventsAndTriggers/Actions/RunEventsAndTriggers.hpp"  // IWYU pragma: keep
+#include "Evolution/EventsAndTriggers/Event.hpp"
+#include "Evolution/EventsAndTriggers/EventsAndTriggers.hpp"  // IWYU pragma: keep
 #include "Evolution/Systems/GeneralizedHarmonic/Equations.hpp"  // IWYU pragma: keep // for UpwindFlux
 #include "Evolution/Systems/GeneralizedHarmonic/Initialize.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Observe.hpp"
@@ -57,6 +64,7 @@
 #include "Time/StepControllers/StepController.hpp"
 #include "Time/Tags.hpp"
 #include "Time/TimeSteppers/TimeStepper.hpp"
+#include "Time/Triggers/TimeTriggers.hpp"
 #include "Utilities/Functional.hpp"
 #include "Utilities/TMPL.hpp"
 
@@ -84,19 +92,28 @@ struct EvolutionMetavars {
   using normal_dot_numerical_flux = OptionTags::NumericalFluxParams<
       // dg::NumericalFluxes::LocalLaxFriedrichs<system>>;
       GeneralizedHarmonic::UpwindFlux<dim>>;
+
+  // public for use by the Charm++ registration code
+  using events = tmpl::list<dg::Events::Registrars::ObserveNorms<
+      dim, db::get_variables_tags_list<system::constraints_tag>>>;
+  using triggers = Triggers::time_triggers;
+
   // A tmpl::list of tags to be added to the ConstGlobalCache by the
   // metavariables
   using const_global_cache_tag_list =
       tmpl::list<analytic_solution_tag,
                  OptionTags::TypedTimeStepper<tmpl::conditional_t<
-                     local_time_stepping, LtsTimeStepper, TimeStepper>>>;
+                     local_time_stepping, LtsTimeStepper, TimeStepper>>,
+                 OptionTags::EventsAndTriggers<events, triggers>>;
   using domain_creator_tag = OptionTags::DomainCreator<dim, Inertial>;
 
   struct ObservationType {};
   using element_observation_type = ObservationType;
 
   using observed_reduction_data_tags = observers::collect_reduction_data_tags<
-      tmpl::list<GeneralizedHarmonic::Actions::Observe>>;
+      tmpl::append<Event<events>::creatable_classes
+                   //, tmpl::list<GeneralizedHarmonic::Actions::Observe>
+                   >>;
 
   using step_choosers = tmpl::list<StepChoosers::Registrars::Cfl<dim, Inertial>,
                                    StepChoosers::Registrars::Constant,
@@ -129,7 +146,8 @@ struct EvolutionMetavars {
           tmpl::flatten<tmpl::list<
               SelfStart::self_start_procedure<compute_rhs, update_variables>,
               Actions::Label<EvolvePhaseStart>, Actions::AdvanceTime,
-              GeneralizedHarmonic::Actions::Observe, Actions::FinalTime,
+              GeneralizedHarmonic::Actions::Observe,
+              Actions::RunEventsAndTriggers, Actions::FinalTime,
               tmpl::conditional_t<local_time_stepping,
                                   Actions::ChangeStepSize<step_choosers>,
                                   tmpl::list<>>,
@@ -169,11 +187,15 @@ struct EvolutionMetavars {
 static const std::vector<void (*)()> charm_init_node_funcs{
     &setup_error_handling,
     &domain::creators::register_derived_with_charm,
+    &Parallel::register_derived_classes_with_charm<
+        Event<metavariables::events>>,
     &Parallel::register_derived_classes_with_charm<MathFunction<1>>,
     &Parallel::register_derived_classes_with_charm<
         StepChooser<metavariables::step_choosers>>,
     &Parallel::register_derived_classes_with_charm<StepController>,
-    &Parallel::register_derived_classes_with_charm<TimeStepper>};
+    &Parallel::register_derived_classes_with_charm<TimeStepper>,
+    &Parallel::register_derived_classes_with_charm<
+        Trigger<metavariables::triggers>>};
 
 static const std::vector<void (*)()> charm_init_proc_funcs{
     &enable_floating_point_exceptions};

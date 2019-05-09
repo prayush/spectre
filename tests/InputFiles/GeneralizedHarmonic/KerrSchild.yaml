@@ -25,7 +25,13 @@ TimeStepper: RungeKutta3
 
 NumericalFluxParams:
 
-ReductionFileName: ReductionData
-VolumeFileName: VolumeData
+EventsAndTriggers:
+  ? EveryNSlabs:
+        N: 1
+        Offset: 0
+  : - ObserveNorms
+
+ReductionFileName: "./GHReductionData"
+VolumeFileName: "./GHVolumeData"
 ObserveNSlabs: 1
 ObserveAtT0: true
