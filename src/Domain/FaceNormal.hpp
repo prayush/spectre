@@ -13,8 +13,12 @@
 #include <unordered_map>
 
 #include "DataStructures/DataBox/DataBoxTag.hpp"
+#include "DataStructures/Tensor/EagerMath/Magnitude.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "Domain/Tags.hpp"  // IWYU pragma: keep
+#include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
+#include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
+#include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "Utilities/TMPL.hpp"
 
 /// \cond
@@ -67,7 +71,8 @@ namespace Tags {
 template <size_t VolumeDim, typename Frame = ::Frame::Inertial>
 struct UnnormalizedFaceNormal : db::ComputeTag {
   static std::string name() noexcept { return "UnnormalizedFaceNormal"; }
-  static constexpr tnsr::i<DataVector, VolumeDim, Frame> (*function)(
+  using type = tnsr::i<DataVector, VolumeDim, Frame>;
+  static constexpr type (*function)(
       const ::Mesh<VolumeDim - 1>&, const ::ElementMap<VolumeDim, Frame>&,
       const ::Direction<VolumeDim>&) = unnormalized_face_normal;
   using argument_tags =
