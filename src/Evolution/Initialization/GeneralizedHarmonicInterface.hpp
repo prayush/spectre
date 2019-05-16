@@ -45,9 +45,7 @@ template <typename System>
 struct GeneralizedHarmonicInterface {
   static constexpr size_t dim = System::volume_dim;
   using Inertial = Frame::Inertial;
-  using simple_tags =
-      db::AddSimpleTags<Tags::Interface<Tags::BoundaryDirectionsExterior<dim>,
-                                        typename System::variables_tag>>;
+  using simple_tags = db::AddSimpleTags<>;
 
   template <typename Directions>
   using face_tags = tmpl::list<
@@ -90,6 +88,14 @@ struct GeneralizedHarmonicInterface {
 
   using ext_tags = tmpl::list<
       Tags::BoundaryDirectionsExterior<dim>,
+      Tags::InterfaceComputeItem<Tags::BoundaryDirectionsExterior<dim>,
+                                 Tags::Direction<dim>>,
+      Tags::InterfaceComputeItem<Tags::BoundaryDirectionsExterior<dim>,
+                                 Tags::InterfaceMesh<dim>>,
+      Tags::InterfaceComputeItem<Tags::BoundaryDirectionsExterior<dim>,
+                                 Tags::BoundaryCoordinates<dim, Inertial>>,
+      Tags::Slice<Tags::BoundaryDirectionsExterior<dim>,
+                  typename System::variables_tag>,
       Tags::InterfaceComputeItem<
           Tags::BoundaryDirectionsExterior<dim>,
           gr::Tags::SpatialMetricCompute<dim, Inertial, DataVector>>,
@@ -102,12 +108,6 @@ struct GeneralizedHarmonicInterface {
       Tags::InterfaceComputeItem<
           Tags::BoundaryDirectionsExterior<dim>,
           gr::Tags::LapseCompute<dim, Inertial, DataVector>>,
-      Tags::InterfaceComputeItem<Tags::BoundaryDirectionsExterior<dim>,
-                                 Tags::Direction<dim>>,
-      Tags::InterfaceComputeItem<Tags::BoundaryDirectionsExterior<dim>,
-                                 Tags::InterfaceMesh<dim>>,
-      Tags::InterfaceComputeItem<Tags::BoundaryDirectionsExterior<dim>,
-                                 Tags::BoundaryCoordinates<dim>>,
       Tags::InterfaceComputeItem<Tags::BoundaryDirectionsExterior<dim>,
                                  Tags::UnnormalizedFaceNormal<dim>>,
       Tags::InterfaceComputeItem<Tags::BoundaryDirectionsExterior<dim>,
@@ -139,20 +139,8 @@ struct GeneralizedHarmonicInterface {
 
   template <typename TagsList>
   static auto initialize(db::DataBox<TagsList>&& box) noexcept {
-    const auto& mesh = db::get<Tags::Mesh<dim>>(box);
-    std::unordered_map<Direction<dim>,
-                       db::item_type<typename System::variables_tag>>
-        external_boundary_vars{};
-
-    for (const auto& direction :
-         db::get<Tags::Element<dim>>(box).external_boundaries()) {
-      external_boundary_vars[direction] =
-          db::item_type<typename System::variables_tag>{
-              mesh.slice_away(direction.dimension()).number_of_grid_points()};
-    }
-
     return db::create_from<db::RemoveTags<>, simple_tags, compute_tags>(
-        std::move(box), std::move(external_boundary_vars));
+        std::move(box));
   }
 };
 
