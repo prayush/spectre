@@ -58,6 +58,7 @@ struct Observe {
       Parallel::ReductionDatum<double, funcl::AssertEqual<>>,
       Parallel::ReductionDatum<size_t, funcl::Plus<>>, reduction_datum,
       reduction_datum, reduction_datum, reduction_datum, reduction_datum,
+      reduction_datum, reduction_datum, reduction_datum,
       reduction_datum, reduction_datum, reduction_datum>;
 
  public:
@@ -110,9 +111,18 @@ struct Observe {
       const auto& gauge_constraint = db::get<
           GeneralizedHarmonic::Tags::GaugeConstraint<Dim, Frame::Inertial>>(
           box);
+      const auto& two_index_constraint = db::get<
+          GeneralizedHarmonic::Tags::TwoIndexConstraint<Dim, Frame::Inertial>>(
+          box);
       const auto& three_index_constraint =
           db::get<GeneralizedHarmonic::Tags::ThreeIndexConstraint<
               Dim, Frame::Inertial>>(box);
+      const auto& four_index_constraint = db::get<
+          GeneralizedHarmonic::Tags::FourIndexConstraint<Dim, Frame::Inertial>>(
+          box);
+      const auto& f_constraint =
+          db::get<GeneralizedHarmonic::Tags::FConstraint<Dim, Frame::Inertial>>(
+              box);
       const auto& constraint_energy = db::get<
           GeneralizedHarmonic::Tags::ConstraintEnergy<Dim, Frame::Inertial>>(
           box);
@@ -169,7 +179,7 @@ struct Observe {
 
       // Remove tensor types, only storing individual components.
       std::vector<TensorComponent> components;
-      components.reserve(8);  // FIXME
+      components.reserve(11);  // FIXME
 
       using PlusSquare = funcl::Plus<funcl::Identity, funcl::Square<>>;
 
@@ -178,16 +188,26 @@ struct Observe {
       DataVector error_in_phi_components{num_grid_points, 0.};
       DataVector error_in_pi_components{num_grid_points, 0.};
       DataVector gauge_constraint_all_components{num_grid_points, 0.};
+      DataVector two_index_constraint_all_components{num_grid_points, 0.};
       DataVector three_index_constraint_all_components{num_grid_points, 0.};
+      DataVector four_index_constraint_all_components{num_grid_points, 0.};
+      DataVector f_constraint_all_components{num_grid_points, 0.};
       for (size_t a = 0; a < Dim + 1; ++a) {
         gauge_constraint_all_components += square(gauge_constraint.get(a));
+        f_constraint_all_components += square(f_constraint.get(a));
         for (size_t b = 0; b < Dim + 1; ++b) {
+          if (a != Dim) {
+            two_index_constraint_all_components +=
+                square(two_index_constraint.get(a, b));
+          }
           error_in_psi_components +=
               square(exact_psi.get(a, b) - psi.get(a, b));
           error_in_pi_components += square(exact_pi.get(a, b) - pi.get(a, b));
           for (size_t i = 0; i < Dim; ++i) {
             three_index_constraint_all_components +=
                 square(three_index_constraint.get(i, a, b));
+            four_index_constraint_all_components +=
+                square(four_index_constraint.get(i, a, b));
             error_in_phi_components +=
                 square(exact_phi.get(i, a, b) - phi.get(i, a, b));
           }
@@ -201,8 +221,14 @@ struct Observe {
           alg::accumulate(error_in_pi_components, 0., PlusSquare{});
       const double gauge_constraint_cumulative =
           alg::accumulate(gauge_constraint_all_components, 0., PlusSquare{});
+      const double two_index_constraint_cumulative = alg::accumulate(
+          two_index_constraint_all_components, 0., PlusSquare{});
       const double three_index_constraint_cumulative = alg::accumulate(
           three_index_constraint_all_components, 0., PlusSquare{});
+      const double four_index_constraint_cumulative = alg::accumulate(
+          four_index_constraint_all_components, 0., PlusSquare{});
+      const double f_constraint_cumulative =
+          alg::accumulate(f_constraint_all_components, 0., PlusSquare{});
       const double constraint_energy_cumulative =
           alg::accumulate(get(constraint_energy), 0., PlusSquare{});
 
@@ -227,11 +253,25 @@ struct Observe {
                                   GeneralizedHarmonic::Tags::GaugeConstraint<
                                       Dim, Frame::Inertial>::name(),
                               gauge_constraint_all_components);
+      components.emplace_back(element_name + "L2Norm" +
+                                  GeneralizedHarmonic::Tags::TwoIndexConstraint<
+                                      Dim, Frame::Inertial>::name(),
+                              two_index_constraint_all_components);
       components.emplace_back(
           element_name + "L2Norm" +
               GeneralizedHarmonic::Tags::ThreeIndexConstraint<
                   Dim, Frame::Inertial>::name(),
           three_index_constraint_all_components);
+      components.emplace_back(
+          element_name + "L2Norm" +
+              GeneralizedHarmonic::Tags::FourIndexConstraint<
+                  Dim, Frame::Inertial>::name(),
+          four_index_constraint_all_components);
+      components.emplace_back(
+          element_name + "L2Norm" +
+              GeneralizedHarmonic::Tags::FConstraint<Dim,
+                                                     Frame::Inertial>::name(),
+          f_constraint_all_components);
 
       for (size_t d = 0; d < Dim; ++d) {
         const std::string component_suffix =
@@ -265,14 +305,18 @@ struct Observe {
           std::string{"/element_data"},
           std::vector<std::string>{
               "Time", "NumberOfPoints", "PsiError", "PhiError", "PiError",
-              "L2NormGaugeConstraint", "L2NormThreeIndexConstraint",
-              "L2NormConstraintEnergy", "L2NormHt", "L2NormHx"},
+              "L2NormGaugeConstraint", "L2NormTwoIndexConstraint",
+              "L2NormThreeIndexConstraint", "L2NormFourIndexConstraint",
+              "L2NormFConstraint", "L2NormConstraintEnergy", "L2NormHt",
+              "L2NormHx"},
           reduction_data{
               time.value(),
               db::get<::Tags::Mesh<Dim>>(box).number_of_grid_points(),
               psi_error, phi_error, pi_error, gauge_constraint_cumulative,
-              three_index_constraint_cumulative, constraint_energy_cumulative,
-              gauge_H_t, gauge_H_x});
+              two_index_constraint_cumulative,
+              three_index_constraint_cumulative,
+              four_index_constraint_cumulative, f_constraint_cumulative,
+              constraint_energy_cumulative, gauge_H_t, gauge_H_x});
     }
     return std::forward_as_tuple(std::move(box));
   }
