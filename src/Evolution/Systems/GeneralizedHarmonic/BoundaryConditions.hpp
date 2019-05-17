@@ -78,7 +78,7 @@ namespace observe_detail {}  // namespace observe_detail
 /// \see ReceiveDataForFluxes
 template <typename Metavariables>
 struct ImposeConstraintPreservingBoundaryConditions {
- private:
+ public:
   // {Psi,Phi,Pi}BcMethod and BcSelector are used to select exactly how to
   // apply the requested boundary condition depending on user input.
   // An overloaded `apply_impl` method is used that implements the
@@ -86,28 +86,11 @@ struct ImposeConstraintPreservingBoundaryConditions {
   enum class PsiBcMethod { AnalyticBc, Freezing, Unknown };
   enum class PhiBcMethod { AnalyticBc, Freezing, Unknown };
   enum class PiBcMethod { AnalyticBc, Freezing, Unknown };
-  template <typename T, T Method>
-  using BcSelector = std::integral_constant<T, Method>;
 
  public:
   using const_global_cache_tags =
       tmpl::list<typename Metavariables::normal_dot_numerical_flux,
                  typename Metavariables::boundary_condition_tag>;
-
-  template <typename DbTags, typename... InboxTags, typename ArrayIndex,
-            typename ActionList, typename ParallelComponent>
-  static std::tuple<db::DataBox<DbTags>&&> apply(
-      db::DataBox<DbTags>& box, tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-      Parallel::ConstGlobalCache<Metavariables>& cache,
-      const ArrayIndex& /*array_index*/, const ActionList /*meta*/,
-      const ParallelComponent* const /*meta*/) noexcept {
-    // Here be logic that selects from various options for
-    // setting BCs on individual evolved variables
-    return apply_impl<Metavariables::system::volume_dim>(
-        box, cache, BcSelector<PsiBcMethod, PsiBcMethod::AnalyticBc>{},
-        BcSelector<PhiBcMethod, PhiBcMethod::AnalyticBc>{},
-        BcSelector<PiBcMethod, PiBcMethod::AnalyticBc>{});
-  }
 
  private:
   /* ------------------------------------------------------------------------
@@ -160,175 +143,157 @@ struct ImposeConstraintPreservingBoundaryConditions {
    * ------------------------------------------------------------------------
    * ------------------------------------------------------------------------
    */
-  template <size_t VolumeDim, typename DbTags>
-  static std::tuple<db::DataBox<DbTags>&&> apply_impl(
-      db::DataBox<DbTags>& box,
-      const Parallel::ConstGlobalCache<Metavariables>& cache,
-      std::integral_constant<PsiBcMethod, PsiBcMethod::Freezing> /*meta*/,
-      std::integral_constant<PhiBcMethod, PhiBcMethod::AnalyticBc> /*meta*/,
-      std::integral_constant<PiBcMethod,
-                             PiBcMethod::AnalyticBc> /*meta*/) noexcept {
-    using system = typename Metavariables::system;
-
-    // Apply the boundary condition
-    db::mutate_apply<tmpl::list<::Tags::Interface<
-                         ::Tags::BoundaryDirectionsExterior<VolumeDim>,
-                         typename system::variables_tag>>,
-                     tmpl::list<>>(
-
-        [](const gsl::not_null<db::item_type<
-               ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
-                                 typename system::variables_tag>>*>
-               external_bdry_vars,
-           const double time, const auto& boundary_condition,
-           const auto& boundary_coords) noexcept {
-          // Loop over external boundaries
-          for (auto& external_direction_and_vars : *external_bdry_vars) {
-            auto& direction = external_direction_and_vars.first;
-            auto& vars = external_direction_and_vars.second;
-
-            // Get evolved variables on current boundary from AnalyticSolution
-            const auto analytic_boundary_vars = boundary_condition.variables(
-                boundary_coords.at(direction), time,
-                typename system::variables_tag::type::tags_list{});
-
-            // --------------------------------------------------
-            // Construct CURRENT time derivs of char fields BdryCharDtU
-            // Proj.FundVarsToCharVars(mBox[sd][sl], BdryDtU, BdryCharDtU);
-            //
-            // // Construct DESIRED time derivs of characteristic fields
-            // if (bslice.MyTypeMatches(BoundaryInfoSlice::External))
-            // {
-            //   // External boundaries:
-            //   // Impose boundary condition.
-            //   Proj.FundVarsToCharVars(mBox[sd][sl], BdryU, BdryCharU);
-            //   for (int nbc = 0; nbc < mFoshTimeDerivBc[sd][sl].Size(); ++nbc)
-            //   {
-            //     if (mFoshTimeDerivBc[sd][sl][nbc] != 0)
-            //       mFoshTimeDerivBc[sd][sl][nbc]->SetBc(mBox[sd][sl], BdryU,
-            //                                            BdryCharU, BdryDtU,
-            //                                            BdryCharDtU,
-            //                                            BcCharDtU);
-            //   }
-            //
-            // // Now reconstruct BdryDtU:
-            // // Incoming modes should be set using BcCharDtU,
-            // // and nonincoming modes should be set using BdryDtUChar
-            // for (int c = 0; c < System.CharVarsStruct().Size(); ++c) {
-            //   const std::string& VarName = System.CharVarsStruct().Name(c);
-            //   SetFirstEqualToSecondWhereThirdIsNegative(
-            //       BdryCharDtU(VarName), BcCharDtU(VarName),
-            //       Speeds(VarName)());
-            // }
-            // Proj.CharVarsToFundVars(mBox[sd][sl], BdryCharDtU, BdryDtU);
-            // --------------------------------------------------
-
-            // Construct CURRENT time derivs of char fields
-
-            // Construct DESIRED time derivs of characteristic fields
-
-            // Now reconstruct time derivs of fund fields:
-            // Incoming modes should be set using DESIRED time derivs of char
-            // fields, and nonincoming modes should be set using CURRENT tiem
-            // derivs
-
-            // Assign Psi
-            get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
-                                          DataVector>>(vars) =
-                get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
-                                              DataVector>>(
-                    analytic_boundary_vars);
-            // Assign Phi
-            get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars) =
-                get<Tags::Phi<VolumeDim, Frame::Inertial>>(
-                    analytic_boundary_vars);
-            // Assign Pi
-            get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars) =
-                get<Tags::Pi<VolumeDim, Frame::Inertial>>(
-                    analytic_boundary_vars);
-
-            // vars.assign_subset(boundary_condition.variables(
-            //     boundary_coords.at(direction), time,
-            //     typename system::variables_tag::type::tags_list{}));
-          }
-          // -------------------------------
-        },
-        make_not_null(&box), db::get<::Tags::Time>(box).value(),
-        get<typename Metavariables::boundary_condition_tag>(cache),
-        db::get<
-            ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
-                              ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(
-            box));
-
-    contribute_data_to_mortar(make_not_null(&box), cache);
-    return std::forward_as_tuple(std::move(box));
-  }
+  template <size_t VolumeDim, PsiBcMethod PsiMethod, PhiBcMethod PhiMethod,
+            PiBcMethod PiMethod, typename DbTags>
+  struct apply_impl {
+    static std::tuple<db::DataBox<DbTags>&&> function_impl(
+        db::DataBox<DbTags>& box,
+        const Parallel::ConstGlobalCache<Metavariables>& cache) noexcept;
+  };
 
   template <size_t VolumeDim, typename DbTags>
-  static std::tuple<db::DataBox<DbTags>&&> apply_impl(
-      db::DataBox<DbTags>& box,
-      const Parallel::ConstGlobalCache<Metavariables>& cache,
-      std::integral_constant<PsiBcMethod, PsiBcMethod::AnalyticBc> /*meta*/,
-      std::integral_constant<PhiBcMethod, PhiBcMethod::AnalyticBc> /*meta*/,
-      std::integral_constant<PiBcMethod,
-                             PiBcMethod::AnalyticBc> /*meta*/) noexcept {
-    using system = typename Metavariables::system;
+  struct apply_impl<VolumeDim, PsiBcMethod::Freezing, PhiBcMethod::Freezing,
+                    PiBcMethod::Freezing, DbTags> {
+    static std::tuple<db::DataBox<DbTags>&&> function_impl(
+        db::DataBox<DbTags>& box,
+        const Parallel::ConstGlobalCache<Metavariables>& cache) noexcept {
+      using system = typename Metavariables::system;
 
-    // Apply the boundary condition
-    db::mutate_apply<tmpl::list<::Tags::Interface<
-                         ::Tags::BoundaryDirectionsExterior<VolumeDim>,
-                         typename system::variables_tag>>,
-                     tmpl::list<>>(
+      // Apply the boundary condition
+      db::mutate_apply<tmpl::list<::Tags::Interface<
+                           ::Tags::BoundaryDirectionsExterior<VolumeDim>,
+                           typename system::variables_tag>>,
+                       tmpl::list<>>(
 
-        [](const gsl::not_null<db::item_type<
-               ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
-                                 typename system::variables_tag>>*>
-               external_bdry_vars,
-           const double time, const auto& boundary_condition,
-           const auto& boundary_coords) noexcept {
-          // -------------------------------
-          // Loop over external boundaries
-          for (auto& external_direction_and_vars : *external_bdry_vars) {
-            auto& direction = external_direction_and_vars.first;
-            auto& vars = external_direction_and_vars.second;
+          [](const gsl::not_null<db::item_type<::Tags::Interface<
+                 ::Tags::BoundaryDirectionsExterior<VolumeDim>,
+                 typename system::variables_tag>>*>
+                 external_bdry_vars,
+             const double time, const auto& boundary_condition,
+             const auto& boundary_coords) noexcept {
+            // -------------------------------
+            // Loop over external boundaries
+            for (auto& external_direction_and_vars : *external_bdry_vars) {
+              auto& direction = external_direction_and_vars.first;
+              auto& vars = external_direction_and_vars.second;
 
-            // Get evolved variables on current boundary from AnalyticSolution
-            const auto analytic_boundary_vars = boundary_condition.variables(
-                boundary_coords.at(direction), time,
-                typename system::variables_tag::type::tags_list{});
+              // Get evolved variables on current boundary from AnalyticSolution
+              const auto analytic_boundary_vars = boundary_condition.variables(
+                  boundary_coords.at(direction), time,
+                  typename system::variables_tag::type::tags_list{});
 
-            // Assign Psi
-            get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
-                                          DataVector>>(vars) =
-                get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
-                                              DataVector>>(
-                    analytic_boundary_vars);
-            // Assign Phi
-            get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars) =
-                get<Tags::Phi<VolumeDim, Frame::Inertial>>(
-                    analytic_boundary_vars);
-            // Assign Pi
-            get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars) =
-                get<Tags::Pi<VolumeDim, Frame::Inertial>>(
-                    analytic_boundary_vars);
+              // Assign Psi
+              get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
+                                            DataVector>>(vars) =
+                  get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
+                                                DataVector>>(
+                      analytic_boundary_vars);
+              // Assign Phi
+              get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars) =
+                  get<Tags::Phi<VolumeDim, Frame::Inertial>>(
+                      analytic_boundary_vars);
+              // Assign Pi
+              get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars) =
+                  get<Tags::Pi<VolumeDim, Frame::Inertial>>(
+                      analytic_boundary_vars);
 
-            // vars.assign_subset(boundary_condition.variables(
-            //     boundary_coords.at(direction), time,
-            //     typename system::variables_tag::type::tags_list{}));
-          }
-          // -------------------------------
-        },
-        make_not_null(&box), db::get<::Tags::Time>(box).value(),
-        get<typename Metavariables::boundary_condition_tag>(cache),
-        db::get<
-            ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
-                              ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(
-            box));
+              // vars.assign_subset(boundary_condition.variables(
+              //     boundary_coords.at(direction), time,
+              //     typename system::variables_tag::type::tags_list{}));
+            }
+            // -------------------------------
+          },
+          make_not_null(&box), db::get<::Tags::Time>(box).value(),
+          get<typename Metavariables::boundary_condition_tag>(cache),
+          db::get<::Tags::Interface<
+              ::Tags::BoundaryDirectionsExterior<VolumeDim>,
+              ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(box));
 
-    contribute_data_to_mortar(make_not_null(&box), cache);
-    return std::forward_as_tuple(std::move(box));
+      contribute_data_to_mortar(make_not_null(&box), cache);
+      return std::forward_as_tuple(std::move(box));
+    }
+  };
+
+  template <size_t VolumeDim, typename DbTags>
+  struct apply_impl<VolumeDim, PsiBcMethod::AnalyticBc, PhiBcMethod::AnalyticBc,
+                    PiBcMethod::AnalyticBc, DbTags> {
+    static std::tuple<db::DataBox<DbTags>&&> function_impl(
+        db::DataBox<DbTags>& box,
+        const Parallel::ConstGlobalCache<Metavariables>& cache) noexcept {
+      using system = typename Metavariables::system;
+
+      // Apply the boundary condition
+      db::mutate_apply<tmpl::list<::Tags::Interface<
+                           ::Tags::BoundaryDirectionsExterior<VolumeDim>,
+                           typename system::variables_tag>>,
+                       tmpl::list<>>(
+
+          [](const gsl::not_null<db::item_type<::Tags::Interface<
+                 ::Tags::BoundaryDirectionsExterior<VolumeDim>,
+                 typename system::variables_tag>>*>
+                 external_bdry_vars,
+             const double time, const auto& boundary_condition,
+             const auto& boundary_coords) noexcept {
+            // -------------------------------
+            // Loop over external boundaries
+            for (auto& external_direction_and_vars : *external_bdry_vars) {
+              auto& direction = external_direction_and_vars.first;
+              auto& vars = external_direction_and_vars.second;
+
+              // Get evolved variables on current boundary from AnalyticSolution
+              const auto analytic_boundary_vars = boundary_condition.variables(
+                  boundary_coords.at(direction), time,
+                  typename system::variables_tag::type::tags_list{});
+
+              // Assign Psi
+              get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
+                                            DataVector>>(vars) =
+                  get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
+                                                DataVector>>(
+                      analytic_boundary_vars);
+              // Assign Phi
+              get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars) =
+                  get<Tags::Phi<VolumeDim, Frame::Inertial>>(
+                      analytic_boundary_vars);
+              // Assign Pi
+              get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars) =
+                  get<Tags::Pi<VolumeDim, Frame::Inertial>>(
+                      analytic_boundary_vars);
+
+              // vars.assign_subset(boundary_condition.variables(
+              //     boundary_coords.at(direction), time,
+              //     typename system::variables_tag::type::tags_list{}));
+            }
+            // -------------------------------
+          },
+          make_not_null(&box), db::get<::Tags::Time>(box).value(),
+          get<typename Metavariables::boundary_condition_tag>(cache),
+          db::get<::Tags::Interface<
+              ::Tags::BoundaryDirectionsExterior<VolumeDim>,
+              ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(box));
+
+      contribute_data_to_mortar(make_not_null(&box), cache);
+      return std::forward_as_tuple(std::move(box));
+    }
+  };
+
+ public:
+  template <typename DbTags, typename... InboxTags, typename ArrayIndex,
+            typename ActionList, typename ParallelComponent>
+  static std::tuple<db::DataBox<DbTags>&&> apply(
+      db::DataBox<DbTags>& box, tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+      Parallel::ConstGlobalCache<Metavariables>& cache,
+      const ArrayIndex& /*array_index*/, const ActionList /*meta*/,
+      const ParallelComponent* const /*meta*/) noexcept {
+    // Here be logic that selects from various options for
+    // setting BCs on individual evolved variables
+    return apply_impl<Metavariables::system::volume_dim,
+                      PsiBcMethod::AnalyticBc, PhiBcMethod::AnalyticBc,
+                      PiBcMethod::AnalyticBc, DbTags>::function_impl(box,
+                                                                     cache);
   }
 };
+
 }  // namespace Actions
 
 namespace GhActions_detail {}  // namespace GhActions_detail
