@@ -14,6 +14,7 @@
 #include "Domain/FaceNormal.hpp"
 #include "Domain/Tags.hpp"
 #include "ErrorHandling/Assert.hpp"
+#include "Evolution/Systems/ScalarWave/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/InterfaceActionHelpers.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/FluxCommunicationTypes.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/MortarHelpers.hpp"
@@ -35,7 +36,7 @@ struct Magnitude;
 // IWYU pragma: no_forward_declare db::DataBox
 /// \endcond
 
-namespace GeneralizedHarmonic {
+namespace ScalarWave {
 namespace Actions {
 
 namespace observe_detail {}  // namespace observe_detail
@@ -73,7 +74,7 @@ namespace observe_detail {}  // namespace observe_detail
 /// - Removes: nothing
 /// - Modifies:
 ///      - Tags::VariablesBoundaryData
-///      - External<Tags::dt<typename system::variables_tag>>
+///      - External<typename system::variables_tag>
 ///
 /// \see ReceiveDataForFluxes
 template <typename Metavariables>
@@ -84,8 +85,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
   // An overloaded `apply_impl` method is used that implements the
   // boundary condition calculation for the different types.
   enum class PsiBcMethod { AnalyticBc, Freezing, Unknown };
-  enum class PhiBcMethod { AnalyticBc, Freezing, Unknown };
-  enum class PiBcMethod { AnalyticBc, Freezing, Unknown };
+  enum class PhiBcMethod { AnalyticBc, Unknown };
+  enum class PiBcMethod { AnalyticBc, Unknown };
   template <typename T, T Method>
   using BcSelector = std::integral_constant<T, Method>;
 
@@ -182,6 +183,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
                external_bdry_vars,
            const double time, const auto& boundary_condition,
            const auto& boundary_coords) noexcept {
+          // -------------------------------
           // Loop over external boundaries
           for (auto& external_direction_and_vars : *external_bdry_vars) {
             auto& direction = external_direction_and_vars.first;
@@ -191,37 +193,6 @@ struct ImposeConstraintPreservingBoundaryConditions {
             const auto analytic_boundary_vars = boundary_condition.variables(
                 boundary_coords.at(direction), time,
                 typename system::variables_tag::type::tags_list{});
-
-            // --------------------------------------------------
-            // Construct CURRENT time derivs of char fields BdryCharDtU
-            // Proj.FundVarsToCharVars(mBox[sd][sl], BdryDtU, BdryCharDtU);
-            //
-            // // Construct DESIRED time derivs of characteristic fields
-            // if (bslice.MyTypeMatches(BoundaryInfoSlice::External))
-            // {
-            //   // External boundaries:
-            //   // Impose boundary condition.
-            //   Proj.FundVarsToCharVars(mBox[sd][sl], BdryU, BdryCharU);
-            //   for (int nbc = 0; nbc < mFoshTimeDerivBc[sd][sl].Size(); ++nbc)
-            //   {
-            //     if (mFoshTimeDerivBc[sd][sl][nbc] != 0)
-            //       mFoshTimeDerivBc[sd][sl][nbc]->SetBc(mBox[sd][sl], BdryU,
-            //                                            BdryCharU, BdryDtU,
-            //                                            BdryCharDtU,
-            //                                            BcCharDtU);
-            //   }
-            //
-            // // Now reconstruct BdryDtU:
-            // // Incoming modes should be set using BcCharDtU,
-            // // and nonincoming modes should be set using BdryDtUChar
-            // for (int c = 0; c < System.CharVarsStruct().Size(); ++c) {
-            //   const std::string& VarName = System.CharVarsStruct().Name(c);
-            //   SetFirstEqualToSecondWhereThirdIsNegative(
-            //       BdryCharDtU(VarName), BcCharDtU(VarName),
-            //       Speeds(VarName)());
-            // }
-            // Proj.CharVarsToFundVars(mBox[sd][sl], BdryCharDtU, BdryDtU);
-            // --------------------------------------------------
 
             // Construct CURRENT time derivs of char fields
 
@@ -233,23 +204,14 @@ struct ImposeConstraintPreservingBoundaryConditions {
             // derivs
 
             // Assign Psi
-            get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
-                                          DataVector>>(vars) =
-                get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
-                                              DataVector>>(
-                    analytic_boundary_vars);
+            get<ScalarWave::Psi>(vars) =
+                get<ScalarWave::Psi>(analytic_boundary_vars);
             // Assign Phi
-            get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars) =
-                get<Tags::Phi<VolumeDim, Frame::Inertial>>(
-                    analytic_boundary_vars);
+            get<ScalarWave::Phi<VolumeDim>>(vars) =
+                get<ScalarWave::Phi<VolumeDim>>(analytic_boundary_vars);
             // Assign Pi
-            get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars) =
-                get<Tags::Pi<VolumeDim, Frame::Inertial>>(
-                    analytic_boundary_vars);
-
-            // vars.assign_subset(boundary_condition.variables(
-            //     boundary_coords.at(direction), time,
-            //     typename system::variables_tag::type::tags_list{}));
+            get<ScalarWave::Psi>(vars) =
+                get<ScalarWave::Psi>(analytic_boundary_vars);
           }
           // -------------------------------
         },
@@ -298,19 +260,14 @@ struct ImposeConstraintPreservingBoundaryConditions {
                 typename system::variables_tag::type::tags_list{});
 
             // Assign Psi
-            get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
-                                          DataVector>>(vars) =
-                get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
-                                              DataVector>>(
-                    analytic_boundary_vars);
+            get<ScalarWave::Psi>(vars) =
+                get<ScalarWave::Psi>(analytic_boundary_vars);
             // Assign Phi
-            get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars) =
-                get<Tags::Phi<VolumeDim, Frame::Inertial>>(
-                    analytic_boundary_vars);
+            get<ScalarWave::Phi<VolumeDim>>(vars) =
+                get<ScalarWave::Phi<VolumeDim>>(analytic_boundary_vars);
             // Assign Pi
-            get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars) =
-                get<Tags::Pi<VolumeDim, Frame::Inertial>>(
-                    analytic_boundary_vars);
+            get<ScalarWave::Psi>(vars) =
+                get<ScalarWave::Psi>(analytic_boundary_vars);
 
             // vars.assign_subset(boundary_condition.variables(
             //     boundary_coords.at(direction), time,
@@ -331,5 +288,5 @@ struct ImposeConstraintPreservingBoundaryConditions {
 };
 }  // namespace Actions
 
-namespace GhActions_detail {}  // namespace GhActions_detail
-}  // namespace GeneralizedHarmonic
+namespace SwActions_detail {}  // namespace SwActions_detail
+}  // namespace ScalarWave
