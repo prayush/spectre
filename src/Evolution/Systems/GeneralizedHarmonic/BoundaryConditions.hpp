@@ -23,6 +23,7 @@
 #include "Parallel/Invoke.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/Tags.hpp"
 #include "Time/Tags.hpp"
+#include "Utilities/ContainerHelpers.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
@@ -108,51 +109,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
  private:
   /* ------------------------------------------------------------------------
    * ------------------------------------------------------------------------
-   * ---------------- SEND DATA TO MORTAR  ----------------
-   * ------------------------------------------------------------------------
-   * ------------------------------------------------------------------------
-   */
-  template <typename DbTags>
-  static void contribute_data_to_mortar(
-      const gsl::not_null<db::DataBox<DbTags>*> box,
-      const Parallel::ConstGlobalCache<Metavariables>& cache) noexcept {
-    using system = typename Metavariables::system;
-    constexpr size_t volume_dim = system::volume_dim;
-
-    const auto& element = db::get<::Tags::Element<volume_dim>>(*box);
-    const auto& temporal_id =
-        db::get<typename Metavariables::temporal_id>(*box);
-    const auto& normal_dot_numerical_flux_computer =
-        get<typename Metavariables::normal_dot_numerical_flux>(cache);
-
-    for (const auto& direction : element.external_boundaries()) {
-      const auto mortar_id = std::make_pair(
-          direction, ElementId<volume_dim>::external_boundary_id());
-
-      auto interior_data = DgActions_detail::compute_local_mortar_data(
-          *box, direction, normal_dot_numerical_flux_computer,
-          ::Tags::BoundaryDirectionsInterior<volume_dim>{}, Metavariables{});
-
-      auto exterior_data = DgActions_detail::compute_packaged_data(
-          *box, direction, normal_dot_numerical_flux_computer,
-          ::Tags::BoundaryDirectionsExterior<volume_dim>{}, Metavariables{});
-
-      db::mutate<::Tags::VariablesBoundaryData>(
-          box, [&mortar_id, &temporal_id, &interior_data, &exterior_data ](
-                   const gsl::not_null<
-                       db::item_type<::Tags::VariablesBoundaryData, DbTags>*>
-                       mortar_data) noexcept {
-            mortar_data->at(mortar_id).local_insert(temporal_id,
-                                                    std::move(interior_data));
-            mortar_data->at(mortar_id).remote_insert(temporal_id,
-                                                     std::move(exterior_data));
-          });
-    }
-  }
-
-  /* ------------------------------------------------------------------------
-   * ------------------------------------------------------------------------
-   * ---------------- APPLY THE BOUNDARY CONDITION  ----------------
+   * ---------------- APPLY BJORHUS BOUNDARY CONDITIONS  --------------------
    * ------------------------------------------------------------------------
    * ------------------------------------------------------------------------
    */
@@ -220,13 +177,13 @@ struct ImposeConstraintPreservingBoundaryConditions {
                       VolumeDim, Frame::Inertial, DataVector>>>(
                       get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
                                                     DataVector>>(vars),
-                      1.e-2);
+                      1.e-12);
               const auto bc_dt_phi = make_with_value<
                   db::item_type<Tags::Phi<VolumeDim, Frame::Inertial>>>(
-                  get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars), 1.e-2);
+                  get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars), 1.e-12);
               const auto bc_dt_pi = make_with_value<
                   db::item_type<Tags::Pi<VolumeDim, Frame::Inertial>>>(
-                  get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars), 1.e-2);
+                  get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars), 1.e-12);
 
               // Now store final values of dt<U> in suitable data structure
               // FIXME:
@@ -265,9 +222,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
                                  i * slice_grid_points];    // NOLINT
                 }
               }
-              //
             }
-            // ------------------------------- (3)
           },
           db::get<::Tags::Interface<
               ::Tags::BoundaryDirectionsExterior<VolumeDim>, variables_tag>>(
@@ -279,7 +234,6 @@ struct ImposeConstraintPreservingBoundaryConditions {
               ::Tags::BoundaryDirectionsExterior<VolumeDim>,
               ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(box));
 
-      contribute_data_to_mortar(make_not_null(&box), cache);
       return std::forward_as_tuple(std::move(box));
     }
   };
@@ -344,14 +298,29 @@ struct ImposeConstraintPreservingBoundaryConditions {
 namespace GhActions_detail {
 
 // \brief This struct sets boundary condition on dt<UPsi>
-template <typename ReturnType>
+template <typename ReturnType, size_t SpatialDim, typename Frame>
 struct set_dt_u_psi {
-  static ReturnType apply(const PsiBcMethod Method) noexcept {
+  static ReturnType apply(
+      const PsiBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
+      const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
+      const Scalar<DataVector>& lapse,
+      const tnsr::I<DataVector, SpatialDim, Frame>& shift,
+      const tnsr::II<DataVector, SpatialDim, Frame>& inverse_spatial_metric,
+      const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>& deriv_spacetime_metric,
+      const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
+      const std::array<DataVector, 4>& char_speeds) noexcept {
     switch (Method) {
       case PsiBcMethod::ConstraintPreservingNeumann:
-        return apply_neumann_constraint_preserving();
+        return apply_neumann_constraint_preserving(
+            bc_dt_u_psi, unit_normal_one_form, lapse, shift, pi, phi, dt_u_psi,
+            char_speeds);
       case PsiBcMethod::ConstraintPreservingDirichlet:
-        return apply_neumann_constraint_preserving();
+        return apply_neumann_constraint_preserving(
+            bc_dt_u_psi, unit_normal_one_form, lapse, shift,
+            inverse_spatial_metric, pi, phi, deriv_spacetime_metric, dt_u_psi,
+            char_speeds);
       case PsiBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method fo UPsi not implemented!");
@@ -359,20 +328,88 @@ struct set_dt_u_psi {
   }
 
  private:
-  static ReturnType apply_neumann_constraint_preserving() noexcept;
-  static ReturnType apply_dirichlet_consrtraint_preserving() noexcept;
+  static ReturnType apply_neumann_constraint_preserving(
+      const gsl::not_null<ReturnType*> bc_dt_u_psi,
+      const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
+      const Scalar<DataVector>& lapse,
+      const tnsr::I<DataVector, SpatialDim, Frame>& shift,
+      const tnsr::II<DataVector, SpatialDim, Frame>& inverse_spatial_metric,
+      const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>& deriv_spacetime_metric,
+      const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
+      const std::array<DataVector, 4>& char_speeds) noexcept;
+  static ReturnType apply_dirichlet_consrtraint_preserving(
+      const gsl::not_null<ReturnType*> bc_dt_u_psi,
+      const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
+      const Scalar<DataVector>& lapse,
+      const tnsr::I<DataVector, SpatialDim, Frame>& shift,
+      const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
+      const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
+      const std::array<DataVector, 4>& char_speeds) noexcept;
 };
 
-template <typename ReturnType>
-ReturnType
-set_dt_u_psi<ReturnType>::apply_neumann_constraint_preserving() noexcept {
-  return ReturnType{};
+template <typename ReturnType, size_t SpatialDim, typename Frame>
+ReturnType set_dt_u_psi<ReturnType, SpatialDim, Frame>::
+    apply_neumann_constraint_preserving(
+        const gsl::not_null<ReturnType*> bc_dt_u_psi,
+        const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
+        const Scalar<DataVector>& lapse,
+        const tnsr::I<DataVector, SpatialDim, Frame>& shift,
+        const tnsr::II<DataVector, SpatialDim, Frame>& inverse_spatial_metric,
+        const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
+        const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
+        const tnsr::iaa<DataVector, SpatialDim, Frame>& deriv_spacetime_metric,
+        const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
+        const std::array<DataVector, 4>& char_speeds) noexcept {
+  if (UNLIKELY(get_size(get<0, 0>(*bc_dt_u_psi)) != get_size(get(lapse)))) {
+    *bc_dt_u_psi = ReturnType(get_size(get(lapse)));
+  }
+  auto unit_normal_vector =
+      make_with_value<tnsr::I<DataVector, SpatialDim, Frame>>(lapse, 0.);
+  for (size_t i = 0; i < SpatialDim; ++i) {
+    for (size_t j = 0; j < SpatialDim; ++j) {
+      unit_normal_vector.get(i) +=
+          inverse_spatial_metric.get(i, j) * unit_normal_one_form.get(j);
+    }
+  }
+  for (size_t mu = 0; mu <= SpatialDim; ++mu) {
+    for (size_t nu = mu; nu <= SpatialDim; ++nu) {
+      bc_dt_u_psi.get(mu, nu) = dt_u_psi.get(mu, nu);
+      for (size_t k = 0; k < SpatialDim; ++k) {
+        bc_dt_u_psi.get(mu, nu) +=
+            char_speeds[0] * unit_normal_vector.get(k) *
+            (deriv_spacetime_metric.get(k, mu, nu) - phi.get(k, mu, nu));
+      }
+    }
+  }
+  return *bc_dt_u_psi;
 }
 
-template <typename ReturnType>
-ReturnType
-set_dt_u_psi<ReturnType>::apply_dirichlet_consrtraint_preserving() noexcept {
-  return ReturnType{};
+template <typename ReturnType, size_t SpatialDim, typename Frame>
+ReturnType set_dt_u_psi<ReturnType, SpatialDim, Frame>::
+    apply_dirichlet_consrtraint_preserving(
+        const gsl::not_null<ReturnType*> bc_dt_u_psi,
+        const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
+        const Scalar<DataVector>& lapse,
+        const tnsr::I<DataVector, SpatialDim, Frame>& shift,
+        const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
+        const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
+        const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
+        const std::array<DataVector, 4>& char_speeds) noexcept {
+  if (UNLIKELY(get_size(get<0, 0>(*bc_dt_u_psi)) != get_size(get(lapse)))) {
+    *bc_dt_u_psi = ReturnType(get_size(get(lapse)));
+  }
+  for (size_t mu = 0; mu <= SpatialDim; ++mu) {
+    for (size_t nu = mu; nu <= SpatialDim; ++nu) {
+      bc_dt_u_psi.get(mu, nu) = -get(lapse) * pi.get(mu, nu);
+      for (size_t m = 0; m < SpatialDim; ++m) {
+        bc_dt_u_psi.get(mu, nu) += shift.get(m) * phi.get(m, mu, nu);
+      }
+    }
+  }
+  return *bc_dt_u_psi;
 }
 
 }  // namespace GhActions_detail
