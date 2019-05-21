@@ -42,7 +42,13 @@ namespace Actions {
 namespace GhActions_detail {}  // namespace GhActions_detail
 
 namespace GhActions_detail {
-enum class PsiBcMethod { AnalyticBc, Freezing, Unknown };
+enum class PsiBcMethod {
+  AnalyticBc,
+  Freezing,
+  ConstraintPreservingNeumann,
+  ConstraintPreservingDirichlet,
+  Unknown
+};
 enum class PhiBcMethod { AnalyticBc, Freezing, Unknown };
 enum class PiBcMethod { AnalyticBc, Freezing, Unknown };
 }  // namespace GhActions_detail
@@ -352,18 +358,36 @@ struct ImposeConstraintPreservingBoundaryConditions {
 namespace GhActions_detail {
 
 // \brief This struct sets boundary condition on dt<UPsi>
-template <typename ReturnType, PsiBcMethod Method>
-struct set_bc_on_psi {
-  static ReturnType apply() noexcept;
+template <typename ReturnType>
+struct set_dt_u_psi {
+  static ReturnType apply(const PsiBcMethod Method) noexcept {
+    switch (Method) {
+      case PsiBcMethod::ConstraintPreservingNeumann:
+        return apply_neumann_constraint_preserving();
+      case PsiBcMethod::ConstraintPreservingDirichlet:
+        return apply_neumann_constraint_preserving();
+      case PsiBcMethod::Unknown:
+      default:
+        ASSERT(false, "Requested BC method fo UPsi not implemented!");
+    }
+  }
+
+ private:
+  static ReturnType apply_neumann_constraint_preserving() noexcept;
+  static ReturnType apply_dirichlet_consrtraint_preserving() noexcept;
 };
 
-// \brief This struct sets boundary condition on dt<UPsi>
-// template <typename ReturnType>
-// struct set_bc_on_psi<ReturnType, PsiBcMethod::Unknown> {
-//   static ReturnType apply() noexcept {
-//     ASSERT(false, "Requested BC method fo UPsi not implemented!");
-//   }
-// };
+template <typename ReturnType>
+ReturnType
+set_dt_u_psi<ReturnType>::apply_neumann_constraint_preserving() noexcept {
+  return ReturnType{};
+}
+
+template <typename ReturnType>
+ReturnType
+set_dt_u_psi<ReturnType>::apply_dirichlet_consrtraint_preserving() noexcept {
+  return ReturnType{};
+}
 
 }  // namespace GhActions_detail
 }  // namespace Actions
