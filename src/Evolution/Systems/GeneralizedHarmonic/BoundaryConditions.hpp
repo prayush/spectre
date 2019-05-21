@@ -219,9 +219,16 @@ struct ImposeConstraintPreservingBoundaryConditions {
               const auto bc_dt_pi = make_with_value<
                   db::item_type<Tags::Pi<VolumeDim, Frame::Inertial>>>(
                   get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars), 1.e-2);
+              // FIXME: Get ingredients for various BCs -
+              // (A) unit normal form to interface
+              // (B) 4metric, inv4metric, lapse, shift on this slice
+              // (C) dampign parameter ConstraintGamma2 on this slice
+              // (D) Compute projection operator on this slice
+              // (E) dt<U> on this slice from `volume_dt_vars`
 
               // FIXME:
-              // How do I get this list of dt<U> tags from dt_variables_tag?
+              // How can I extract this list of dt<U> tags directly from
+              // `dt_variables_tag`?
               const tuples::TaggedTuple<
                   db::add_tag_prefix<
                       Metavariables::temporal_id::template step_prefix,
@@ -241,7 +248,6 @@ struct ImposeConstraintPreservingBoundaryConditions {
               // ------------------------------- (2.2)
               // Assign BC values of dt_volume_vars on external boundary
               // slices of volume variables
-
               //
               auto* const volume_dt_data = volume_dt_vars->data();
               for (SliceIterator si(
@@ -288,7 +294,6 @@ struct ImposeConstraintPreservingBoundaryConditions {
                            ::Tags::BoundaryDirectionsExterior<VolumeDim>,
                            typename system::variables_tag>>,
                        tmpl::list<>>(
-
           [](const gsl::not_null<db::item_type<::Tags::Interface<
                  ::Tags::BoundaryDirectionsExterior<VolumeDim>,
                  typename system::variables_tag>>*>
@@ -328,9 +333,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
     // Here be logic that selects from various options for
     // setting BCs on individual evolved variables
     return apply_impl<Metavariables::system::volume_dim, /* **** */
-                      PsiBcMethod::AnalyticBc, PhiBcMethod::AnalyticBc,
-                      PiBcMethod::AnalyticBc, DbTags>::function_impl(box,
-                                                                     cache);
+                      PsiBcMethod::Freezing, PhiBcMethod::Freezing,
+                      PiBcMethod::Freezing, DbTags>::function_impl(box, cache);
   }
 };
 
