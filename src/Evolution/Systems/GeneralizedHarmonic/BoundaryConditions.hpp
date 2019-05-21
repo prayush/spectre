@@ -40,9 +40,9 @@ struct Magnitude;
 namespace GeneralizedHarmonic {
 namespace Actions {
 
-namespace GhActions_detail {}  // namespace GhActions_detail
+namespace BoundaryConditions_detail {}  // namespace BoundaryConditions_detail
 
-namespace GhActions_detail {
+namespace BoundaryConditions_detail {
 enum class PsiBcMethod {
   AnalyticBc,
   Freezing,
@@ -52,7 +52,7 @@ enum class PsiBcMethod {
 };
 enum class PhiBcMethod { AnalyticBc, Freezing, Unknown };
 enum class PiBcMethod { AnalyticBc, Freezing, Unknown };
-}  // namespace GhActions_detail
+}  // namespace BoundaryConditions_detail
 
 /// \ingroup ActionsGroup
 /// \brief Packages data on external boundaries for calculating numerical flux.
@@ -97,9 +97,9 @@ struct ImposeConstraintPreservingBoundaryConditions {
   // apply the requested boundary condition depending on user input.
   // A specialized `apply_impl` struct is used that implements the
   // boundary condition calculation for the different types.
-  using PsiBcMethod = GhActions_detail::PsiBcMethod;
-  using PhiBcMethod = GhActions_detail::PhiBcMethod;
-  using PiBcMethod = GhActions_detail::PiBcMethod;
+  using PsiBcMethod = BoundaryConditions_detail::PsiBcMethod;
+  using PhiBcMethod = BoundaryConditions_detail::PhiBcMethod;
+  using PiBcMethod = BoundaryConditions_detail::PiBcMethod;
 
  public:
   using const_global_cache_tags =
@@ -295,7 +295,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
   }
 };
 
-namespace GhActions_detail {
+namespace BoundaryConditions_detail {
 
 // \brief This struct sets boundary condition on dt<UPsi>
 template <typename ReturnType, size_t SpatialDim, typename Frame>
@@ -412,6 +412,6 @@ ReturnType set_dt_u_psi<ReturnType, SpatialDim, Frame>::
   return *bc_dt_u_psi;
 }
 
-}  // namespace GhActions_detail
+}  // namespace BoundaryConditions_detail
 }  // namespace Actions
 }  // namespace GeneralizedHarmonic

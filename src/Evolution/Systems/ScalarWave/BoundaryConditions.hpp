@@ -39,7 +39,19 @@ struct Magnitude;
 namespace ScalarWave {
 namespace Actions {
 
-namespace observe_detail {}  // namespace observe_detail
+namespace BoundaryConditions_detail {}  // namespace BoundaryConditions_detail
+
+namespace BoundaryConditions_detail {
+enum class PsiBcMethod {
+  AnalyticBc,
+  Freezing,
+  ConstraintPreservingNeumann,
+  ConstraintPreservingDirichlet,
+  Unknown
+};
+enum class PhiBcMethod { AnalyticBc, Freezing, Unknown };
+enum class PiBcMethod { AnalyticBc, Freezing, Unknown };
+}  // namespace BoundaryConditions_detail
 
 /// \ingroup ActionsGroup
 /// \brief Packages data on external boundaries for calculating numerical flux.
@@ -82,11 +94,11 @@ struct ImposeConstraintPreservingBoundaryConditions {
  private:
   // {Psi,Phi,Pi}BcMethod and BcSelector are used to select exactly how to
   // apply the requested boundary condition depending on user input.
-  // An overloaded `apply_impl` method is used that implements the
+  // A specialized `apply_impl` struct is used that implements the
   // boundary condition calculation for the different types.
-  enum class PsiBcMethod { AnalyticBc, Freezing, Unknown };
-  enum class PhiBcMethod { AnalyticBc, Unknown };
-  enum class PiBcMethod { AnalyticBc, Unknown };
+  using PsiBcMethod = BoundaryConditions_detail::PsiBcMethod;
+  using PhiBcMethod = BoundaryConditions_detail::PhiBcMethod;
+  using PiBcMethod = BoundaryConditions_detail::PiBcMethod;
   template <typename T, T Method>
   using BcSelector = std::integral_constant<T, Method>;
 
@@ -241,6 +253,4 @@ struct ImposeConstraintPreservingBoundaryConditions {
   }
 };
 }  // namespace Actions
-
-namespace SwActions_detail {}  // namespace SwActions_detail
 }  // namespace ScalarWave
