@@ -205,8 +205,16 @@ struct ImposeConstraintPreservingBoundaryConditions {
                          << vars.number_of_grid_points());
 
               // ------------------------------- (2.1)
-              // Compute desired values of dt_volume_vars (Freezing, Freezing,
-              // Freezing)
+              // Compute desired values of dt_volume_vars
+              //
+              // FIXME: Get ingredients for other BCs -
+              // (A) unit normal form to interface
+              // (B) 4metric, inv4metric, lapse, shift on this slice
+              // (C) dampign parameter ConstraintGamma2 on this slice
+              // (D) Compute projection operator on this slice
+              // (E) dt<U> on this slice from `volume_dt_vars`
+
+              // For now, we set to  (Freezing, Freezing, Freezing)
               const auto bc_dt_psi =
                   make_with_value<db::item_type<gr::Tags::SpacetimeMetric<
                       VolumeDim, Frame::Inertial, DataVector>>>(
@@ -219,13 +227,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
               const auto bc_dt_pi = make_with_value<
                   db::item_type<Tags::Pi<VolumeDim, Frame::Inertial>>>(
                   get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars), 1.e-2);
-              // FIXME: Get ingredients for various BCs -
-              // (A) unit normal form to interface
-              // (B) 4metric, inv4metric, lapse, shift on this slice
-              // (C) dampign parameter ConstraintGamma2 on this slice
-              // (D) Compute projection operator on this slice
-              // (E) dt<U> on this slice from `volume_dt_vars`
 
+              // Now store final values of dt<U> in suitable data structure
               // FIXME:
               // How can I extract this list of dt<U> tags directly from
               // `dt_variables_tag`?
