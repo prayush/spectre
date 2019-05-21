@@ -12,6 +12,7 @@
 #include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "DataStructures/VariablesHelpers.hpp"
 #include "Domain/FaceNormal.hpp"
+#include "Domain/IndexToSliceAt.hpp"
 #include "Domain/Tags.hpp"
 #include "ErrorHandling/Assert.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/InterfaceActionHelpers.hpp"
@@ -38,7 +39,13 @@ struct Magnitude;
 namespace GeneralizedHarmonic {
 namespace Actions {
 
-namespace observe_detail {}  // namespace observe_detail
+namespace GhActions_detail {}  // namespace GhActions_detail
+
+namespace GhActions_detail {
+enum class PsiBcMethod { AnalyticBc, Freezing, Unknown };
+enum class PhiBcMethod { AnalyticBc, Freezing, Unknown };
+enum class PiBcMethod { AnalyticBc, Freezing, Unknown };
+}  // namespace GhActions_detail
 
 /// \ingroup ActionsGroup
 /// \brief Packages data on external boundaries for calculating numerical flux.
@@ -78,14 +85,14 @@ namespace observe_detail {}  // namespace observe_detail
 /// \see ReceiveDataForFluxes
 template <typename Metavariables>
 struct ImposeConstraintPreservingBoundaryConditions {
- public:
+ private:
   // {Psi,Phi,Pi}BcMethod and BcSelector are used to select exactly how to
   // apply the requested boundary condition depending on user input.
-  // An overloaded `apply_impl` method is used that implements the
+  // A specialized `apply_impl` struct is used that implements the
   // boundary condition calculation for the different types.
-  enum class PsiBcMethod { AnalyticBc, Freezing, Unknown };
-  enum class PhiBcMethod { AnalyticBc, Freezing, Unknown };
-  enum class PiBcMethod { AnalyticBc, Freezing, Unknown };
+  using PsiBcMethod = GhActions_detail::PsiBcMethod;
+  using PhiBcMethod = GhActions_detail::PhiBcMethod;
+  using PiBcMethod = GhActions_detail::PiBcMethod;
 
  public:
   using const_global_cache_tags =
@@ -148,62 +155,110 @@ struct ImposeConstraintPreservingBoundaryConditions {
   struct apply_impl {
     static std::tuple<db::DataBox<DbTags>&&> function_impl(
         db::DataBox<DbTags>& box,
-        const Parallel::ConstGlobalCache<Metavariables>& cache) noexcept;
-  };
-
-  template <size_t VolumeDim, typename DbTags>
-  struct apply_impl<VolumeDim, PsiBcMethod::Freezing, PhiBcMethod::Freezing,
-                    PiBcMethod::Freezing, DbTags> {
-    static std::tuple<db::DataBox<DbTags>&&> function_impl(
-        db::DataBox<DbTags>& box,
         const Parallel::ConstGlobalCache<Metavariables>& cache) noexcept {
+      // Get information about system: tags for evolved variables
+      // and their time derivatives
       using system = typename Metavariables::system;
+      using variables_tag = typename system::variables_tag;
+      using dt_variables_tag =
+          db::add_tag_prefix<Metavariables::temporal_id::template step_prefix,
+                             variables_tag>;
 
       // Apply the boundary condition
-      db::mutate_apply<tmpl::list<::Tags::Interface<
-                           ::Tags::BoundaryDirectionsExterior<VolumeDim>,
-                           typename system::variables_tag>>,
-                       tmpl::list<>>(
+      db::mutate<dt_variables_tag>(
+          make_not_null(&box),
+          // Function that applies bdry conditions to dt<variables>
+          [&](const gsl::not_null<db::item_type<dt_variables_tag>*>
+                  volume_dt_vars,
+              const auto& external_bdry_vars,
+              const db::item_type<::Tags::Mesh<VolumeDim>>& mesh,
+              const double /* time */, const auto& /* boundary_condition */,
+              const auto& /* boundary_coords */) noexcept {
+            // ------------------------------- (1)
+            // Get preliminary quantities
+            constexpr const size_t number_of_independent_components =
+                dt_variables_tag::type::number_of_independent_components;
+            const size_t volume_grid_points = mesh.extents().product();
+            ASSERT(
+                volume_dt_vars->number_of_grid_points() == volume_grid_points,
+                "volume_dt_vars has wrong number of grid points.  Expected "
+                    << volume_grid_points << ", got "
+                    << volume_dt_vars->number_of_grid_points());
 
-          [](const gsl::not_null<db::item_type<::Tags::Interface<
-                 ::Tags::BoundaryDirectionsExterior<VolumeDim>,
-                 typename system::variables_tag>>*>
-                 external_bdry_vars,
-             const double time, const auto& boundary_condition,
-             const auto& boundary_coords) noexcept {
-            // -------------------------------
-            // Loop over external boundaries
-            for (auto& external_direction_and_vars : *external_bdry_vars) {
-              auto& direction = external_direction_and_vars.first;
-              auto& vars = external_direction_and_vars.second;
+            // ------------------------------- (2)
+            // Loop over external boundaries and set dt_volume_vars on them
+            for (auto& external_direction_and_vars : external_bdry_vars) {
+              const auto& direction = external_direction_and_vars.first;
+              const size_t dimension = direction.dimension();
+              const auto& vars = external_direction_and_vars.second;
+              const size_t slice_grid_points =
+                  mesh.extents().slice_away(dimension).product();
+              ASSERT(vars.number_of_grid_points() == slice_grid_points,
+                     "vars_on_slice has wrong number of grid points.  Expected "
+                         << slice_grid_points << ", got "
+                         << vars.number_of_grid_points());
 
-              // Get evolved variables on current boundary from AnalyticSolution
-              const auto analytic_boundary_vars = boundary_condition.variables(
-                  boundary_coords.at(direction), time,
-                  typename system::variables_tag::type::tags_list{});
+              // ------------------------------- (2.1)
+              // Compute desired values of dt_volume_vars (Freezing, Freezing,
+              // Freezing)
+              const auto bc_dt_psi =
+                  make_with_value<db::item_type<gr::Tags::SpacetimeMetric<
+                      VolumeDim, Frame::Inertial, DataVector>>>(
+                      get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
+                                                    DataVector>>(vars),
+                      1.e-2);
+              const auto bc_dt_phi = make_with_value<
+                  db::item_type<Tags::Phi<VolumeDim, Frame::Inertial>>>(
+                  get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars), 1.e-2);
+              const auto bc_dt_pi = make_with_value<
+                  db::item_type<Tags::Pi<VolumeDim, Frame::Inertial>>>(
+                  get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars), 1.e-2);
 
-              // Assign Psi
-              get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
-                                            DataVector>>(vars) =
-                  get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
-                                                DataVector>>(
-                      analytic_boundary_vars);
-              // Assign Phi
-              get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars) =
-                  get<Tags::Phi<VolumeDim, Frame::Inertial>>(
-                      analytic_boundary_vars);
-              // Assign Pi
-              get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars) =
-                  get<Tags::Pi<VolumeDim, Frame::Inertial>>(
-                      analytic_boundary_vars);
+              // FIXME:
+              // How do I get this list of dt<U> tags from dt_variables_tag?
+              const tuples::TaggedTuple<
+                  db::add_tag_prefix<
+                      Metavariables::temporal_id::template step_prefix,
+                      gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
+                                                DataVector>>,
+                  db::add_tag_prefix<
+                      Metavariables::temporal_id::template step_prefix,
+                      Tags::Phi<VolumeDim, Frame::Inertial>>,
+                  db::add_tag_prefix<
+                      Metavariables::temporal_id::template step_prefix,
+                      Tags::Pi<VolumeDim, Frame::Inertial>>>
+                  bc_dt_tuple(std::move(bc_dt_psi), std::move(bc_dt_phi),
+                              std::move(bc_dt_pi));
+              const auto slice_data_ = variables_from_tagged_tuple(bc_dt_tuple);
+              const auto* slice_data = slice_data_.data();
 
-              // vars.assign_subset(boundary_condition.variables(
-              //     boundary_coords.at(direction), time,
-              //     typename system::variables_tag::type::tags_list{}));
+              // ------------------------------- (2.2)
+              // Assign BC values of dt_volume_vars on external boundary
+              // slices of volume variables
+
+              //
+              auto* const volume_dt_data = volume_dt_vars->data();
+              for (SliceIterator si(
+                       mesh.extents(), dimension,
+                       index_to_slice_at(mesh.extents(), direction));
+                   si; ++si) {
+                for (size_t i = 0; i < number_of_independent_components; ++i) {
+                  // clang-tidy: do not use pointer arithmetic
+                  volume_dt_data[si.volume_offset() +       // NOLINT
+                                 i * volume_grid_points] =  // NOLINT
+                      slice_data[si.slice_offset() +        // NOLINT
+                                 i * slice_grid_points];    // NOLINT
+                }
+              }
+              //
             }
-            // -------------------------------
+            // ------------------------------- (3)
           },
-          make_not_null(&box), db::get<::Tags::Time>(box).value(),
+          db::get<::Tags::Interface<
+              ::Tags::BoundaryDirectionsExterior<VolumeDim>, variables_tag>>(
+              box),
+          db::get<::Tags::Mesh<VolumeDim>>(box),
+          db::get<::Tags::Time>(box).value(),
           get<typename Metavariables::boundary_condition_tag>(cache),
           db::get<::Tags::Interface<
               ::Tags::BoundaryDirectionsExterior<VolumeDim>,
@@ -294,7 +349,22 @@ struct ImposeConstraintPreservingBoundaryConditions {
   }
 };
 
-}  // namespace Actions
+namespace GhActions_detail {
 
-namespace GhActions_detail {}  // namespace GhActions_detail
+// \brief This struct sets boundary condition on dt<UPsi>
+template <typename ReturnType, PsiBcMethod Method>
+struct set_bc_on_psi {
+  static ReturnType apply() noexcept;
+};
+
+// \brief This struct sets boundary condition on dt<UPsi>
+// template <typename ReturnType>
+// struct set_bc_on_psi<ReturnType, PsiBcMethod::Unknown> {
+//   static ReturnType apply() noexcept {
+//     ASSERT(false, "Requested BC method fo UPsi not implemented!");
+//   }
+// };
+
+}  // namespace GhActions_detail
+}  // namespace Actions
 }  // namespace GeneralizedHarmonic
