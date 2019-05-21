@@ -295,37 +295,16 @@ struct ImposeConstraintPreservingBoundaryConditions {
                  external_bdry_vars,
              const double time, const auto& boundary_condition,
              const auto& boundary_coords) noexcept {
-            // -------------------------------
             // Loop over external boundaries
             for (auto& external_direction_and_vars : *external_bdry_vars) {
               auto& direction = external_direction_and_vars.first;
               auto& vars = external_direction_and_vars.second;
-
               // Get evolved variables on current boundary from AnalyticSolution
-              const auto analytic_boundary_vars = boundary_condition.variables(
+              // and assign them to `vars`
+              vars.assign_subset(boundary_condition.variables(
                   boundary_coords.at(direction), time,
-                  typename system::variables_tag::type::tags_list{});
-
-              // Assign Psi
-              get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
-                                            DataVector>>(vars) =
-                  get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
-                                                DataVector>>(
-                      analytic_boundary_vars);
-              // Assign Phi
-              get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars) =
-                  get<Tags::Phi<VolumeDim, Frame::Inertial>>(
-                      analytic_boundary_vars);
-              // Assign Pi
-              get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars) =
-                  get<Tags::Pi<VolumeDim, Frame::Inertial>>(
-                      analytic_boundary_vars);
-
-              // vars.assign_subset(boundary_condition.variables(
-              //     boundary_coords.at(direction), time,
-              //     typename system::variables_tag::type::tags_list{}));
+                  typename system::variables_tag::type::tags_list{}));
             }
-            // -------------------------------
           },
           make_not_null(&box), db::get<::Tags::Time>(box).value(),
           get<typename Metavariables::boundary_condition_tag>(cache),
@@ -348,7 +327,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
       const ParallelComponent* const /*meta*/) noexcept {
     // Here be logic that selects from various options for
     // setting BCs on individual evolved variables
-    return apply_impl<Metavariables::system::volume_dim,
+    return apply_impl<Metavariables::system::volume_dim, /* **** */
                       PsiBcMethod::AnalyticBc, PhiBcMethod::AnalyticBc,
                       PiBcMethod::AnalyticBc, DbTags>::function_impl(box,
                                                                      cache);
