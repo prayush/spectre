@@ -279,6 +279,50 @@ struct ImposeConstraintPreservingBoundaryConditions {
     }
   };
 
+  /* ------------------------------------------------------------------------
+   * ------------------------------------------------------------------------
+   * ---------------- SEND DATA TO MORTAR  ----------------
+   * ------------------------------------------------------------------------
+   * ------------------------------------------------------------------------
+   */
+  template <typename DbTags>
+  static void contribute_data_to_mortar(
+      const gsl::not_null<db::DataBox<DbTags>*> box,
+      const Parallel::ConstGlobalCache<Metavariables>& cache) noexcept {
+    using system = typename Metavariables::system;
+    constexpr size_t volume_dim = system::volume_dim;
+
+    const auto& element = db::get<::Tags::Element<volume_dim>>(*box);
+    const auto& temporal_id =
+        db::get<typename Metavariables::temporal_id>(*box);
+    const auto& normal_dot_numerical_flux_computer =
+        get<typename Metavariables::normal_dot_numerical_flux>(cache);
+
+    for (const auto& direction : element.external_boundaries()) {
+      const auto mortar_id = std::make_pair(
+          direction, ElementId<volume_dim>::external_boundary_id());
+
+      auto interior_data = DgActions_detail::compute_local_mortar_data(
+          *box, direction, normal_dot_numerical_flux_computer,
+          ::Tags::BoundaryDirectionsInterior<volume_dim>{}, Metavariables{});
+
+      auto exterior_data = DgActions_detail::compute_packaged_data(
+          *box, direction, normal_dot_numerical_flux_computer,
+          ::Tags::BoundaryDirectionsExterior<volume_dim>{}, Metavariables{});
+
+      db::mutate<::Tags::VariablesBoundaryData>(
+          box, [&mortar_id, &temporal_id, &interior_data, &exterior_data ](
+                   const gsl::not_null<
+                       db::item_type<::Tags::VariablesBoundaryData, DbTags>*>
+                       mortar_data) noexcept {
+            mortar_data->at(mortar_id).local_insert(temporal_id,
+                                                    std::move(interior_data));
+            mortar_data->at(mortar_id).remote_insert(temporal_id,
+                                                     std::move(exterior_data));
+          });
+    }
+  }
+
  public:
   template <typename DbTags, typename... InboxTags, typename ArrayIndex,
             typename ActionList, typename ParallelComponent>
