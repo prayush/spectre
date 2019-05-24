@@ -10,6 +10,10 @@
 
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/DataBox/DataBoxTag.hpp"
+#include "DataStructures/DataBox/DataOnSlice.hpp"
+#include "DataStructures/TempBuffer.hpp"
+#include "DataStructures/Tensor/Tensor.hpp"
+#include "DataStructures/Tensor/TypeAliases.hpp"
 #include "DataStructures/VariablesHelpers.hpp"
 #include "Domain/FaceNormal.hpp"
 #include "Domain/IndexToSliceAt.hpp"
@@ -52,6 +56,52 @@ enum class PsiBcMethod {
 };
 enum class PhiBcMethod { AnalyticBc, Freezing, Unknown };
 enum class PiBcMethod { AnalyticBc, Freezing, Unknown };
+
+// \brief This function computes intermediate variables needed for the
+// Bjorhus type boundary condition
+template <size_t VolumeDim, typename TagsList, typename DbTags,
+          typename VarsTagsList, typename DtVarsTagsList>
+void local_variables(
+    gsl::not_null<TempBuffer<TagsList>*> buffer, db::DataBox<DbTags>& box,
+    const Direction<VolumeDim>& direction, const size_t& dimension,
+    const db::item_type<::Tags::Mesh<VolumeDim>>& mesh,
+    const Variables<VarsTagsList>& vars,
+    const Variables<DtVarsTagsList>& dt_vars_volume,
+    const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& unit_normal_one_form,
+    const db::item_type<GeneralizedHarmonic::Tags::CharacteristicSpeeds<
+        VolumeDim, Frame::Inertial>>& char_speeds) noexcept {
+  // I need to compute here the following quantities:
+  using tags_needed_on_slice = tmpl::list<
+      gr::Tags::Lapse<DataVector>,
+      gr::Tags::Shift<VolumeDim, Frame::Inertial, DataVector>,
+      gr::Tags::SpatialMetric<VolumeDim, Frame::Inertial, DataVector>,
+      gr::Tags::InverseSpatialMetric<VolumeDim, Frame::Inertial, DataVector>,
+      gr::Tags::SpacetimeNormalOneForm<VolumeDim, Frame::Inertial, DataVector>,
+      gr::Tags::SpacetimeNormalVector<VolumeDim, Frame::Inertial, DataVector>,
+      gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>,
+      GeneralizedHarmonic::Tags::Pi<VolumeDim, Frame::Inertial>,
+      GeneralizedHarmonic::Tags::Phi<VolumeDim, Frame::Inertial>,
+      // derivs of Psi, Pi, and Phi.
+      gr::Tags::DerivSpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>,
+      ::Tags::deriv<GeneralizedHarmonic::Tags::Pi<VolumeDim, Frame::Inertial>,
+                    tmpl::size_t<VolumeDim>, Frame::Inertial>,
+      ::Tags::deriv<GeneralizedHarmonic::Tags::Phi<VolumeDim, Frame::Inertial>,
+                    tmpl::size_t<VolumeDim>, Frame::Inertial>,
+      // constraint damping parameters
+      GeneralizedHarmonic::Tags::ConstraintGamma0,
+      GeneralizedHarmonic::Tags::ConstraintGamma1,
+      GeneralizedHarmonic::Tags::ConstraintGamma2>;
+  const auto vars_on_this_slice = db::data_on_slice(
+      box, mesh.extents(), dimension,
+      index_to_slice_at(mesh.extents(), direction), tags_needed_on_slice{});
+  // 1) incoming null spacetime vector & one-form
+
+  // 2) outgoing null spacetime vector & one-form
+
+  // 3) spacetime projection operator
+
+  // 4) spatial projection operator
+}
 }  // namespace BoundaryConditions_detail
 
 /// \ingroup ActionsGroup
@@ -135,10 +185,12 @@ struct ImposeConstraintPreservingBoundaryConditions {
                   volume_dt_vars,
               const auto& external_bdry_vars,
               const db::item_type<::Tags::Mesh<VolumeDim>>& mesh,
-              const double /* time */, const auto& /* boundary_condition */,
-              const auto& /* boundary_coords */) noexcept {
+              const double time, const auto& boundary_condition,
+              const auto& boundary_coords, const auto& unit_normal_one_forms,
+              const auto& external_bdry_char_speeds) noexcept {
             // ------------------------------- (1)
             // Get preliminary quantities
+            const auto& dt_vars_const = *volume_dt_vars;
             constexpr const size_t number_of_independent_components =
                 dt_variables_tag::type::number_of_independent_components;
             const size_t volume_grid_points = mesh.extents().product();
@@ -164,6 +216,17 @@ struct ImposeConstraintPreservingBoundaryConditions {
               // ------------------------------- (2.1)
               // Compute desired values of dt_volume_vars
               //
+              // Create a TempTensor that stores all temporaries computed
+              // here and elsewhere
+              TempBuffer<tmpl::list<
+                  ::Tags::TempI<0, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::TempAB<1, VolumeDim, Frame::Inertial, DataVector>>>
+                  buffer(slice_grid_points);
+              BoundaryConditions_detail::local_variables(
+                  make_not_null(&buffer), box, direction, dimension, mesh, vars,
+                  dt_vars_const, unit_normal_one_forms.at(direction),
+                  external_bdry_char_speeds.at(direction));
+
               // FIXME: Get ingredients for other BCs -
               // (A) unit normal form to interface
               // (B) 4metric, inv4metric, lapse, shift on this slice
@@ -232,7 +295,16 @@ struct ImposeConstraintPreservingBoundaryConditions {
           get<typename Metavariables::boundary_condition_tag>(cache),
           db::get<::Tags::Interface<
               ::Tags::BoundaryDirectionsExterior<VolumeDim>,
-              ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(box));
+              ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(box),
+          db::get<::Tags::Interface<
+              ::Tags::BoundaryDirectionsExterior<VolumeDim>,
+              ::Tags::Normalized<
+                  ::Tags::UnnormalizedFaceNormal<VolumeDim, Frame::Inertial>>>>(
+              box),
+          db::get<
+              ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
+                                GeneralizedHarmonic::Tags::CharacteristicSpeeds<
+                                    VolumeDim, Frame::Inertial>>>(box));
 
       return std::forward_as_tuple(std::move(box));
     }
