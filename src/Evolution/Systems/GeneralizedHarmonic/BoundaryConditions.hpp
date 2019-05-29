@@ -128,8 +128,9 @@ struct ImposeConstraintPreservingBoundaryConditions {
                   volume_dt_vars,
               const auto& external_bdry_vars,
               const db::item_type<::Tags::Mesh<VolumeDim>>& mesh,
-              const double time, const auto& boundary_condition,
-              const auto& boundary_coords, const auto& unit_normal_one_forms,
+              const double /* time */, const auto& /* boundary_condition */,
+              const auto& /* boundary_coords */,
+              const auto& unit_normal_one_forms,
               const auto& external_bdry_char_speeds) noexcept {
             // ------------------------------- (1)
             // Get preliminary quantities
@@ -161,21 +162,46 @@ struct ImposeConstraintPreservingBoundaryConditions {
               //
               // Create a TempTensor that stores all temporaries computed
               // here and elsewhere
-              TempBuffer<tmpl::list<
-                  ::Tags::TempI<0, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::TempAB<1, VolumeDim, Frame::Inertial, DataVector>>>
-                  buffer(slice_grid_points);
-              BoundaryConditions_detail::local_variables(
-                  make_not_null(&buffer), box, direction, dimension, mesh, vars,
-                  dt_vars_const, unit_normal_one_forms.at(direction),
-                  external_bdry_char_speeds.at(direction));
-
+              using all_local_vars = tmpl::list<
+                  // timelike and spacelike SPACETIME vectors, l^a and k^a
+                  ::Tags::TempA<0, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::TempA<1, VolumeDim, Frame::Inertial, DataVector>,
+                  // timelike and spacelike SPACETIME oneforms, l_a and k_a
+                  ::Tags::Tempa<2, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::Tempa<3, VolumeDim, Frame::Inertial, DataVector>,
+                  // SPACETIME form of interface normal (vector and oneform)
+                  ::Tags::Tempa<4, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>,
+                  // spacetime null form t_a and vector t^a
+                  ::Tags::Tempa<6, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::TempA<7, VolumeDim, Frame::Inertial, DataVector>,
+                  // interface normal dot shift: n_k N^k
+                  ::Tags::TempScalar<8, DataVector>,
+                  // spacetime projection operator P_ab, P^ab, and P^a_b
+                  ::Tags::TempAA<9, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::Tempaa<10, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::TempAb<11, VolumeDim, Frame::Inertial, DataVector>,
+                  // Char speeds
+                  ::Tags::TempScalar<12, DataVector>,
+                  ::Tags::TempScalar<13, DataVector>,
+                  ::Tags::TempScalar<14, DataVector>,
+                  ::Tags::TempScalar<15, DataVector>,
+                  ::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::Tempiaa<18, VolumeDim, Frame::Inertial,
+                                  DataVector>  //,
+                  >;
+              TempBuffer<all_local_vars> buffer(slice_grid_points);
               // FIXME: Get ingredients for other BCs -
               // (A) unit normal form to interface
               // (B) 4metric, inv4metric, lapse, shift on this slice
               // (C) dampign parameter ConstraintGamma2 on this slice
               // (D) Compute projection operator on this slice
               // (E) dt<U> on this slice from `volume_dt_vars`
+              BoundaryConditions_detail::local_variables(
+                  make_not_null(&buffer), box, direction, dimension, mesh, vars,
+                  dt_vars_const, unit_normal_one_forms.at(direction),
+                  external_bdry_char_speeds.at(direction));
 
               // For now, we set to  (Freezing, Freezing, Freezing)
               const auto bc_dt_psi =

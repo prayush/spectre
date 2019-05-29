@@ -4,6 +4,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <tuple>
 #include <utility>
@@ -57,20 +58,26 @@ enum class PsiBcMethod {
 enum class PhiBcMethod { AnalyticBc, Freezing, Unknown };
 enum class PiBcMethod { AnalyticBc, Freezing, Unknown };
 
-// \brief This function computes intermediate variables needed for the
-// Bjorhus type boundary condition
+// \brief This function computes intermediate variables needed for
+// Bjorhus-type constraint preserving boundary conditions for the
+// GeneralizedHarmonic system
 template <size_t VolumeDim, typename TagsList, typename DbTags,
           typename VarsTagsList, typename DtVarsTagsList>
 void local_variables(
     gsl::not_null<TempBuffer<TagsList>*> buffer, db::DataBox<DbTags>& box,
     const Direction<VolumeDim>& direction, const size_t& dimension,
     const db::item_type<::Tags::Mesh<VolumeDim>>& mesh,
-    const Variables<VarsTagsList>& vars,
-    const Variables<DtVarsTagsList>& dt_vars_volume,
-    const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& unit_normal_one_form,
+    const Variables<VarsTagsList>& /* vars */,
+    const Variables<DtVarsTagsList>& /* dt_vars_volume */,
+    const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+        unit_interface_normal_one_form,
     const db::item_type<GeneralizedHarmonic::Tags::CharacteristicSpeeds<
         VolumeDim, Frame::Inertial>>& char_speeds) noexcept {
-  // I need to compute here the following quantities:
+  //
+  // NOTE: variable names below closely follow \cite Lindblom2005qh
+  //
+  // 1) Extract quantities from databox that are needed to compute
+  // intermediate variables
   using tags_needed_on_slice = tmpl::list<
       gr::Tags::Lapse<DataVector>,
       gr::Tags::Shift<VolumeDim, Frame::Inertial, DataVector>,
@@ -79,28 +86,231 @@ void local_variables(
       gr::Tags::SpacetimeNormalOneForm<VolumeDim, Frame::Inertial, DataVector>,
       gr::Tags::SpacetimeNormalVector<VolumeDim, Frame::Inertial, DataVector>,
       gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>,
-      GeneralizedHarmonic::Tags::Pi<VolumeDim, Frame::Inertial>,
-      GeneralizedHarmonic::Tags::Phi<VolumeDim, Frame::Inertial>,
-      // derivs of Psi, Pi, and Phi.
-      gr::Tags::DerivSpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>,
-      ::Tags::deriv<GeneralizedHarmonic::Tags::Pi<VolumeDim, Frame::Inertial>,
-                    tmpl::size_t<VolumeDim>, Frame::Inertial>,
-      ::Tags::deriv<GeneralizedHarmonic::Tags::Phi<VolumeDim, Frame::Inertial>,
-                    tmpl::size_t<VolumeDim>, Frame::Inertial>,
-      // constraint damping parameters
-      GeneralizedHarmonic::Tags::ConstraintGamma0,
-      GeneralizedHarmonic::Tags::ConstraintGamma1,
-      GeneralizedHarmonic::Tags::ConstraintGamma2>;
+      gr::Tags::InverseSpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>,
+      // GeneralizedHarmonic::Tags::Pi<VolumeDim, Frame::Inertial>,
+      // GeneralizedHarmonic::Tags::Phi<VolumeDim, Frame::Inertial>,
+      // ---- derivs of Psi, Pi, and Phi.
+      // gr::Tags::DerivSpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>,
+      // ::Tags::deriv<GeneralizedHarmonic::Tags::Pi<VolumeDim,
+      // Frame::Inertial>,
+      //               tmpl::size_t<VolumeDim>, Frame::Inertial>,
+      // ::Tags::deriv<GeneralizedHarmonic::Tags::Phi<VolumeDim,
+      // Frame::Inertial>,
+      //               tmpl::size_t<VolumeDim>, Frame::Inertial>,
+      // ---- constraint damping parameters
+      // GeneralizedHarmonic::Tags::ConstraintGamma0,
+      // GeneralizedHarmonic::Tags::ConstraintGamma1,
+      // GeneralizedHarmonic::Tags::ConstraintGamma2,
+      // Constraints
+      GeneralizedHarmonic::Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>,
+      GeneralizedHarmonic::Tags::ThreeIndexConstraint<VolumeDim,
+                                                      Frame::Inertial>,
+      GeneralizedHarmonic::Tags::FourIndexConstraint<VolumeDim,
+                                                     Frame::Inertial>,
+      GeneralizedHarmonic::Tags::FConstraint<VolumeDim, Frame::Inertial>
+      //
+      >;
   const auto vars_on_this_slice = db::data_on_slice(
       box, mesh.extents(), dimension,
       index_to_slice_at(mesh.extents(), direction), tags_needed_on_slice{});
-  // 1) incoming null spacetime vector & one-form
 
-  // 2) outgoing null spacetime vector & one-form
+  // 2) name quantities as its just easier
+  // const auto& lapse = get<gr::Tags::Lapse<DataVector>>(vars_on_this_slice);
+  const auto& shift =
+      get<gr::Tags::Shift<VolumeDim, Frame::Inertial, DataVector>>(
+          vars_on_this_slice);
+  // const auto& spatial_metric =
+  //     get<gr::Tags::SpatialMetric<VolumeDim, Frame::Inertial, DataVector>>(
+  //         vars_on_this_slice);
+  const auto& inverse_spatial_metric = get<
+      gr::Tags::InverseSpatialMetric<VolumeDim, Frame::Inertial, DataVector>>(
+      vars_on_this_slice);
+  const auto& spacetime_normal_one_form = get<
+      gr::Tags::SpacetimeNormalOneForm<VolumeDim, Frame::Inertial, DataVector>>(
+      vars_on_this_slice);
+  const auto& spacetime_normal_vector = get<
+      gr::Tags::SpacetimeNormalVector<VolumeDim, Frame::Inertial, DataVector>>(
+      vars_on_this_slice);
+  const auto& spacetime_metric =
+      get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>>(
+          vars_on_this_slice);
+  const auto& inverse_spacetime_metric = get<
+      gr::Tags::InverseSpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>>(
+      vars_on_this_slice);
+  /*const auto& pi = get<GeneralizedHarmonic::Tags::Pi<VolumeDim,
+  Frame::Inertial>>( vars_on_this_slice); const auto& phi =
+  get<GeneralizedHarmonic::Tags::Phi<VolumeDim, Frame::Inertial>>(
+      vars_on_this_slice);
+  const auto& dspacetime_metric = get<
+      gr::Tags::DerivSpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>>(
+      vars_on_this_slice);
+  const auto& dpi = get<
+      ::Tags::deriv<GeneralizedHarmonic::Tags::Pi<VolumeDim, Frame::Inertial>,
+                    tmpl::size_t<VolumeDim>, Frame::Inertial>>(
+      vars_on_this_slice);
+  const auto& dphi = get<
+      ::Tags::deriv<GeneralizedHarmonic::Tags::Phi<VolumeDim, Frame::Inertial>,
+                    tmpl::size_t<VolumeDim>, Frame::Inertial>>(
+      vars_on_this_slice);
+  const auto& gamma0 =
+      get<GeneralizedHarmonic::Tags::ConstraintGamma0>(vars_on_this_slice);
+  const auto& gamma1 =
+      get<GeneralizedHarmonic::Tags::ConstraintGamma1>(vars_on_this_slice);
+  const auto& gamma2 =
+      get<GeneralizedHarmonic::Tags::ConstraintGamma2>(vars_on_this_slice);*/
+  const auto& two_index_constraint =
+      get<GeneralizedHarmonic::Tags::TwoIndexConstraint<VolumeDim,
+                                                        Frame::Inertial>>(
+          vars_on_this_slice);
+  const auto& three_index_constraint =
+      get<GeneralizedHarmonic::Tags::ThreeIndexConstraint<VolumeDim,
+                                                          Frame::Inertial>>(
+          vars_on_this_slice);
+  const auto& four_index_constraint =
+      get<GeneralizedHarmonic::Tags::FourIndexConstraint<VolumeDim,
+                                                         Frame::Inertial>>(
+          vars_on_this_slice);
+  const auto& f_constraint =
+      get<GeneralizedHarmonic::Tags::FConstraint<VolumeDim, Frame::Inertial>>(
+          vars_on_this_slice);
 
-  // 3) spacetime projection operator
+  // 3) Extract variable storage out of the buffer now
+  // timelike and spacelike SPACETIME vectors, l^a and k^a
+  auto& local_outgoing_null_one_form =
+      get<::Tags::TempA<0, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  auto& local_incoming_null_one_form =
+      get<::Tags::TempA<1, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  // timelike and spacelike SPACETIME oneforms, l_a and k_a
+  auto& local_outgoing_null_vector =
+      get<::Tags::Tempa<2, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  auto& local_incoming_null_vector =
+      get<::Tags::Tempa<3, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  // SPACETIME form of interface normal (vector and oneform)
+  auto& local_interface_normal_one_form =
+      get<::Tags::Tempa<4, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  auto& local_interface_normal_vector =
+      get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  // spacetime null form t_a and vector t^a
+  get<::Tags::Tempa<6, VolumeDim, Frame::Inertial, DataVector>>(*buffer) = get<
+      gr::Tags::SpacetimeNormalOneForm<VolumeDim, Frame::Inertial, DataVector>>(
+      vars_on_this_slice);
+  get<::Tags::TempA<7, VolumeDim, Frame::Inertial, DataVector>>(*buffer) = get<
+      gr::Tags::SpacetimeNormalVector<VolumeDim, Frame::Inertial, DataVector>>(
+      vars_on_this_slice);
+  // interface normal dot shift: n_k N^k
+  auto& interface_normal_dot_shift =
+      get<::Tags::TempScalar<8, DataVector>>(*buffer);
+  // spacetime projection operator P_ab, P^ab, and P^a_b
+  auto& local_projection_ab =
+      get<::Tags::TempAA<9, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  auto& local_projection_AB =
+      get<::Tags::Tempaa<10, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  auto& local_projection_Ab =
+      get<::Tags::TempAb<11, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  // Char speeds
+  auto& local_char_speed_u_psi =
+      get<::Tags::TempScalar<12, DataVector>>(*buffer);
+  auto& local_char_speed_u_plus =
+      get<::Tags::TempScalar<13, DataVector>>(*buffer);
+  auto& local_char_speed_u_minus =
+      get<::Tags::TempScalar<14, DataVector>>(*buffer);
+  auto& local_char_speed_u_zero =
+      get<::Tags::TempScalar<15, DataVector>>(*buffer);
+  // constraint characteristics
+  auto& local_constraint_char_zero_minus =
+      get<::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  auto& local_constraint_char_three =
+      get<::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  auto& local_constraint_char_four =
+      get<::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
 
-  // 4) spatial projection operator
+  // 4) Compute intermediate variables now
+  // 4.1) Spacetime form of interface normal (vector and oneform)
+  const auto unit_interface_normal_vector = raise_or_lower_index(
+      unit_interface_normal_one_form, inverse_spatial_metric);
+  get<0>(local_interface_normal_one_form) = 0.;
+  get<0>(local_interface_normal_vector) = 0.;
+  for (size_t i = 0; i < VolumeDim; ++i) {
+    local_interface_normal_one_form.get(1 + i) =
+        unit_interface_normal_one_form.get(i);
+    local_interface_normal_vector.get(1 + i) =
+        unit_interface_normal_vector.get(i);
+  }
+  // 4.2) timelike and spacelike SPACETIME vectors, l^a and k^a,
+  //      without (1/sqrt(2))
+  for (size_t a = 0; a < VolumeDim + 1; ++a) {
+    local_outgoing_null_one_form.get(a) =
+        spacetime_normal_one_form.get(a) +
+        local_interface_normal_one_form.get(a);
+    local_incoming_null_one_form.get(a) =
+        spacetime_normal_one_form.get(a) -
+        local_interface_normal_one_form.get(a);
+    local_outgoing_null_vector.get(a) =
+        spacetime_normal_vector.get(a) + local_interface_normal_vector.get(a);
+    local_incoming_null_vector.get(a) =
+        spacetime_normal_vector.get(a) - local_interface_normal_vector.get(a);
+  }
+  //       interface_normal_dot_shift = n_i N^i
+  for (size_t i = 0; i < VolumeDim; ++i) {
+    get(interface_normal_dot_shift) =
+        shift.get(i) * local_interface_normal_one_form.get(i + 1);
+  }
+  // 4.3) Spacetime projection operators P_ab, P^ab and P^a_b
+  for (size_t a = 0; a < VolumeDim + 1; ++a) {
+    for (size_t b = 0; b < VolumeDim + 1; ++b) {
+      local_projection_ab.get(a, b) =
+          spacetime_metric.get(a, b) +
+          spacetime_normal_one_form.get(a) * spacetime_normal_one_form.get(b) +
+          local_interface_normal_one_form.get(a) *
+              local_interface_normal_one_form.get(b);
+      local_projection_Ab.get(a, b) =
+          spacetime_normal_one_form.get(a) * spacetime_normal_vector.get(b) +
+          local_interface_normal_one_form.get(a) *
+              local_interface_normal_vector.get(b);
+      if (UNLIKELY(a == b)) {
+        local_projection_Ab.get(a, b) += 1.;
+      }
+      local_projection_AB.get(a, b) =
+          inverse_spacetime_metric.get(a, b) +
+          spacetime_normal_vector.get(a) * spacetime_normal_vector.get(b) +
+          local_interface_normal_vector.get(a) *
+              local_interface_normal_vector.get(b);
+    }
+  }
+  // 4.4) Characteristic speeds
+  get(local_char_speed_u_psi) = char_speeds.at(0);
+  get(local_char_speed_u_zero) = char_speeds.at(1);
+  get(local_char_speed_u_plus) = char_speeds.at(2);
+  get(local_char_speed_u_minus) = char_speeds.at(3);
+
+  // 4.5) c^{\hat{0}-}_a = F_a + n^k C_{ka}
+  for (size_t a = 0; a < VolumeDim + 1; ++a) {
+    local_constraint_char_zero_minus.get(a) = f_constraint.get(a);
+    for (size_t i = 0; i < VolumeDim; ++i) {
+      local_constraint_char_zero_minus.get(a) +=
+          unit_interface_normal_vector.get(i) * two_index_constraint.get(i, a);
+    }
+  }
+  // 4.6) c^\hat{3}_{jab} = C_{jab} = \partial_j\psi_{ab} - \Phi_{jab}
+  for (size_t i = 0; i < VolumeDim; ++i) {
+    for (size_t a = 0; a < VolumeDim + 1; ++a) {
+      // due to symmetry, loop over b \in [a, Dim + 1] instead of [0, Dim + 1]
+      for (size_t b = a; b < VolumeDim + 1; ++b) {
+        local_constraint_char_three.get(i, a, b) =
+            three_index_constraint.get(i, a, b);
+      }
+    }
+  }
+  // 4.7) c^\hat{4}_{ijab} = C_{ijab}
+  for (size_t i = 0; i < VolumeDim; ++i) {
+    for (size_t a = 0; a < VolumeDim + 1; ++a) {
+      // due to symmetry, loop over b \in [a, Dim + 1] instead of [0, Dim + 1]
+      for (size_t b = a; b < VolumeDim + 1; ++b) {
+        local_constraint_char_four.get(i, a, b) =
+            four_index_constraint.get(i, a, b);
+      }
+    }
+  }
 }
 
 // \brief This struct sets boundary condition on dt<UPsi>
