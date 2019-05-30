@@ -27,6 +27,7 @@
 #include "Parallel/ConstGlobalCache.hpp"
 #include "Parallel/Invoke.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/Tags.hpp"
+#include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "Time/Tags.hpp"
 #include "Utilities/ContainerHelpers.hpp"
 #include "Utilities/Gsl.hpp"
@@ -87,8 +88,6 @@ void local_variables(
       gr::Tags::SpacetimeNormalVector<VolumeDim, Frame::Inertial, DataVector>,
       gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>,
       gr::Tags::InverseSpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>,
-      // GeneralizedHarmonic::Tags::Pi<VolumeDim, Frame::Inertial>,
-      // GeneralizedHarmonic::Tags::Phi<VolumeDim, Frame::Inertial>,
       // ---- derivs of Psi, Pi, and Phi.
       // gr::Tags::DerivSpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>,
       // ::Tags::deriv<GeneralizedHarmonic::Tags::Pi<VolumeDim,
@@ -115,7 +114,6 @@ void local_variables(
       index_to_slice_at(mesh.extents(), direction), tags_needed_on_slice{});
 
   // 2) name quantities as its just easier
-  // const auto& lapse = get<gr::Tags::Lapse<DataVector>>(vars_on_this_slice);
   const auto& shift =
       get<gr::Tags::Shift<VolumeDim, Frame::Inertial, DataVector>>(
           vars_on_this_slice);
@@ -137,11 +135,7 @@ void local_variables(
   const auto& inverse_spacetime_metric = get<
       gr::Tags::InverseSpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>>(
       vars_on_this_slice);
-  /*const auto& pi = get<GeneralizedHarmonic::Tags::Pi<VolumeDim,
-  Frame::Inertial>>( vars_on_this_slice); const auto& phi =
-  get<GeneralizedHarmonic::Tags::Phi<VolumeDim, Frame::Inertial>>(
-      vars_on_this_slice);
-  const auto& dspacetime_metric = get<
+  /*const auto& dspacetime_metric = get<
       gr::Tags::DerivSpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>>(
       vars_on_this_slice);
   const auto& dpi = get<
@@ -223,6 +217,15 @@ void local_variables(
       get<::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
   auto& local_constraint_char_four =
       get<::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  // lapse, shift and inverse spatial_metric
+  get<::Tags::TempScalar<19, DataVector>>(*buffer) =
+      get<gr::Tags::Lapse<DataVector>>(vars_on_this_slice);
+  get<::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
+      get<gr::Tags::Shift<VolumeDim, Frame::Inertial, DataVector>>(
+          vars_on_this_slice);
+  get<::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
+      get<gr::Tags::InverseSpatialMetric<VolumeDim, Frame::Inertial,
+                                         DataVector>>(vars_on_this_slice);
 
   // 4) Compute intermediate variables now
   // 4.1) Spacetime form of interface normal (vector and oneform)
@@ -382,21 +385,15 @@ ReturnType set_dt_u_psi<ReturnType, SpatialDim, Frame>::
   if (UNLIKELY(get_size(get<0, 0>(*bc_dt_u_psi)) != get_size(get(lapse)))) {
     *bc_dt_u_psi = ReturnType(get_size(get(lapse)));
   }
-  auto unit_normal_vector =
-      make_with_value<tnsr::I<DataVector, SpatialDim, Frame>>(lapse, 0.);
-  for (size_t i = 0; i < SpatialDim; ++i) {
-    for (size_t j = 0; j < SpatialDim; ++j) {
-      unit_normal_vector.get(i) +=
-          inverse_spatial_metric.get(i, j) * unit_normal_one_form.get(j);
-    }
-  }
-  for (size_t mu = 0; mu <= SpatialDim; ++mu) {
-    for (size_t nu = mu; nu <= SpatialDim; ++nu) {
-      bc_dt_u_psi.get(mu, nu) = dt_u_psi.get(mu, nu);
-      for (size_t k = 0; k < SpatialDim; ++k) {
-        bc_dt_u_psi.get(mu, nu) +=
-            char_speeds[0] * unit_normal_vector.get(k) *
-            (deriv_spacetime_metric.get(k, mu, nu) - phi.get(k, mu, nu));
+  const auto unit_normal_vector =
+      raise_or_lower_index(unit_normal_one_form, inverse_spatial_metric);
+  for (size_t a = 0; a <= SpatialDim; ++a) {
+    for (size_t b = a; b <= SpatialDim; ++b) {
+      bc_dt_u_psi.get(a, b) = dt_u_psi.get(a, b);
+      for (size_t i = 0; i < SpatialDim; ++i) {
+        bc_dt_u_psi.get(a, b) +=
+            char_speeds[0] * unit_normal_vector.get(i) *
+            (deriv_spacetime_metric.get(i, a, b) - phi.get(i, a, b));
       }
     }
   }
@@ -417,11 +414,11 @@ ReturnType set_dt_u_psi<ReturnType, SpatialDim, Frame>::
   if (UNLIKELY(get_size(get<0, 0>(*bc_dt_u_psi)) != get_size(get(lapse)))) {
     *bc_dt_u_psi = ReturnType(get_size(get(lapse)));
   }
-  for (size_t mu = 0; mu <= SpatialDim; ++mu) {
-    for (size_t nu = mu; nu <= SpatialDim; ++nu) {
-      bc_dt_u_psi.get(mu, nu) = -get(lapse) * pi.get(mu, nu);
-      for (size_t m = 0; m < SpatialDim; ++m) {
-        bc_dt_u_psi.get(mu, nu) += shift.get(m) * phi.get(m, mu, nu);
+  for (size_t a = 0; a <= SpatialDim; ++a) {
+    for (size_t b = a; b <= SpatialDim; ++b) {
+      bc_dt_u_psi.get(a, b) = -get(lapse) * pi.get(a, b);
+      for (size_t i = 0; i < SpatialDim; ++i) {
+        bc_dt_u_psi.get(a, b) += shift.get(i) * phi.get(i, a, b);
       }
     }
   }
