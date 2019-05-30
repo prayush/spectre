@@ -126,8 +126,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
           // Function that applies bdry conditions to dt<variables>
           [&](const gsl::not_null<db::item_type<dt_variables_tag>*>
                   volume_dt_vars,
-              const auto&
-                  external_bdry_vars,  // const auto& external_bdry_dt_vars,
+              const auto& external_bdry_vars,
               const db::item_type<::Tags::Mesh<VolumeDim>>& mesh,
               const double /* time */, const auto& /* boundary_condition */,
               const auto& /* boundary_coords */,
@@ -150,15 +149,15 @@ struct ImposeConstraintPreservingBoundaryConditions {
               const auto& direction = external_direction_and_vars.first;
               const size_t dimension = direction.dimension();
               const auto& vars = external_direction_and_vars.second;
-              // const auto& dt_vars = external_bdry_dt_vars.at(direction);
-              const auto& dt_vars_const = *volume_dt_vars;
+              const auto dt_vars =
+                  data_on_slice(*volume_dt_vars, mesh.extents(), dimension,
+                                index_to_slice_at(mesh.extents(), direction));
               const size_t slice_grid_points =
                   mesh.extents().slice_away(dimension).product();
               ASSERT(vars.number_of_grid_points() == slice_grid_points,
                      "vars_on_slice has wrong number of grid points.  Expected "
                          << slice_grid_points << ", got "
                          << vars.number_of_grid_points());
-
               // ------------------------------- (2.1)
               // Compute desired values of dt_volume_vars
               //
@@ -197,7 +196,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
                   ::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>,
                   ::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>>;
               TempBuffer<all_local_vars> buffer(slice_grid_points);
-              // FIXME: Get ingredients for other BCs -
+              // ------------------------------- (2.2)
+              // Compute local variables, including:
               // (A) unit normal form to interface
               // (B) 4metric, inv4metric, lapse, shift on this slice
               // (C) dampign parameter ConstraintGamma2 on this slice
@@ -205,9 +205,11 @@ struct ImposeConstraintPreservingBoundaryConditions {
               // (E) dt<U> on this slice from `volume_dt_vars`
               BoundaryConditions_detail::local_variables(
                   make_not_null(&buffer), box, direction, dimension, mesh, vars,
-                  dt_vars_const, unit_normal_one_forms.at(direction),
+                  dt_vars, unit_normal_one_forms.at(direction),
                   external_bdry_char_speeds.at(direction));
-
+              // ------------------------------- (2.3)
+              // Get desired values of dt<Uchar>
+              //
               // For now, we set to  (Freezing, Freezing, Freezing)
               const auto bc_dt_psi =
                   make_with_value<db::item_type<gr::Tags::SpacetimeMetric<
@@ -264,9 +266,6 @@ struct ImposeConstraintPreservingBoundaryConditions {
           db::get<::Tags::Interface<
               ::Tags::BoundaryDirectionsExterior<VolumeDim>, variables_tag>>(
               box),
-          // db::get<::Tags::Interface<
-          //     ::Tags::BoundaryDirectionsExterior<VolumeDim>,
-          //     dt_variables_tag>>( box),
           db::get<::Tags::Mesh<VolumeDim>>(box),
           db::get<::Tags::Time>(box).value(),
           get<typename Metavariables::boundary_condition_tag>(cache),
