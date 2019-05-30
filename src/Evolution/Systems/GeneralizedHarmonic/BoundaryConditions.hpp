@@ -126,7 +126,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
           // Function that applies bdry conditions to dt<variables>
           [&](const gsl::not_null<db::item_type<dt_variables_tag>*>
                   volume_dt_vars,
-              const auto& external_bdry_vars,
+              const auto&
+                  external_bdry_vars,  // const auto& external_bdry_dt_vars,
               const db::item_type<::Tags::Mesh<VolumeDim>>& mesh,
               const double /* time */, const auto& /* boundary_condition */,
               const auto& /* boundary_coords */,
@@ -134,7 +135,6 @@ struct ImposeConstraintPreservingBoundaryConditions {
               const auto& external_bdry_char_speeds) noexcept {
             // ------------------------------- (1)
             // Get preliminary quantities
-            const auto& dt_vars_const = *volume_dt_vars;
             constexpr const size_t number_of_independent_components =
                 dt_variables_tag::type::number_of_independent_components;
             const size_t volume_grid_points = mesh.extents().product();
@@ -150,6 +150,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
               const auto& direction = external_direction_and_vars.first;
               const size_t dimension = direction.dimension();
               const auto& vars = external_direction_and_vars.second;
+              // const auto& dt_vars = external_bdry_dt_vars.at(direction);
+              const auto& dt_vars_const = *volume_dt_vars;
               const size_t slice_grid_points =
                   mesh.extents().slice_away(dimension).product();
               ASSERT(vars.number_of_grid_points() == slice_grid_points,
@@ -186,11 +188,14 @@ struct ImposeConstraintPreservingBoundaryConditions {
                   ::Tags::TempScalar<13, DataVector>,
                   ::Tags::TempScalar<14, DataVector>,
                   ::Tags::TempScalar<15, DataVector>,
+                  // Constraints
                   ::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>,
                   ::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::Tempiaa<18, VolumeDim, Frame::Inertial,
-                                  DataVector>  //,
-                  >;
+                  ::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>,
+                  // 3+1 geometric quantities: lapse, shift, inverse 3-metric
+                  ::Tags::TempScalar<19, DataVector>,
+                  ::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>>;
               TempBuffer<all_local_vars> buffer(slice_grid_points);
               // FIXME: Get ingredients for other BCs -
               // (A) unit normal form to interface
@@ -259,6 +264,9 @@ struct ImposeConstraintPreservingBoundaryConditions {
           db::get<::Tags::Interface<
               ::Tags::BoundaryDirectionsExterior<VolumeDim>, variables_tag>>(
               box),
+          // db::get<::Tags::Interface<
+          //     ::Tags::BoundaryDirectionsExterior<VolumeDim>,
+          //     dt_variables_tag>>( box),
           db::get<::Tags::Mesh<VolumeDim>>(box),
           db::get<::Tags::Time>(box).value(),
           get<typename Metavariables::boundary_condition_tag>(cache),
