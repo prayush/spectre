@@ -20,6 +20,8 @@
 #include "Domain/Tags.hpp"
 #include "ErrorHandling/Assert.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditionsHelpers.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/InterfaceActionHelpers.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/FluxCommunicationTypes.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/MortarHelpers.hpp"
@@ -30,6 +32,7 @@
 #include "Time/Tags.hpp"
 #include "Utilities/ContainerHelpers.hpp"
 #include "Utilities/Gsl.hpp"
+#include "Utilities/MakeWithValue.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
 #include "Utilities/TypeTraits.hpp"
@@ -148,6 +151,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
             for (auto& external_direction_and_vars : external_bdry_vars) {
               const auto& direction = external_direction_and_vars.first;
               const size_t dimension = direction.dimension();
+              const auto& unit_normal_one_form =
+                  unit_normal_one_forms.at(direction);
               const auto& vars = external_direction_and_vars.second;
               const auto dt_vars =
                   data_on_slice(*volume_dt_vars, mesh.extents(), dimension,
@@ -198,7 +203,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
                   ::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>,
                   ::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>,
                   ::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>>;
+                  ::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::TempScalar<26, DataVector>>;
               TempBuffer<all_local_vars> buffer(slice_grid_points);
               // ------------------------------- (2.2)
               // Compute local variables, including:
@@ -209,28 +215,32 @@ struct ImposeConstraintPreservingBoundaryConditions {
               // (E) dt<U> on this slice from `volume_dt_vars`
               BoundaryConditions_detail::local_variables(
                   make_not_null(&buffer), box, direction, dimension, mesh, vars,
-                  dt_vars, unit_normal_one_forms.at(direction),
+                  dt_vars, unit_normal_one_form,
                   external_bdry_char_speeds.at(direction));
               // ------------------------------- (2.3)
               // Get desired values of dt<Uchar>
-              //
               // For now, we set to  (Freezing, Freezing, Freezing)
-              const auto bc_dt_psi =
-                  make_with_value<db::item_type<gr::Tags::SpacetimeMetric<
-                      VolumeDim, Frame::Inertial, DataVector>>>(
-                      get<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial,
-                                                    DataVector>>(vars),
-                      1.e-12);
-              const auto bc_dt_phi = make_with_value<
-                  db::item_type<Tags::Phi<VolumeDim, Frame::Inertial>>>(
-                  get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars), 1.e-12);
-              const auto bc_dt_pi = make_with_value<
-                  db::item_type<Tags::Pi<VolumeDim, Frame::Inertial>>>(
-                  get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars), 1.e-12);
-
+              const auto bc_dt_u_psi = make_with_value<
+                  typename Tags::UPsi<VolumeDim, Frame::Inertial>::type>(
+                  unit_normal_one_form, 1.e-12);
+              const auto bc_dt_u_zero = make_with_value<
+                  typename Tags::UZero<VolumeDim, Frame::Inertial>::type>(
+                  unit_normal_one_form, 1.e-12);
+              const auto bc_dt_u_plus = make_with_value<
+                  typename Tags::UPlus<VolumeDim, Frame::Inertial>::type>(
+                  unit_normal_one_form, 1.e-12);
+              const auto bc_dt_u_minus = make_with_value<
+                  typename Tags::UMinus<VolumeDim, Frame::Inertial>::type>(
+                  unit_normal_one_form, 1.e-12);
+              // Convert them to desired values on dt<U>
+              const auto bc_dt_all_u =
+                  evolved_fields_from_characteristic_fields(
+                      get<::Tags::TempScalar<26, DataVector>>(
+                          buffer),  // Gamma2
+                      bc_dt_u_psi, bc_dt_u_zero, bc_dt_u_plus, bc_dt_u_minus,
+                      unit_normal_one_form);
               // Now store final values of dt<U> in suitable data structure
-              // FIXME:
-              // How can I extract this list of dt<U> tags directly from
+              // FIXME: How can I extract this list of dt<U> tags directly from
               // `dt_variables_tag`?
               const tuples::TaggedTuple<
                   db::add_tag_prefix<
@@ -243,15 +253,20 @@ struct ImposeConstraintPreservingBoundaryConditions {
                   db::add_tag_prefix<
                       Metavariables::temporal_id::template step_prefix,
                       Tags::Pi<VolumeDim, Frame::Inertial>>>
-                  bc_dt_tuple(std::move(bc_dt_psi), std::move(bc_dt_phi),
-                              std::move(bc_dt_pi));
+                  bc_dt_tuple(
+                      std::move(get<gr::Tags::SpacetimeMetric<
+                                    VolumeDim, Frame::Inertial, DataVector>>(
+                          bc_dt_all_u)),
+                      std::move(get<Tags::Phi<VolumeDim, Frame::Inertial>>(
+                          bc_dt_all_u)),
+                      std::move(get<Tags::Pi<VolumeDim, Frame::Inertial>>(
+                          bc_dt_all_u)));
               const auto slice_data_ = variables_from_tagged_tuple(bc_dt_tuple);
               const auto* slice_data = slice_data_.data();
 
-              // ------------------------------- (2.2)
+              // ------------------------------- (2.4)
               // Assign BC values of dt_volume_vars on external boundary
               // slices of volume variables
-              //
               auto* const volume_dt_data = volume_dt_vars->data();
               for (SliceIterator si(
                        mesh.extents(), dimension,
@@ -281,10 +296,9 @@ struct ImposeConstraintPreservingBoundaryConditions {
               ::Tags::Normalized<
                   ::Tags::UnnormalizedFaceNormal<VolumeDim, Frame::Inertial>>>>(
               box),
-          db::get<
-              ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
-                                GeneralizedHarmonic::Tags::CharacteristicSpeeds<
-                                    VolumeDim, Frame::Inertial>>>(box));
+          db::get<::Tags::Interface<
+              ::Tags::BoundaryDirectionsExterior<VolumeDim>,
+              Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>>>(box));
 
       return std::forward_as_tuple(std::move(box));
     }

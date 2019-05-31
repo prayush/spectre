@@ -73,8 +73,8 @@ void local_variables(
     const Variables<DtVarsTagsList>& dt_vars,
     const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
         unit_interface_normal_one_form,
-    const db::item_type<GeneralizedHarmonic::Tags::CharacteristicSpeeds<
-        VolumeDim, Frame::Inertial>>& char_speeds) noexcept {
+    const db::item_type<Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>>&
+        char_speeds) noexcept {
   //
   // NOTE: variable names below closely follow \cite Lindblom2005qh
   //
@@ -91,23 +91,21 @@ void local_variables(
       gr::Tags::InverseSpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>,
       // ---- derivs of Psi, Pi, and Phi.
       // gr::Tags::DerivSpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>,
-      // ::Tags::deriv<GeneralizedHarmonic::Tags::Pi<VolumeDim,
+      // ::Tags::deriv<Tags::Pi<VolumeDim,
       // Frame::Inertial>,
       //               tmpl::size_t<VolumeDim>, Frame::Inertial>,
-      // ::Tags::deriv<GeneralizedHarmonic::Tags::Phi<VolumeDim,
+      // ::Tags::deriv<Tags::Phi<VolumeDim,
       // Frame::Inertial>,
       //               tmpl::size_t<VolumeDim>, Frame::Inertial>,
       // ---- constraint damping parameters
-      // GeneralizedHarmonic::Tags::ConstraintGamma0,
-      // GeneralizedHarmonic::Tags::ConstraintGamma1,
-      GeneralizedHarmonic::Tags::ConstraintGamma2,
+      // Tags::ConstraintGamma0,
+      // Tags::ConstraintGamma1,
+      Tags::ConstraintGamma2,
       // Constraints
-      GeneralizedHarmonic::Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>,
-      GeneralizedHarmonic::Tags::ThreeIndexConstraint<VolumeDim,
-                                                      Frame::Inertial>,
-      GeneralizedHarmonic::Tags::FourIndexConstraint<VolumeDim,
-                                                     Frame::Inertial>,
-      GeneralizedHarmonic::Tags::FConstraint<VolumeDim, Frame::Inertial>
+      Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>,
+      Tags::ThreeIndexConstraint<VolumeDim, Frame::Inertial>,
+      Tags::FourIndexConstraint<VolumeDim, Frame::Inertial>,
+      Tags::FConstraint<VolumeDim, Frame::Inertial>
       //
       >;
   const auto vars_on_this_slice = db::data_on_slice(
@@ -140,45 +138,38 @@ void local_variables(
       gr::Tags::DerivSpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>>(
       vars_on_this_slice);
   const auto& dpi = get<
-      ::Tags::deriv<GeneralizedHarmonic::Tags::Pi<VolumeDim, Frame::Inertial>,
+      ::Tags::deriv<Tags::Pi<VolumeDim, Frame::Inertial>,
                     tmpl::size_t<VolumeDim>, Frame::Inertial>>(
       vars_on_this_slice);
   const auto& dphi = get<
-      ::Tags::deriv<GeneralizedHarmonic::Tags::Phi<VolumeDim, Frame::Inertial>,
+      ::Tags::deriv<Tags::Phi<VolumeDim, Frame::Inertial>,
                     tmpl::size_t<VolumeDim>, Frame::Inertial>>(
       vars_on_this_slice);
   const auto& gamma0 =
-      get<GeneralizedHarmonic::Tags::ConstraintGamma0>(vars_on_this_slice);
+      get<Tags::ConstraintGamma0>(vars_on_this_slice);
   const auto& gamma1 =
-      get<GeneralizedHarmonic::Tags::ConstraintGamma1>(vars_on_this_slice);*/
-  const auto& gamma2 =
-      get<GeneralizedHarmonic::Tags::ConstraintGamma2>(vars_on_this_slice);
+      get<Tags::ConstraintGamma1>(vars_on_this_slice);*/
+  const auto& gamma2 = get<Tags::ConstraintGamma2>(vars_on_this_slice);
   const auto& two_index_constraint =
-      get<GeneralizedHarmonic::Tags::TwoIndexConstraint<VolumeDim,
-                                                        Frame::Inertial>>(
+      get<Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>>(
           vars_on_this_slice);
   const auto& three_index_constraint =
-      get<GeneralizedHarmonic::Tags::ThreeIndexConstraint<VolumeDim,
-                                                          Frame::Inertial>>(
+      get<Tags::ThreeIndexConstraint<VolumeDim, Frame::Inertial>>(
           vars_on_this_slice);
   const auto& four_index_constraint =
-      get<GeneralizedHarmonic::Tags::FourIndexConstraint<VolumeDim,
-                                                         Frame::Inertial>>(
+      get<Tags::FourIndexConstraint<VolumeDim, Frame::Inertial>>(
           vars_on_this_slice);
   const auto& f_constraint =
-      get<GeneralizedHarmonic::Tags::FConstraint<VolumeDim, Frame::Inertial>>(
-          vars_on_this_slice);
+      get<Tags::FConstraint<VolumeDim, Frame::Inertial>>(vars_on_this_slice);
   // storage for DT<UChar> = CharProjection(dt<U>)
   const auto& rhs_dt_psi = get<::Tags::dt<
       gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>>>(
       dt_vars);
-  const auto& rhs_dt_pi = get<
-      ::Tags::dt<GeneralizedHarmonic::Tags::Pi<VolumeDim, Frame::Inertial>>>(
-      dt_vars);
-  const auto& rhs_dt_phi = get<
-      ::Tags::dt<GeneralizedHarmonic::Tags::Phi<VolumeDim, Frame::Inertial>>>(
-      dt_vars);
-  const auto char_projected_dt_u = GeneralizedHarmonic::characteristic_fields(
+  const auto& rhs_dt_pi =
+      get<::Tags::dt<Tags::Pi<VolumeDim, Frame::Inertial>>>(dt_vars);
+  const auto& rhs_dt_phi =
+      get<::Tags::dt<Tags::Phi<VolumeDim, Frame::Inertial>>>(dt_vars);
+  const auto char_projected_dt_u = characteristic_fields(
       gamma2, inverse_spatial_metric, rhs_dt_psi, rhs_dt_pi, rhs_dt_phi,
       unit_interface_normal_one_form);
 
@@ -242,17 +233,16 @@ void local_variables(
                                          DataVector>>(vars_on_this_slice);
   // Characteristic projected time derivatives of evolved fields
   get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
-      get<GeneralizedHarmonic::Tags::UPsi<VolumeDim, Frame::Inertial>>(
-          char_projected_dt_u);
+      get<Tags::UPsi<VolumeDim, Frame::Inertial>>(char_projected_dt_u);
   get<::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
-      get<GeneralizedHarmonic::Tags::UZero<VolumeDim, Frame::Inertial>>(
-          char_projected_dt_u);
+      get<Tags::UZero<VolumeDim, Frame::Inertial>>(char_projected_dt_u);
   get<::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
-      get<GeneralizedHarmonic::Tags::UPlus<VolumeDim, Frame::Inertial>>(
-          char_projected_dt_u);
+      get<Tags::UPlus<VolumeDim, Frame::Inertial>>(char_projected_dt_u);
   get<::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
-      get<GeneralizedHarmonic::Tags::UMinus<VolumeDim, Frame::Inertial>>(
-          char_projected_dt_u);
+      get<Tags::UMinus<VolumeDim, Frame::Inertial>>(char_projected_dt_u);
+  // Constraint damping parameters
+  get<::Tags::TempScalar<26, DataVector>>(*buffer) =
+      get<Tags::ConstraintGamma2>(vars_on_this_slice);
 
   // 4) Compute intermediate variables now
   // 4.1) Spacetime form of interface normal (vector and oneform)
@@ -358,6 +348,8 @@ struct set_dt_u_psi {
       const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
       const std::array<DataVector, 4>& char_speeds) noexcept {
     switch (Method) {
+      case PsiBcMethod::Freezing:
+        return make_with_value<ReturnType>(unit_normal_one_form, 0.);
       case PsiBcMethod::ConstraintPreservingNeumann:
         return apply_neumann_constraint_preserving(
             bc_dt_u_psi, unit_normal_one_form, lapse, shift, pi, phi, dt_u_psi,
@@ -452,6 +444,89 @@ ReturnType set_dt_u_psi<ReturnType, SpatialDim, Frame>::
   return *bc_dt_u_psi;
 }
 
+// \brief This struct sets boundary condition on dt<UZero>
+template <typename ReturnType, size_t SpatialDim, typename Frame>
+struct set_dt_u_zero {
+  static ReturnType apply(
+      const PsiBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
+      const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
+      const Scalar<DataVector>& lapse,
+      const tnsr::I<DataVector, SpatialDim, Frame>& shift,
+      const tnsr::II<DataVector, SpatialDim, Frame>& inverse_spatial_metric,
+      const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>& deriv_spacetime_metric,
+      const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
+      const std::array<DataVector, 4>& char_speeds) noexcept {
+    switch (Method) {
+      case PsiBcMethod::Freezing:
+        return make_with_value<ReturnType>(unit_normal_one_form, 0.);
+      case PsiBcMethod::ConstraintPreservingNeumann:
+      case PsiBcMethod::ConstraintPreservingDirichlet:
+      case PsiBcMethod::Unknown:
+      default:
+        ASSERT(false, "Requested BC method fo UPsi not implemented!");
+    }
+  }
+
+ private:
+};
+
+// \brief This struct sets boundary condition on dt<UPlus>
+template <typename ReturnType, size_t SpatialDim, typename Frame>
+struct set_dt_u_plus {
+  static ReturnType apply(
+      const PsiBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
+      const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
+      const Scalar<DataVector>& lapse,
+      const tnsr::I<DataVector, SpatialDim, Frame>& shift,
+      const tnsr::II<DataVector, SpatialDim, Frame>& inverse_spatial_metric,
+      const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>& deriv_spacetime_metric,
+      const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
+      const std::array<DataVector, 4>& char_speeds) noexcept {
+    switch (Method) {
+      case PsiBcMethod::Freezing:
+        return make_with_value<ReturnType>(unit_normal_one_form, 0.);
+      case PsiBcMethod::ConstraintPreservingNeumann:
+      case PsiBcMethod::ConstraintPreservingDirichlet:
+      case PsiBcMethod::Unknown:
+      default:
+        ASSERT(false, "Requested BC method fo UPsi not implemented!");
+    }
+  }
+
+ private:
+};
+
+// \brief This struct sets boundary condition on dt<UMinus>
+template <typename ReturnType, size_t SpatialDim, typename Frame>
+struct set_dt_u_minus {
+  static ReturnType apply(
+      const PsiBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
+      const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
+      const Scalar<DataVector>& lapse,
+      const tnsr::I<DataVector, SpatialDim, Frame>& shift,
+      const tnsr::II<DataVector, SpatialDim, Frame>& inverse_spatial_metric,
+      const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
+      const tnsr::iaa<DataVector, SpatialDim, Frame>& deriv_spacetime_metric,
+      const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
+      const std::array<DataVector, 4>& char_speeds) noexcept {
+    switch (Method) {
+      case PsiBcMethod::Freezing:
+        return make_with_value<ReturnType>(unit_normal_one_form, 0.);
+      case PsiBcMethod::ConstraintPreservingNeumann:
+      case PsiBcMethod::ConstraintPreservingDirichlet:
+      case PsiBcMethod::Unknown:
+      default:
+        ASSERT(false, "Requested BC method fo UPsi not implemented!");
+    }
+  }
+
+ private:
+};
 }  // namespace BoundaryConditions_detail
 }  // namespace Actions
 }  // namespace GeneralizedHarmonic
