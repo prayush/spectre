@@ -353,7 +353,8 @@ struct set_dt_u_psi {
         return make_with_value<ReturnType>(unit_normal_one_form, 0.);
       case UPsiBcMethod::ConstraintPreservingNeumann:
         return apply_bjorhus_constraint_preserving(
-            bc_dt_u_psi, unit_normal_one_form, lapse, shift, pi, phi, dt_u_psi,
+            bc_dt_u_psi, unit_normal_one_form, lapse, shift,
+            inverse_spatial_metric, pi, phi, deriv_spacetime_metric, dt_u_psi,
             char_speeds);
       case UPsiBcMethod::ConstraintPreservingDirichlet:
         return apply_dirichlet_constraint_preserving(
