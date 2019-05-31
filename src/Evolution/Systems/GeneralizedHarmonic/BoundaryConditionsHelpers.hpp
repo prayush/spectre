@@ -335,31 +335,51 @@ void local_variables(
 }
 
 // \brief This struct sets boundary condition on dt<UPsi>
-template <typename ReturnType, size_t SpatialDim, typename Frame>
+template <typename ReturnType, size_t VolumeDim, typename DbTags,
+          typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
 struct set_dt_u_psi {
-  static ReturnType apply(
-      const UPsiBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
-      const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
-      const Scalar<DataVector>& lapse,
-      const tnsr::I<DataVector, SpatialDim, Frame>& shift,
-      const tnsr::II<DataVector, SpatialDim, Frame>& inverse_spatial_metric,
-      const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
-      const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
-      const tnsr::iaa<DataVector, SpatialDim, Frame>& deriv_spacetime_metric,
-      const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
-      const std::array<DataVector, 4>& char_speeds) noexcept {
+  static ReturnType apply(const UPsiBcMethod Method,
+                          const db::DataBox<DbTags>& box,
+                          const TempBuffer<TagsList>& buffer,
+                          const Variables<VarsTagsList>& vars,
+                          const Variables<DtVarsTagsList>& dt_vars,
+                          const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+                              unit_normal_one_form) noexcept {
+    // Not using auto below to enforce a loose test on the quantity being
+    // fetched from the buffer
+    const Scalar<DataVector>& lapse =
+        get<::Tags::TempScalar<19, DataVector>>(buffer);
+    const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift =
+        get<::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    const tnsr::II<DataVector, VolumeDim,
+                   Frame::Inertial>& inverse_spatial_metric =
+        get<::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    const db::item_type<Tags::Pi<VolumeDim, Frame::Inertial>>& pi =
+        get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars);
+    const db::item_type<Tags::Phi<VolumeDim, Frame::Inertial>>& phi =
+        get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars);
+    const db::item_type<Tags::UPsi<VolumeDim, Frame::Inertial>>& dt_u_psi_rhs =
+        get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    const std::array<DataVector, 4> char_speeds{
+        get(get<::Tags::TempScalar<12, DataVector>>(buffer)),
+        get(get<::Tags::TempScalar<13, DataVector>>(buffer)),
+        get(get<::Tags::TempScalar<14, DataVector>>(buffer)),
+        get(get<::Tags::TempScalar<15, DataVector>>(buffer))};
+    const db::item_type<Tags::UPsi<VolumeDim, Frame::Inertial>>& bc_dt_u_psi =
+        get<::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+
+    // Switch on prescribed boundary condition method
     switch (Method) {
       case UPsiBcMethod::Freezing:
         return make_with_value<ReturnType>(unit_normal_one_form, 0.);
       case UPsiBcMethod::ConstraintPreservingNeumann:
         return apply_bjorhus_constraint_preserving(
-            bc_dt_u_psi, unit_normal_one_form, lapse, shift,
-            inverse_spatial_metric, pi, phi, deriv_spacetime_metric, dt_u_psi,
-            char_speeds);
+            make_not_null(&bc_dt_u_psi), unit_normal_one_form, lapse, shift,
+            inverse_spatial_metric, pi, phi, dt_u_psi_rhs, char_speeds);
       case UPsiBcMethod::ConstraintPreservingDirichlet:
         return apply_dirichlet_constraint_preserving(
-            bc_dt_u_psi, unit_normal_one_form, lapse, shift, pi, phi, dt_u_psi,
-            char_speeds);
+            make_not_null(&bc_dt_u_psi), unit_normal_one_form, lapse, shift, pi,
+            phi, dt_u_psi_rhs, char_speeds);
       case UPsiBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method fo UPsi not implemented!");
@@ -369,48 +389,57 @@ struct set_dt_u_psi {
  private:
   static ReturnType apply_bjorhus_constraint_preserving(
       const gsl::not_null<ReturnType*> bc_dt_u_psi,
-      const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+          unit_normal_one_form,
       const Scalar<DataVector>& lapse,
-      const tnsr::I<DataVector, SpatialDim, Frame>& shift,
-      const tnsr::II<DataVector, SpatialDim, Frame>& inverse_spatial_metric,
-      const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
-      const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
-      const tnsr::iaa<DataVector, SpatialDim, Frame>& deriv_spacetime_metric,
-      const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
+      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
+      const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
+          inverse_spatial_metric,
+      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+          deriv_spacetime_metric,
+      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
       const std::array<DataVector, 4>& char_speeds) noexcept;
   static ReturnType apply_dirichlet_constraint_preserving(
       const gsl::not_null<ReturnType*> bc_dt_u_psi,
-      const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+          unit_normal_one_form,
       const Scalar<DataVector>& lapse,
-      const tnsr::I<DataVector, SpatialDim, Frame>& shift,
-      const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
-      const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
-      const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
+      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
+      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
+      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
       const std::array<DataVector, 4>& char_speeds) noexcept;
 };
 
-template <typename ReturnType, size_t SpatialDim, typename Frame>
-ReturnType set_dt_u_psi<ReturnType, SpatialDim, Frame>::
+template <typename ReturnType, size_t VolumeDim, typename DbTags,
+          typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
+ReturnType set_dt_u_psi<ReturnType, VolumeDim, DbTags, TagsList, VarsTagsList,
+                        DtVarsTagsList>::
     apply_bjorhus_constraint_preserving(
         const gsl::not_null<ReturnType*> bc_dt_u_psi,
-        const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
+        const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+            unit_normal_one_form,
         const Scalar<DataVector>& lapse,
-        const tnsr::I<DataVector, SpatialDim, Frame>& shift,
-        const tnsr::II<DataVector, SpatialDim, Frame>& inverse_spatial_metric,
-        const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
-        const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
-        const tnsr::iaa<DataVector, SpatialDim, Frame>& deriv_spacetime_metric,
-        const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
+        const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
+        const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
+            inverse_spatial_metric,
+        const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
+        const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
+        const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+            deriv_spacetime_metric,
+        const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
         const std::array<DataVector, 4>& char_speeds) noexcept {
   if (UNLIKELY(get_size(get<0, 0>(*bc_dt_u_psi)) != get_size(get(lapse)))) {
     *bc_dt_u_psi = ReturnType(get_size(get(lapse)));
   }
   const auto unit_normal_vector =
       raise_or_lower_index(unit_normal_one_form, inverse_spatial_metric);
-  for (size_t a = 0; a <= SpatialDim; ++a) {
-    for (size_t b = a; b <= SpatialDim; ++b) {
+  for (size_t a = 0; a <= VolumeDim; ++a) {
+    for (size_t b = a; b <= VolumeDim; ++b) {
       bc_dt_u_psi.get(a, b) = dt_u_psi.get(a, b);
-      for (size_t i = 0; i < SpatialDim; ++i) {
+      for (size_t i = 0; i < VolumeDim; ++i) {
         bc_dt_u_psi.get(a, b) +=
             char_speeds[0] * unit_normal_vector.get(i) *
             (deriv_spacetime_metric.get(i, a, b) - phi.get(i, a, b));
@@ -420,24 +449,27 @@ ReturnType set_dt_u_psi<ReturnType, SpatialDim, Frame>::
   return *bc_dt_u_psi;
 }
 
-template <typename ReturnType, size_t SpatialDim, typename Frame>
-ReturnType set_dt_u_psi<ReturnType, SpatialDim, Frame>::
+template <typename ReturnType, size_t VolumeDim, typename DbTags,
+          typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
+ReturnType set_dt_u_psi<ReturnType, VolumeDim, DbTags, TagsList, VarsTagsList,
+                        DtVarsTagsList>::
     apply_dirichlet_constraint_preserving(
         const gsl::not_null<ReturnType*> bc_dt_u_psi,
-        const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
+        const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+            unit_normal_one_form,
         const Scalar<DataVector>& lapse,
-        const tnsr::I<DataVector, SpatialDim, Frame>& shift,
-        const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
-        const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
-        const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
+        const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
+        const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
+        const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
+        const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
         const std::array<DataVector, 4>& char_speeds) noexcept {
   if (UNLIKELY(get_size(get<0, 0>(*bc_dt_u_psi)) != get_size(get(lapse)))) {
     *bc_dt_u_psi = ReturnType(get_size(get(lapse)));
   }
-  for (size_t a = 0; a <= SpatialDim; ++a) {
-    for (size_t b = a; b <= SpatialDim; ++b) {
+  for (size_t a = 0; a <= VolumeDim; ++a) {
+    for (size_t b = a; b <= VolumeDim; ++b) {
       bc_dt_u_psi.get(a, b) = -get(lapse) * pi.get(a, b);
-      for (size_t i = 0; i < SpatialDim; ++i) {
+      for (size_t i = 0; i < VolumeDim; ++i) {
         bc_dt_u_psi.get(a, b) += shift.get(i) * phi.get(i, a, b);
       }
     }
@@ -446,18 +478,21 @@ ReturnType set_dt_u_psi<ReturnType, SpatialDim, Frame>::
 }
 
 // \brief This struct sets boundary condition on dt<UZero>
-template <typename ReturnType, size_t SpatialDim, typename Frame>
+template <typename ReturnType, size_t VolumeDim>
 struct set_dt_u_zero {
   static ReturnType apply(
       const UZeroBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
-      const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+          unit_normal_one_form,
       const Scalar<DataVector>& lapse,
-      const tnsr::I<DataVector, SpatialDim, Frame>& shift,
-      const tnsr::II<DataVector, SpatialDim, Frame>& inverse_spatial_metric,
-      const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
-      const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
-      const tnsr::iaa<DataVector, SpatialDim, Frame>& deriv_spacetime_metric,
-      const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
+      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
+      const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
+          inverse_spatial_metric,
+      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+          deriv_spacetime_metric,
+      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
       const std::array<DataVector, 4>& char_speeds) noexcept {
     switch (Method) {
       case UZeroBcMethod::Freezing:
@@ -472,18 +507,21 @@ struct set_dt_u_zero {
 };
 
 // \brief This struct sets boundary condition on dt<UPlus>
-template <typename ReturnType, size_t SpatialDim, typename Frame>
+template <typename ReturnType, size_t VolumeDim>
 struct set_dt_u_plus {
   static ReturnType apply(
       const UPlusBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
-      const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+          unit_normal_one_form,
       const Scalar<DataVector>& lapse,
-      const tnsr::I<DataVector, SpatialDim, Frame>& shift,
-      const tnsr::II<DataVector, SpatialDim, Frame>& inverse_spatial_metric,
-      const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
-      const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
-      const tnsr::iaa<DataVector, SpatialDim, Frame>& deriv_spacetime_metric,
-      const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
+      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
+      const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
+          inverse_spatial_metric,
+      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+          deriv_spacetime_metric,
+      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
       const std::array<DataVector, 4>& char_speeds) noexcept {
     switch (Method) {
       case UPlusBcMethod::Freezing:
@@ -498,18 +536,21 @@ struct set_dt_u_plus {
 };
 
 // \brief This struct sets boundary condition on dt<UMinus>
-template <typename ReturnType, size_t SpatialDim, typename Frame>
+template <typename ReturnType, size_t VolumeDim>
 struct set_dt_u_minus {
   static ReturnType apply(
       const UMinusBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
-      const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+          unit_normal_one_form,
       const Scalar<DataVector>& lapse,
-      const tnsr::I<DataVector, SpatialDim, Frame>& shift,
-      const tnsr::II<DataVector, SpatialDim, Frame>& inverse_spatial_metric,
-      const tnsr::aa<DataVector, SpatialDim, Frame>& pi,
-      const tnsr::iaa<DataVector, SpatialDim, Frame>& phi,
-      const tnsr::iaa<DataVector, SpatialDim, Frame>& deriv_spacetime_metric,
-      const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
+      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
+      const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
+          inverse_spatial_metric,
+      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+          deriv_spacetime_metric,
+      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
       const std::array<DataVector, 4>& char_speeds) noexcept {
     switch (Method) {
       case UMinusBcMethod::Freezing:
