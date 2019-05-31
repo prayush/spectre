@@ -89,13 +89,14 @@ namespace BoundaryConditions_detail {}  // namespace BoundaryConditions_detail
 template <typename Metavariables>
 struct ImposeConstraintPreservingBoundaryConditions {
  private:
-  // {Psi,Phi,Pi}BcMethod and BcSelector are used to select exactly how to
-  // apply the requested boundary condition depending on user input.
-  // A specialized `apply_impl` struct is used that implements the
-  // boundary condition calculation for the different types.
-  using PsiBcMethod = BoundaryConditions_detail::PsiBcMethod;
-  using PhiBcMethod = BoundaryConditions_detail::PhiBcMethod;
-  using PiBcMethod = BoundaryConditions_detail::PiBcMethod;
+  // {UPsi,UZero,UPlus,UMinus}BcMethod are used to select exactly
+  // how to apply the requested boundary condition based on user input. A
+  // specialized `apply_impl` struct is used that implements the boundary
+  // condition calculation for the different types.
+  using UPsiBcMethod = BoundaryConditions_detail::UPsiBcMethod;
+  using UZeroBcMethod = BoundaryConditions_detail::UZeroBcMethod;
+  using UPlusBcMethod = BoundaryConditions_detail::UPlusBcMethod;
+  using UMinusBcMethod = BoundaryConditions_detail::UMinusBcMethod;
 
  public:
   using const_global_cache_tags =
@@ -109,8 +110,9 @@ struct ImposeConstraintPreservingBoundaryConditions {
    * ------------------------------------------------------------------------
    * ------------------------------------------------------------------------
    */
-  template <size_t VolumeDim, PsiBcMethod PsiMethod, PhiBcMethod PhiMethod,
-            PiBcMethod PiMethod, typename DbTags>
+  template <size_t VolumeDim, UPsiBcMethod UPsiMethod,
+            UZeroBcMethod UZeroMethod, UPlusBcMethod UPlusMethod,
+            UMinusBcMethod UMinusMethod, typename DbTags>
   struct apply_impl {
     static std::tuple<db::DataBox<DbTags>&&> function_impl(
         db::DataBox<DbTags>& box,
@@ -305,8 +307,9 @@ struct ImposeConstraintPreservingBoundaryConditions {
   };
 
   template <size_t VolumeDim, typename DbTags>
-  struct apply_impl<VolumeDim, PsiBcMethod::AnalyticBc, PhiBcMethod::AnalyticBc,
-                    PiBcMethod::AnalyticBc, DbTags> {
+  struct apply_impl<VolumeDim, UPsiBcMethod::AnalyticBc,
+                    UZeroBcMethod::AnalyticBc, UPlusBcMethod::AnalyticBc,
+                    UMinusBcMethod::AnalyticBc, DbTags> {
     static std::tuple<db::DataBox<DbTags>&&> function_impl(
         db::DataBox<DbTags>& box,
         const Parallel::ConstGlobalCache<Metavariables>& cache) noexcept {
@@ -397,11 +400,13 @@ struct ImposeConstraintPreservingBoundaryConditions {
       Parallel::ConstGlobalCache<Metavariables>& cache,
       const ArrayIndex& /*array_index*/, const ActionList /*meta*/,
       const ParallelComponent* const /*meta*/) noexcept {
-    // Here be logic that selects from various options for
-    // setting BCs on individual evolved variables
-    return apply_impl<Metavariables::system::volume_dim, /* **** */
-                      PsiBcMethod::Freezing, PhiBcMethod::Freezing,
-                      PiBcMethod::Freezing, DbTags>::function_impl(box, cache);
+    // Here be user logic that determines / selects from various options for
+    // setting BCs on individual characteristic variables
+    return apply_impl<Metavariables::system::volume_dim,
+                      // Freezing BCs for all dt<UChar>
+                      UPsiBcMethod::Freezing, UZeroBcMethod::Freezing,
+                      UPlusBcMethod::Freezing, UMinusBcMethod::Freezing,
+                      DbTags>::function_impl(box, cache);
   }
 };
 
