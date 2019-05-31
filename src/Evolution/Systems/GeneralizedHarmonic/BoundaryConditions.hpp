@@ -194,7 +194,11 @@ struct ImposeConstraintPreservingBoundaryConditions {
                   // 3+1 geometric quantities: lapse, shift, inverse 3-metric
                   ::Tags::TempScalar<19, DataVector>,
                   ::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>>;
+                  ::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>>;
               TempBuffer<all_local_vars> buffer(slice_grid_points);
               // ------------------------------- (2.2)
               // Compute local variables, including:

@@ -20,6 +20,7 @@
 #include "Domain/IndexToSliceAt.hpp"
 #include "Domain/Tags.hpp"
 #include "ErrorHandling/Assert.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/InterfaceActionHelpers.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/FluxCommunicationTypes.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/MortarHelpers.hpp"
@@ -69,7 +70,7 @@ void local_variables(
     const Direction<VolumeDim>& direction, const size_t& dimension,
     const db::item_type<::Tags::Mesh<VolumeDim>>& mesh,
     const Variables<VarsTagsList>& /* vars */,
-    const Variables<DtVarsTagsList>& /* dt_vars_volume */,
+    const Variables<DtVarsTagsList>& dt_vars,
     const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
         unit_interface_normal_one_form,
     const db::item_type<GeneralizedHarmonic::Tags::CharacteristicSpeeds<
@@ -99,7 +100,7 @@ void local_variables(
       // ---- constraint damping parameters
       // GeneralizedHarmonic::Tags::ConstraintGamma0,
       // GeneralizedHarmonic::Tags::ConstraintGamma1,
-      // GeneralizedHarmonic::Tags::ConstraintGamma2,
+      GeneralizedHarmonic::Tags::ConstraintGamma2,
       // Constraints
       GeneralizedHarmonic::Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>,
       GeneralizedHarmonic::Tags::ThreeIndexConstraint<VolumeDim,
@@ -149,9 +150,9 @@ void local_variables(
   const auto& gamma0 =
       get<GeneralizedHarmonic::Tags::ConstraintGamma0>(vars_on_this_slice);
   const auto& gamma1 =
-      get<GeneralizedHarmonic::Tags::ConstraintGamma1>(vars_on_this_slice);
+      get<GeneralizedHarmonic::Tags::ConstraintGamma1>(vars_on_this_slice);*/
   const auto& gamma2 =
-      get<GeneralizedHarmonic::Tags::ConstraintGamma2>(vars_on_this_slice);*/
+      get<GeneralizedHarmonic::Tags::ConstraintGamma2>(vars_on_this_slice);
   const auto& two_index_constraint =
       get<GeneralizedHarmonic::Tags::TwoIndexConstraint<VolumeDim,
                                                         Frame::Inertial>>(
@@ -167,6 +168,19 @@ void local_variables(
   const auto& f_constraint =
       get<GeneralizedHarmonic::Tags::FConstraint<VolumeDim, Frame::Inertial>>(
           vars_on_this_slice);
+  // storage for DT<UChar> = CharProjection(dt<U>)
+  const auto& rhs_dt_psi = get<::Tags::dt<
+      gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>>>(
+      dt_vars);
+  const auto& rhs_dt_pi = get<
+      ::Tags::dt<GeneralizedHarmonic::Tags::Pi<VolumeDim, Frame::Inertial>>>(
+      dt_vars);
+  const auto& rhs_dt_phi = get<
+      ::Tags::dt<GeneralizedHarmonic::Tags::Phi<VolumeDim, Frame::Inertial>>>(
+      dt_vars);
+  const auto char_projected_dt_u = GeneralizedHarmonic::characteristic_fields(
+      gamma2, inverse_spatial_metric, rhs_dt_psi, rhs_dt_pi, rhs_dt_phi,
+      unit_interface_normal_one_form);
 
   // 3) Extract variable storage out of the buffer now
   // timelike and spacelike SPACETIME vectors, l^a and k^a
@@ -226,6 +240,19 @@ void local_variables(
   get<::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
       get<gr::Tags::InverseSpatialMetric<VolumeDim, Frame::Inertial,
                                          DataVector>>(vars_on_this_slice);
+  // Characteristic projected time derivatives of evolved fields
+  get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
+      get<GeneralizedHarmonic::Tags::UPsi<VolumeDim, Frame::Inertial>>(
+          char_projected_dt_u);
+  get<::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
+      get<GeneralizedHarmonic::Tags::UZero<VolumeDim, Frame::Inertial>>(
+          char_projected_dt_u);
+  get<::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
+      get<GeneralizedHarmonic::Tags::UPlus<VolumeDim, Frame::Inertial>>(
+          char_projected_dt_u);
+  get<::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
+      get<GeneralizedHarmonic::Tags::UMinus<VolumeDim, Frame::Inertial>>(
+          char_projected_dt_u);
 
   // 4) Compute intermediate variables now
   // 4.1) Spacetime form of interface normal (vector and oneform)
