@@ -50,15 +50,16 @@ namespace Actions {
 namespace BoundaryConditions_detail {}  // namespace BoundaryConditions_detail
 
 namespace BoundaryConditions_detail {
-enum class PsiBcMethod {
+enum class UPsiBcMethod {
   AnalyticBc,
   Freezing,
   ConstraintPreservingNeumann,
   ConstraintPreservingDirichlet,
   Unknown
 };
-enum class PhiBcMethod { AnalyticBc, Freezing, Unknown };
-enum class PiBcMethod { AnalyticBc, Freezing, Unknown };
+enum class UZeroBcMethod { AnalyticBc, Freezing, Unknown };
+enum class UPlusBcMethod { AnalyticBc, Freezing, Unknown };
+enum class UMinusBcMethod { AnalyticBc, Freezing, Unknown };
 
 // \brief This function computes intermediate variables needed for
 // Bjorhus-type constraint preserving boundary conditions for the
@@ -337,7 +338,7 @@ void local_variables(
 template <typename ReturnType, size_t SpatialDim, typename Frame>
 struct set_dt_u_psi {
   static ReturnType apply(
-      const PsiBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
+      const UPsiBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
       const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
       const Scalar<DataVector>& lapse,
       const tnsr::I<DataVector, SpatialDim, Frame>& shift,
@@ -348,18 +349,18 @@ struct set_dt_u_psi {
       const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
       const std::array<DataVector, 4>& char_speeds) noexcept {
     switch (Method) {
-      case PsiBcMethod::Freezing:
+      case UPsiBcMethod::Freezing:
         return make_with_value<ReturnType>(unit_normal_one_form, 0.);
-      case PsiBcMethod::ConstraintPreservingNeumann:
+      case UPsiBcMethod::ConstraintPreservingNeumann:
         return apply_neumann_constraint_preserving(
             bc_dt_u_psi, unit_normal_one_form, lapse, shift, pi, phi, dt_u_psi,
             char_speeds);
-      case PsiBcMethod::ConstraintPreservingDirichlet:
+      case UPsiBcMethod::ConstraintPreservingDirichlet:
         return apply_neumann_constraint_preserving(
             bc_dt_u_psi, unit_normal_one_form, lapse, shift,
             inverse_spatial_metric, pi, phi, deriv_spacetime_metric, dt_u_psi,
             char_speeds);
-      case PsiBcMethod::Unknown:
+      case UPsiBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method fo UPsi not implemented!");
     }
@@ -448,7 +449,7 @@ ReturnType set_dt_u_psi<ReturnType, SpatialDim, Frame>::
 template <typename ReturnType, size_t SpatialDim, typename Frame>
 struct set_dt_u_zero {
   static ReturnType apply(
-      const PsiBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
+      const UZeroBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
       const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
       const Scalar<DataVector>& lapse,
       const tnsr::I<DataVector, SpatialDim, Frame>& shift,
@@ -459,13 +460,11 @@ struct set_dt_u_zero {
       const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
       const std::array<DataVector, 4>& char_speeds) noexcept {
     switch (Method) {
-      case PsiBcMethod::Freezing:
+      case UZeroBcMethod::Freezing:
         return make_with_value<ReturnType>(unit_normal_one_form, 0.);
-      case PsiBcMethod::ConstraintPreservingNeumann:
-      case PsiBcMethod::ConstraintPreservingDirichlet:
-      case PsiBcMethod::Unknown:
+      case UZeroBcMethod::Unknown:
       default:
-        ASSERT(false, "Requested BC method fo UPsi not implemented!");
+        ASSERT(false, "Requested BC method fo UZero not implemented!");
     }
   }
 
@@ -476,7 +475,7 @@ struct set_dt_u_zero {
 template <typename ReturnType, size_t SpatialDim, typename Frame>
 struct set_dt_u_plus {
   static ReturnType apply(
-      const PsiBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
+      const UPlusBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
       const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
       const Scalar<DataVector>& lapse,
       const tnsr::I<DataVector, SpatialDim, Frame>& shift,
@@ -487,13 +486,11 @@ struct set_dt_u_plus {
       const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
       const std::array<DataVector, 4>& char_speeds) noexcept {
     switch (Method) {
-      case PsiBcMethod::Freezing:
+      case UPlusBcMethod::Freezing:
         return make_with_value<ReturnType>(unit_normal_one_form, 0.);
-      case PsiBcMethod::ConstraintPreservingNeumann:
-      case PsiBcMethod::ConstraintPreservingDirichlet:
-      case PsiBcMethod::Unknown:
+      case UPlusBcMethod::Unknown:
       default:
-        ASSERT(false, "Requested BC method fo UPsi not implemented!");
+        ASSERT(false, "Requested BC method fo UPlus not implemented!");
     }
   }
 
@@ -504,7 +501,7 @@ struct set_dt_u_plus {
 template <typename ReturnType, size_t SpatialDim, typename Frame>
 struct set_dt_u_minus {
   static ReturnType apply(
-      const PsiBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
+      const UMinusBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
       const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
       const Scalar<DataVector>& lapse,
       const tnsr::I<DataVector, SpatialDim, Frame>& shift,
@@ -515,13 +512,11 @@ struct set_dt_u_minus {
       const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
       const std::array<DataVector, 4>& char_speeds) noexcept {
     switch (Method) {
-      case PsiBcMethod::Freezing:
+      case UMinusBcMethod::Freezing:
         return make_with_value<ReturnType>(unit_normal_one_form, 0.);
-      case PsiBcMethod::ConstraintPreservingNeumann:
-      case PsiBcMethod::ConstraintPreservingDirichlet:
-      case PsiBcMethod::Unknown:
+      case UMinusBcMethod::Unknown:
       default:
-        ASSERT(false, "Requested BC method fo UPsi not implemented!");
+        ASSERT(false, "Requested BC method fo UMinus not implemented!");
     }
   }
 
