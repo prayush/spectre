@@ -134,8 +134,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
               const auto& external_bdry_vars,
               const db::item_type<::Tags::Mesh<VolumeDim>>& mesh,
               const double /* time */, const auto& /* boundary_condition */,
-              const auto& boundary_coords, const auto& unit_normal_one_forms,
-              const auto& external_bdry_char_speeds) noexcept {
+              const auto& boundary_coords/*, const auto& unit_normal_one_forms,
+              const auto& external_bdry_char_speeds*/) noexcept {
             // ------------------------------- (1)
             // Get preliminary quantities
             constexpr const size_t number_of_independent_components =
@@ -153,8 +153,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
               const auto& direction = external_direction_and_vars.first;
               const size_t dimension = direction.dimension();
               const auto& coords = boundary_coords.at(direction);
-              const auto& unit_normal_one_form =
-                  unit_normal_one_forms.at(direction);
+              // const auto& unit_normal_one_form =
+              //                   unit_normal_one_forms.at(direction);
               const auto& vars = external_direction_and_vars.second;
               const auto dt_vars =
                   data_on_slice(*volume_dt_vars, mesh.extents(), dimension,
@@ -222,10 +222,13 @@ struct ImposeConstraintPreservingBoundaryConditions {
               // (C) dampign parameter ConstraintGamma2 on this slice
               // (D) Compute projection operator on this slice
               // (E) dt<U> on this slice from `volume_dt_vars`
-              BoundaryConditions_detail::local_variables(
-                  make_not_null(&buffer), box, direction, dimension, mesh, vars,
-                  dt_vars, unit_normal_one_form,
-                  external_bdry_char_speeds.at(direction));
+              // BoundaryConditions_detail::local_variables(
+              //     make_not_null(&buffer), box, direction, dimension,
+              //     mesh, vars, dt_vars, unit_normal_one_form,
+              //     external_bdry_char_speeds.at(direction));
+              const auto bc_dt_ALL_U = make_with_value<
+                typename Tags::EvolvedFieldsFromCharacteristicFields<
+                  VolumeDim, Frame::Inertial>::type>(coords, 0.);
               // ------------------------------- (2.3)
               // Get desired values of dt<Uchar>
               // For now, we set to  (Freezing, Freezing, Freezing)
@@ -242,12 +245,12 @@ struct ImposeConstraintPreservingBoundaryConditions {
                   typename Tags::UMinus<VolumeDim, Frame::Inertial>::type>(
                   coords, 1.e-16);
               // Convert them to desired values on dt<U>
-              const auto bc_dt_all_u =
-                  evolved_fields_from_characteristic_fields(
-                      get<::Tags::TempScalar<26, DataVector>>(
-                          buffer),  // Gamma2
-                      bc_dt_u_psi, bc_dt_u_zero, bc_dt_u_plus, bc_dt_u_minus,
-                      unit_normal_one_form);
+              // const auto bc_dt_all_u =
+              //     evolved_fields_from_characteristic_fields(
+              //         get<::Tags::TempScalar<26, DataVector>>(
+              //             buffer),  // Gamma2
+              //         bc_dt_u_psi, bc_dt_u_zero, bc_dt_u_plus, bc_dt_u_minus,
+              //         unit_normal_one_form);
               // Now store final values of dt<U> in suitable data structure
               // FIXME: How can I extract this list of dt<U> tags directly from
               // `dt_variables_tag`?
@@ -265,11 +268,11 @@ struct ImposeConstraintPreservingBoundaryConditions {
                   bc_dt_tuple(
                       std::move(get<gr::Tags::SpacetimeMetric<
                                     VolumeDim, Frame::Inertial, DataVector>>(
-                          bc_dt_all_u)),
+                          bc_dt_ALL_U)),
                       std::move(get<Tags::Phi<VolumeDim, Frame::Inertial>>(
-                          bc_dt_all_u)),
+                          bc_dt_ALL_U)),
                       std::move(get<Tags::Pi<VolumeDim, Frame::Inertial>>(
-                          bc_dt_all_u)));
+                          bc_dt_ALL_U)));
               const auto slice_data_ = variables_from_tagged_tuple(bc_dt_tuple);
               const auto* slice_data = slice_data_.data();
 
@@ -299,15 +302,17 @@ struct ImposeConstraintPreservingBoundaryConditions {
           get<typename Metavariables::boundary_condition_tag>(cache),
           db::get<::Tags::Interface<
               ::Tags::BoundaryDirectionsExterior<VolumeDim>,
-              ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(box),
-          db::get<::Tags::Interface<
-              ::Tags::BoundaryDirectionsExterior<VolumeDim>,
-              ::Tags::Normalized<
-                  ::Tags::UnnormalizedFaceNormal<VolumeDim, Frame::Inertial>>>>(
-              box),
-          db::get<::Tags::Interface<
-              ::Tags::BoundaryDirectionsExterior<VolumeDim>,
-              Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>>>(box));
+              ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(box)//,
+          // db::get<::Tags::Interface<
+          //     ::Tags::BoundaryDirectionsExterior<VolumeDim>,
+          //     ::Tags::Normalized<
+          //         ::Tags::UnnormalizedFaceNormal<VolumeDim,
+          //                                        Frame::Inertial>>>>(
+          //     box),
+          // db::get<::Tags::Interface<
+          //     ::Tags::BoundaryDirectionsExterior<VolumeDim>,
+          //     Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>>>(box)
+            );
 
       return std::forward_as_tuple(std::move(box));
     }
