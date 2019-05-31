@@ -134,8 +134,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
               const auto& external_bdry_vars,
               const db::item_type<::Tags::Mesh<VolumeDim>>& mesh,
               const double /* time */, const auto& /* boundary_condition */,
-              const auto& /* boundary_coords */,
-              const auto& unit_normal_one_forms,
+              const auto& boundary_coords, const auto& unit_normal_one_forms,
               const auto& external_bdry_char_speeds) noexcept {
             // ------------------------------- (1)
             // Get preliminary quantities
@@ -153,6 +152,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
             for (auto& external_direction_and_vars : external_bdry_vars) {
               const auto& direction = external_direction_and_vars.first;
               const size_t dimension = direction.dimension();
+              const auto& coords = boundary_coords.at(direction);
               const auto& unit_normal_one_form =
                   unit_normal_one_forms.at(direction);
               const auto& vars = external_direction_and_vars.second;
@@ -208,7 +208,12 @@ struct ImposeConstraintPreservingBoundaryConditions {
                   ::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>,
                   ::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>,
                   // Constraint damping parameter
-                  ::Tags::TempScalar<26, DataVector>>;
+                  ::Tags::TempScalar<26, DataVector>,
+                  // Preallocated memory to store boundary conditions
+                  ::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::Tempiaa<28, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::Tempaa<29, VolumeDim, Frame::Inertial, DataVector>,
+                  ::Tags::Tempaa<20, VolumeDim, Frame::Inertial, DataVector>>;
               TempBuffer<all_local_vars> buffer(slice_grid_points);
               // ------------------------------- (2.2)
               // Compute local variables, including:
@@ -226,16 +231,16 @@ struct ImposeConstraintPreservingBoundaryConditions {
               // For now, we set to  (Freezing, Freezing, Freezing)
               const auto bc_dt_u_psi = make_with_value<
                   typename Tags::UPsi<VolumeDim, Frame::Inertial>::type>(
-                  unit_normal_one_form, 1.e-12);
+                  coords, 1.e-16);
               const auto bc_dt_u_zero = make_with_value<
                   typename Tags::UZero<VolumeDim, Frame::Inertial>::type>(
-                  unit_normal_one_form, 1.e-12);
+                  coords, 1.e-16);
               const auto bc_dt_u_plus = make_with_value<
                   typename Tags::UPlus<VolumeDim, Frame::Inertial>::type>(
-                  unit_normal_one_form, 1.e-12);
+                  coords, 1.e-16);
               const auto bc_dt_u_minus = make_with_value<
                   typename Tags::UMinus<VolumeDim, Frame::Inertial>::type>(
-                  unit_normal_one_form, 1.e-12);
+                  coords, 1.e-16);
               // Convert them to desired values on dt<U>
               const auto bc_dt_all_u =
                   evolved_fields_from_characteristic_fields(
