@@ -352,13 +352,12 @@ struct set_dt_u_psi {
       case UPsiBcMethod::Freezing:
         return make_with_value<ReturnType>(unit_normal_one_form, 0.);
       case UPsiBcMethod::ConstraintPreservingNeumann:
-        return apply_neumann_constraint_preserving(
+        return apply_bjorhus_constraint_preserving(
             bc_dt_u_psi, unit_normal_one_form, lapse, shift, pi, phi, dt_u_psi,
             char_speeds);
       case UPsiBcMethod::ConstraintPreservingDirichlet:
-        return apply_neumann_constraint_preserving(
-            bc_dt_u_psi, unit_normal_one_form, lapse, shift,
-            inverse_spatial_metric, pi, phi, deriv_spacetime_metric, dt_u_psi,
+        return apply_dirichlet_constraint_preserving(
+            bc_dt_u_psi, unit_normal_one_form, lapse, shift, pi, phi, dt_u_psi,
             char_speeds);
       case UPsiBcMethod::Unknown:
       default:
@@ -367,7 +366,7 @@ struct set_dt_u_psi {
   }
 
  private:
-  static ReturnType apply_neumann_constraint_preserving(
+  static ReturnType apply_bjorhus_constraint_preserving(
       const gsl::not_null<ReturnType*> bc_dt_u_psi,
       const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
       const Scalar<DataVector>& lapse,
@@ -378,7 +377,7 @@ struct set_dt_u_psi {
       const tnsr::iaa<DataVector, SpatialDim, Frame>& deriv_spacetime_metric,
       const tnsr::aa<DataVector, SpatialDim, Frame>& dt_u_psi,
       const std::array<DataVector, 4>& char_speeds) noexcept;
-  static ReturnType apply_dirichlet_consrtraint_preserving(
+  static ReturnType apply_dirichlet_constraint_preserving(
       const gsl::not_null<ReturnType*> bc_dt_u_psi,
       const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
       const Scalar<DataVector>& lapse,
@@ -391,7 +390,7 @@ struct set_dt_u_psi {
 
 template <typename ReturnType, size_t SpatialDim, typename Frame>
 ReturnType set_dt_u_psi<ReturnType, SpatialDim, Frame>::
-    apply_neumann_constraint_preserving(
+    apply_bjorhus_constraint_preserving(
         const gsl::not_null<ReturnType*> bc_dt_u_psi,
         const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
         const Scalar<DataVector>& lapse,
@@ -422,7 +421,7 @@ ReturnType set_dt_u_psi<ReturnType, SpatialDim, Frame>::
 
 template <typename ReturnType, size_t SpatialDim, typename Frame>
 ReturnType set_dt_u_psi<ReturnType, SpatialDim, Frame>::
-    apply_dirichlet_consrtraint_preserving(
+    apply_dirichlet_constraint_preserving(
         const gsl::not_null<ReturnType*> bc_dt_u_psi,
         const tnsr::i<DataVector, SpatialDim, Frame>& unit_normal_one_form,
         const Scalar<DataVector>& lapse,

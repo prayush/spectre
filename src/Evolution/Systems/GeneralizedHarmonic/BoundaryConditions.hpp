@@ -202,10 +202,12 @@ struct ImposeConstraintPreservingBoundaryConditions {
                   ::Tags::TempScalar<19, DataVector>,
                   ::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>,
                   ::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>,
+                  // Characteristic projected time derivatives of evolved fields
                   ::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>,
                   ::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>,
                   ::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>,
                   ::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>,
+                  // Constraint damping parameter
                   ::Tags::TempScalar<26, DataVector>>;
               TempBuffer<all_local_vars> buffer(slice_grid_points);
               // ------------------------------- (2.2)
