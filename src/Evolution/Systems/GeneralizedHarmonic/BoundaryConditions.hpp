@@ -126,108 +126,125 @@ struct ImposeConstraintPreservingBoundaryConditions {
           db::add_tag_prefix<Metavariables::temporal_id::template step_prefix,
                              variables_tag>;
 
-      // Apply the boundary condition
-      db::mutate<dt_variables_tag>(
-          make_not_null(&box),
-          // Function that applies bdry conditions to dt<variables>
-          [&](const gsl::not_null<db::item_type<dt_variables_tag>*>
-                  volume_dt_vars,
-              const auto& external_bdry_vars,
-              const db::item_type<::Tags::Mesh<VolumeDim>>& mesh,
-              const double /* time */, const auto& /* boundary_condition */,
-              const auto& boundary_coords, const auto& unit_normal_one_forms,
-              const auto& external_bdry_char_speeds) noexcept {
-            // ------------------------------- (1)
-            // Get preliminary quantities
-            constexpr const size_t number_of_independent_components =
-                dt_variables_tag::type::number_of_independent_components;
-            const size_t volume_grid_points = mesh.extents().product();
-            ASSERT(
-                volume_dt_vars->number_of_grid_points() == volume_grid_points,
-                "volume_dt_vars has wrong number of grid points.  Expected "
-                    << volume_grid_points << ", got "
-                    << volume_dt_vars->number_of_grid_points());
+      const auto& external_bdry_vars = db::get<::Tags::Interface<
+          ::Tags::BoundaryDirectionsExterior<VolumeDim>, variables_tag>>(box);
+      const db::item_type<::Tags::Mesh<VolumeDim>>& mesh =
+          db::get<::Tags::Mesh<VolumeDim>>(box);
+      const auto& boundary_coords = db::get<
+          ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
+                            ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(
+          box);
+      const auto& unit_normal_one_forms = db::get<
+          ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
+                            ::Tags::Normalized<::Tags::UnnormalizedFaceNormal<
+                                VolumeDim, Frame::Inertial>>>>(box);
+      const auto& external_bdry_char_speeds = db::get<::Tags::Interface<
+          ::Tags::BoundaryDirectionsExterior<VolumeDim>,
+          Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>>>(box);
 
-            // ------------------------------- (2)
-            // Loop over external boundaries and set dt_volume_vars on them
-            for (auto& external_direction_and_vars : external_bdry_vars) {
-              const auto& direction = external_direction_and_vars.first;
-              const size_t dimension = direction.dimension();
-              const auto& coords = boundary_coords.at(direction);
-              const auto& unit_normal_one_form =
-                  unit_normal_one_forms.at(direction);
-              const auto& vars = external_direction_and_vars.second;
+      // Apply the boundary condition
+      // ------------------------------- (2)
+      // Loop over external boundaries and set dt_volume_vars on them
+      for (auto& external_direction_and_vars : external_bdry_vars) {
+        const auto& direction = external_direction_and_vars.first;
+        const size_t dimension = direction.dimension();
+        const auto& coords = boundary_coords.at(direction);
+        const auto& unit_normal_one_form = unit_normal_one_forms.at(direction);
+        const auto& vars = external_direction_and_vars.second;
+        const size_t slice_grid_points =
+            mesh.extents().slice_away(dimension).product();
+        ASSERT(vars.number_of_grid_points() == slice_grid_points,
+               "vars_on_slice has wrong number of grid points.  "
+               "Expected "
+                   << slice_grid_points << ", got "
+                   << vars.number_of_grid_points());
+        // ------------------------------- (2)
+        // Create a TempTensor that stores all temporaries computed
+        // here and elsewhere
+        using all_local_vars = tmpl::list<
+            // timelike and spacelike SPACETIME vectors, l^a and k^a
+            ::Tags::TempA<0, VolumeDim, Frame::Inertial, DataVector>,
+            ::Tags::TempA<1, VolumeDim, Frame::Inertial, DataVector>,
+            // timelike and spacelike SPACETIME oneforms, l_a and k_a
+            ::Tags::Tempa<2, VolumeDim, Frame::Inertial, DataVector>,
+            ::Tags::Tempa<3, VolumeDim, Frame::Inertial, DataVector>,
+            // SPACETIME form of interface normal (vector and oneform)
+            ::Tags::Tempa<4, VolumeDim, Frame::Inertial, DataVector>,
+            ::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>,
+            // spacetime null form t_a and vector t^a
+            ::Tags::Tempa<6, VolumeDim, Frame::Inertial, DataVector>,
+            ::Tags::TempA<7, VolumeDim, Frame::Inertial, DataVector>,
+            // interface normal dot shift: n_k N^k
+            ::Tags::TempScalar<8, DataVector>,
+            // spacetime projection operator P_ab, P^ab, and P^a_b
+            ::Tags::TempAA<9, VolumeDim, Frame::Inertial, DataVector>,
+            ::Tags::Tempaa<10, VolumeDim, Frame::Inertial, DataVector>,
+            ::Tags::TempAb<11, VolumeDim, Frame::Inertial, DataVector>,
+            // Char speeds
+            ::Tags::TempScalar<12, DataVector>,
+            ::Tags::TempScalar<13, DataVector>,
+            ::Tags::TempScalar<14, DataVector>,
+            ::Tags::TempScalar<15, DataVector>,
+            // Constraints
+            ::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>,
+            ::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>,
+            ::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>,
+            // 3+1 geometric quantities: lapse, shift, inverse
+            // 3-metric
+            ::Tags::TempScalar<19, DataVector>,
+            ::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>,
+            ::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>,
+            // Characteristic projected time derivatives of evolved
+            // fields
+            ::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>,
+            ::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>,
+            ::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>,
+            ::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>,
+            // Constraint damping parameter
+            ::Tags::TempScalar<26, DataVector>,
+            // Preallocated memory to store boundary conditions
+            ::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>,
+            ::Tags::Tempiaa<28, VolumeDim, Frame::Inertial, DataVector>,
+            ::Tags::Tempaa<29, VolumeDim, Frame::Inertial, DataVector>,
+            ::Tags::Tempaa<20, VolumeDim, Frame::Inertial, DataVector>>;
+        TempBuffer<all_local_vars> buffer(slice_grid_points);
+        // ------------------------------- (2.2)
+        // Compute local variables, including:
+        // (A) unit normal form to interface
+        // (B) 4metric, inv4metric, lapse, shift on this slice
+        // (C) dampign parameter ConstraintGamma2 on this slice
+        // (D) Compute projection operator on this slice
+        // (E) dt<U> on this slice from `volume_dt_vars`
+        // BoundaryConditions_detail::local_variables(
+        //     make_not_null(&buffer), box, direction, dimension,
+        //     mesh, vars, dt_vars, unit_normal_one_form,
+        //     external_bdry_char_speeds.at(direction));
+
+        db::mutate<dt_variables_tag>(
+            make_not_null(&box),
+            // Function that applies bdry conditions to dt<variables>
+            [&](const gsl::not_null<db::item_type<dt_variables_tag>*>
+                    volume_dt_vars,
+                const double /* time */, const auto& /* boundary_condition */
+                ) noexcept {
+              // ------------------------------- (1)
+              // Preliminaries
+              constexpr const size_t number_of_independent_components =
+                  dt_variables_tag::type::number_of_independent_components;
+              const size_t volume_grid_points = mesh.extents().product();
+              ASSERT(
+                  volume_dt_vars->number_of_grid_points() == volume_grid_points,
+                  "volume_dt_vars has wrong number of grid points.  Expected "
+                      << volume_grid_points << ", got "
+                      << volume_dt_vars->number_of_grid_points());
+              // Get dt<U> on this slice
               const auto dt_vars =
                   data_on_slice(*volume_dt_vars, mesh.extents(), dimension,
                                 index_to_slice_at(mesh.extents(), direction));
-              const size_t slice_grid_points =
-                  mesh.extents().slice_away(dimension).product();
-              ASSERT(vars.number_of_grid_points() == slice_grid_points,
-                     "vars_on_slice has wrong number of grid points.  Expected "
-                         << slice_grid_points << ", got "
-                         << vars.number_of_grid_points());
-              // ------------------------------- (2.1)
+              // ------------------------------- (2)
               // Compute desired values of dt_volume_vars
               //
-              // Create a TempTensor that stores all temporaries computed
-              // here and elsewhere
-              using all_local_vars = tmpl::list<
-                  // timelike and spacelike SPACETIME vectors, l^a and k^a
-                  ::Tags::TempA<0, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::TempA<1, VolumeDim, Frame::Inertial, DataVector>,
-                  // timelike and spacelike SPACETIME oneforms, l_a and k_a
-                  ::Tags::Tempa<2, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::Tempa<3, VolumeDim, Frame::Inertial, DataVector>,
-                  // SPACETIME form of interface normal (vector and oneform)
-                  ::Tags::Tempa<4, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>,
-                  // spacetime null form t_a and vector t^a
-                  ::Tags::Tempa<6, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::TempA<7, VolumeDim, Frame::Inertial, DataVector>,
-                  // interface normal dot shift: n_k N^k
-                  ::Tags::TempScalar<8, DataVector>,
-                  // spacetime projection operator P_ab, P^ab, and P^a_b
-                  ::Tags::TempAA<9, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::Tempaa<10, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::TempAb<11, VolumeDim, Frame::Inertial, DataVector>,
-                  // Char speeds
-                  ::Tags::TempScalar<12, DataVector>,
-                  ::Tags::TempScalar<13, DataVector>,
-                  ::Tags::TempScalar<14, DataVector>,
-                  ::Tags::TempScalar<15, DataVector>,
-                  // Constraints
-                  ::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>,
-                  // 3+1 geometric quantities: lapse, shift, inverse 3-metric
-                  ::Tags::TempScalar<19, DataVector>,
-                  ::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>,
-                  // Characteristic projected time derivatives of evolved fields
-                  ::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>,
-                  // Constraint damping parameter
-                  ::Tags::TempScalar<26, DataVector>,
-                  // Preallocated memory to store boundary conditions
-                  ::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::Tempiaa<28, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::Tempaa<29, VolumeDim, Frame::Inertial, DataVector>,
-                  ::Tags::Tempaa<20, VolumeDim, Frame::Inertial, DataVector>>;
-              TempBuffer<all_local_vars> buffer(slice_grid_points);
-              // ------------------------------- (2.2)
-              // Compute local variables, including:
-              // (A) unit normal form to interface
-              // (B) 4metric, inv4metric, lapse, shift on this slice
-              // (C) dampign parameter ConstraintGamma2 on this slice
-              // (D) Compute projection operator on this slice
-              // (E) dt<U> on this slice from `volume_dt_vars`
-              // BoundaryConditions_detail::local_variables(
-              //     make_not_null(&buffer), box, direction, dimension,
-              //     mesh, vars, dt_vars, unit_normal_one_form,
-              //     external_bdry_char_speeds.at(direction));
-              // ------------------------------- (2.3)
+              // ------------------------------- (2.1)
               // Get desired values of dt<Uchar>
               // For now, we set to  (Freezing, Freezing, Freezing)
               const auto bc_dt_u_psi = make_with_value<
@@ -247,11 +264,11 @@ struct ImposeConstraintPreservingBoundaryConditions {
               //     evolved_fields_from_characteristic_fields(
               //         get<::Tags::TempScalar<26, DataVector>>(
               //             buffer),  // Gamma2
-              //         bc_dt_u_psi, bc_dt_u_zero, bc_dt_u_plus, bc_dt_u_minus,
-              //         unit_normal_one_form);
+              //         bc_dt_u_psi, bc_dt_u_zero, bc_dt_u_plus,
+              //         bc_dt_u_minus, unit_normal_one_form);
               // Now store final values of dt<U> in suitable data structure
-              // FIXME: How can I extract this list of dt<U> tags directly from
-              // `dt_variables_tag`?
+              // FIXME: How can I extract this list of dt<U> tags directly
+              // from `dt_variables_tag`?
               const auto bc_dt_ALL_U = make_with_value<
                   typename Tags::EvolvedFieldsFromCharacteristicFields<
                       VolumeDim, Frame::Inertial>::type>(coords, 0.);
@@ -293,25 +310,10 @@ struct ImposeConstraintPreservingBoundaryConditions {
                                  i * slice_grid_points];    // NOLINT
                 }
               }
-            }
-          },
-          db::get<::Tags::Interface<
-              ::Tags::BoundaryDirectionsExterior<VolumeDim>, variables_tag>>(
-              box),
-          db::get<::Tags::Mesh<VolumeDim>>(box),
-          db::get<::Tags::Time>(box).value(),
-          get<typename Metavariables::boundary_condition_tag>(cache),
-          db::get<::Tags::Interface<
-              ::Tags::BoundaryDirectionsExterior<VolumeDim>,
-              ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(box),
-          db::get<::Tags::Interface<
-              ::Tags::BoundaryDirectionsExterior<VolumeDim>,
-              ::Tags::Normalized<
-                  ::Tags::UnnormalizedFaceNormal<VolumeDim, Frame::Inertial>>>>(
-              box),
-          db::get<::Tags::Interface<
-              ::Tags::BoundaryDirectionsExterior<VolumeDim>,
-              Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>>>(box));
+            },
+            db::get<::Tags::Time>(box).value(),
+            get<typename Metavariables::boundary_condition_tag>(cache));
+      }
 
       return std::forward_as_tuple(std::move(box));
     }
