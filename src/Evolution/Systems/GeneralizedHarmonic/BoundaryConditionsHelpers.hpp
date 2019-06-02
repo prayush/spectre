@@ -61,6 +61,52 @@ enum class UZeroBcMethod { AnalyticBc, Freezing, Unknown };
 enum class UPlusBcMethod { AnalyticBc, Freezing, Unknown };
 enum class UMinusBcMethod { AnalyticBc, Freezing, Unknown };
 
+template <size_t VolumeDim>
+using all_local_vars = tmpl::list<
+    // timelike and spacelike SPACETIME vectors, l^a and k^a
+    ::Tags::TempA<0, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::TempA<1, VolumeDim, Frame::Inertial, DataVector>,
+    // timelike and spacelike SPACETIME oneforms, l_a and k_a
+    ::Tags::Tempa<2, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::Tempa<3, VolumeDim, Frame::Inertial, DataVector>,
+    // SPACETIME form of interface normal (vector and oneform)
+    ::Tags::Tempa<4, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>,
+    // spacetime null form t_a and vector t^a
+    ::Tags::Tempa<6, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::TempA<7, VolumeDim, Frame::Inertial, DataVector>,
+    // interface normal dot shift: n_k N^k
+    ::Tags::TempScalar<8, DataVector>,
+    // spacetime projection operator P_ab, P^ab, and P^a_b
+    ::Tags::TempAA<9, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::Tempaa<10, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::TempAb<11, VolumeDim, Frame::Inertial, DataVector>,
+    // Char speeds
+    ::Tags::TempScalar<12, DataVector>, ::Tags::TempScalar<13, DataVector>,
+    ::Tags::TempScalar<14, DataVector>, ::Tags::TempScalar<15, DataVector>,
+    // Constraints
+    ::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>,
+    // 3+1 geometric quantities: lapse, shift, inverse
+    // 3-metric
+    ::Tags::TempScalar<19, DataVector>,
+    ::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>,
+    // Characteristic projected time derivatives of evolved
+    // fields
+    ::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>,
+    // Constraint damping parameter
+    ::Tags::TempScalar<26, DataVector>,
+    // Preallocated memory to store boundary conditions
+    ::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::Tempiaa<28, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::Tempaa<29, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::Tempaa<20, VolumeDim, Frame::Inertial, DataVector>>;
+
 // \brief This function computes intermediate variables needed for
 // Bjorhus-type constraint preserving boundary conditions for the
 // GeneralizedHarmonic system
@@ -346,6 +392,9 @@ struct set_dt_u_psi {
                               unit_normal_one_form) noexcept {
     // Not using auto below to enforce a loose test on the quantity being
     // fetched from the buffer
+    const auto& three_index_constraint =
+        get<::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>>(
+            buffer);
     const Scalar<DataVector>& lapse =
         get<::Tags::TempScalar<19, DataVector>>(buffer);
     const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift =
@@ -359,6 +408,7 @@ struct set_dt_u_psi {
         get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars);
     const typename Tags::UPsi<VolumeDim, Frame::Inertial>::type& dt_u_psi_rhs =
         get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+
     const std::array<DataVector, 4> char_speeds{
         get(get<::Tags::TempScalar<12, DataVector>>(buffer)),
         get(get<::Tags::TempScalar<13, DataVector>>(buffer)),
@@ -374,7 +424,8 @@ struct set_dt_u_psi {
       case UPsiBcMethod::ConstraintPreservingNeumann:
         return apply_bjorhus_constraint_preserving(
             make_not_null(&bc_dt_u_psi), unit_normal_one_form, lapse, shift,
-            inverse_spatial_metric, pi, phi, dt_u_psi_rhs, char_speeds);
+            inverse_spatial_metric, pi, three_index_constraint, dt_u_psi_rhs,
+            char_speeds);
       case UPsiBcMethod::ConstraintPreservingDirichlet:
         return apply_dirichlet_constraint_preserving(
             make_not_null(&bc_dt_u_psi), unit_normal_one_form, lapse, shift, pi,
@@ -395,7 +446,8 @@ struct set_dt_u_psi {
       const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
           inverse_spatial_metric,
       const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+          three_index_constraint,
       const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
       const std::array<DataVector, 4>& char_speeds) noexcept;
   static ReturnType apply_dirichlet_constraint_preserving(
@@ -420,7 +472,8 @@ set_dt_u_psi<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
     const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
         inverse_spatial_metric,
     const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
-    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
+    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+        three_index_constraint,
     const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
     const std::array<DataVector, 4>& char_speeds) noexcept {
   if (UNLIKELY(get_size(get<0, 0>(*bc_dt_u_psi)) != get_size(get(lapse)))) {
@@ -433,7 +486,7 @@ set_dt_u_psi<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
       bc_dt_u_psi->get(a, b) = dt_u_psi.get(a, b);
       for (size_t i = 0; i < VolumeDim; ++i) {
         bc_dt_u_psi->get(a, b) += char_speeds[0] * unit_normal_vector.get(i) *
-                                  (phi.get(i, a, b) - phi.get(i, a, b));
+                                  three_index_constraint.get(i, a, b);
       }
     }
   }

@@ -118,8 +118,9 @@ struct ImposeConstraintPreservingBoundaryConditions {
     static std::tuple<db::DataBox<DbTags>&&> function_impl(
         db::DataBox<DbTags>& box,
         const Parallel::ConstGlobalCache<Metavariables>& cache) noexcept {
-      // Get information about system: tags for evolved variables
-      // and their time derivatives
+      // ------------------------------- (1)
+      // Get information about system:
+      // tags for evolved variables and their time derivatives
       using system = typename Metavariables::system;
       using variables_tag = typename system::variables_tag;
       using dt_variables_tag =
@@ -131,10 +132,6 @@ struct ImposeConstraintPreservingBoundaryConditions {
       const db::item_type<::Tags::Mesh<VolumeDim>>& mesh =
           db::get<::Tags::Mesh<VolumeDim>>(box);
       const size_t volume_grid_points = mesh.extents().product();
-      const auto& boundary_coords = db::get<
-          ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
-                            ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(
-          box);
       const auto& unit_normal_one_forms = db::get<
           ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
                             ::Tags::Normalized<::Tags::UnnormalizedFaceNormal<
@@ -146,13 +143,12 @@ struct ImposeConstraintPreservingBoundaryConditions {
           ::Tags::BoundaryDirectionsExterior<VolumeDim>,
           Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>>>(box);
 
-      // Apply the boundary condition
       // ------------------------------- (2)
+      // Apply the boundary condition
       // Loop over external boundaries and set dt_volume_vars on them
       for (auto& external_direction_and_vars : external_bdry_vars) {
         const auto& direction = external_direction_and_vars.first;
         const size_t dimension = direction.dimension();
-        const auto& coords = boundary_coords.at(direction);
         const auto& unit_normal_one_form = unit_normal_one_forms.at(direction);
         const auto& vars = external_direction_and_vars.second;
         const size_t slice_grid_points =
@@ -170,53 +166,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
         // ------------------------------- (2)
         // Create a TempTensor that stores all temporaries computed
         // here and elsewhere
-        using all_local_vars = tmpl::list<
-            // timelike and spacelike SPACETIME vectors, l^a and k^a
-            ::Tags::TempA<0, VolumeDim, Frame::Inertial, DataVector>,
-            ::Tags::TempA<1, VolumeDim, Frame::Inertial, DataVector>,
-            // timelike and spacelike SPACETIME oneforms, l_a and k_a
-            ::Tags::Tempa<2, VolumeDim, Frame::Inertial, DataVector>,
-            ::Tags::Tempa<3, VolumeDim, Frame::Inertial, DataVector>,
-            // SPACETIME form of interface normal (vector and oneform)
-            ::Tags::Tempa<4, VolumeDim, Frame::Inertial, DataVector>,
-            ::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>,
-            // spacetime null form t_a and vector t^a
-            ::Tags::Tempa<6, VolumeDim, Frame::Inertial, DataVector>,
-            ::Tags::TempA<7, VolumeDim, Frame::Inertial, DataVector>,
-            // interface normal dot shift: n_k N^k
-            ::Tags::TempScalar<8, DataVector>,
-            // spacetime projection operator P_ab, P^ab, and P^a_b
-            ::Tags::TempAA<9, VolumeDim, Frame::Inertial, DataVector>,
-            ::Tags::Tempaa<10, VolumeDim, Frame::Inertial, DataVector>,
-            ::Tags::TempAb<11, VolumeDim, Frame::Inertial, DataVector>,
-            // Char speeds
-            ::Tags::TempScalar<12, DataVector>,
-            ::Tags::TempScalar<13, DataVector>,
-            ::Tags::TempScalar<14, DataVector>,
-            ::Tags::TempScalar<15, DataVector>,
-            // Constraints
-            ::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>,
-            ::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>,
-            ::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>,
-            // 3+1 geometric quantities: lapse, shift, inverse
-            // 3-metric
-            ::Tags::TempScalar<19, DataVector>,
-            ::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>,
-            ::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>,
-            // Characteristic projected time derivatives of evolved
-            // fields
-            ::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>,
-            ::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>,
-            ::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>,
-            ::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>,
-            // Constraint damping parameter
-            ::Tags::TempScalar<26, DataVector>,
-            // Preallocated memory to store boundary conditions
-            ::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>,
-            ::Tags::Tempiaa<28, VolumeDim, Frame::Inertial, DataVector>,
-            ::Tags::Tempaa<29, VolumeDim, Frame::Inertial, DataVector>,
-            ::Tags::Tempaa<20, VolumeDim, Frame::Inertial, DataVector>>;
-        TempBuffer<all_local_vars> buffer(slice_grid_points);
+        TempBuffer<BoundaryConditions_detail::all_local_vars<VolumeDim>> buffer(
+            slice_grid_points);
         // ------------------------------- (2.2)
         // Compute local variables, including:
         // (A) unit normal form to interface
