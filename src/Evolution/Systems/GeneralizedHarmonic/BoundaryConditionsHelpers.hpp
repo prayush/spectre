@@ -67,7 +67,7 @@ enum class UMinusBcMethod { AnalyticBc, Freezing, Unknown };
 template <size_t VolumeDim, typename TagsList, typename DbTags,
           typename VarsTagsList, typename DtVarsTagsList>
 void local_variables(
-    gsl::not_null<TempBuffer<TagsList>*> buffer, db::DataBox<DbTags>& box,
+    gsl::not_null<TempBuffer<TagsList>*> buffer, const db::DataBox<DbTags>& box,
     const Direction<VolumeDim>& direction, const size_t& dimension,
     const db::item_type<::Tags::Mesh<VolumeDim>>& mesh,
     const Variables<VarsTagsList>& /* vars */,
@@ -335,11 +335,10 @@ void local_variables(
 }
 
 // \brief This struct sets boundary condition on dt<UPsi>
-template <typename ReturnType, size_t VolumeDim, typename DbTags,
-          typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
+template <typename ReturnType, size_t VolumeDim, typename TagsList,
+          typename VarsTagsList, typename DtVarsTagsList>
 struct set_dt_u_psi {
   static ReturnType apply(const UPsiBcMethod Method,
-                          const db::DataBox<DbTags>& box,
                           const TempBuffer<TagsList>& buffer,
                           const Variables<VarsTagsList>& vars,
                           const Variables<DtVarsTagsList>& dt_vars,
@@ -478,22 +477,15 @@ ReturnType set_dt_u_psi<ReturnType, VolumeDim, DbTags, TagsList, VarsTagsList,
 }
 
 // \brief This struct sets boundary condition on dt<UZero>
-template <typename ReturnType, size_t VolumeDim>
+template <typename ReturnType, size_t VolumeDim, typename TagsList,
+          typename VarsTagsList, typename DtVarsTagsList>
 struct set_dt_u_zero {
-  static ReturnType apply(
-      const UZeroBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
-      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-          unit_normal_one_form,
-      const Scalar<DataVector>& lapse,
-      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
-      const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
-          inverse_spatial_metric,
-      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
-          deriv_spacetime_metric,
-      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
-      const std::array<DataVector, 4>& char_speeds) noexcept {
+  static ReturnType apply(const UZeroBcMethod Method,
+                          const TempBuffer<TagsList>& buffer,
+                          const Variables<VarsTagsList>& vars,
+                          const Variables<DtVarsTagsList>& dt_vars,
+                          const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+                              unit_normal_one_form) noexcept {
     switch (Method) {
       case UZeroBcMethod::Freezing:
         return make_with_value<ReturnType>(unit_normal_one_form, 0.);
@@ -507,22 +499,15 @@ struct set_dt_u_zero {
 };
 
 // \brief This struct sets boundary condition on dt<UPlus>
-template <typename ReturnType, size_t VolumeDim>
+template <typename ReturnType, size_t VolumeDim, typename TagsList,
+          typename VarsTagsList, typename DtVarsTagsList>
 struct set_dt_u_plus {
-  static ReturnType apply(
-      const UPlusBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
-      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-          unit_normal_one_form,
-      const Scalar<DataVector>& lapse,
-      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
-      const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
-          inverse_spatial_metric,
-      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
-          deriv_spacetime_metric,
-      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
-      const std::array<DataVector, 4>& char_speeds) noexcept {
+  static ReturnType apply(const UPlusBcMethod Method,
+                          const TempBuffer<TagsList>& buffer,
+                          const Variables<VarsTagsList>& vars,
+                          const Variables<DtVarsTagsList>& dt_vars,
+                          const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+                              unit_normal_one_form) noexcept {
     switch (Method) {
       case UPlusBcMethod::Freezing:
         return make_with_value<ReturnType>(unit_normal_one_form, 0.);
@@ -536,22 +521,15 @@ struct set_dt_u_plus {
 };
 
 // \brief This struct sets boundary condition on dt<UMinus>
-template <typename ReturnType, size_t VolumeDim>
+template <typename ReturnType, size_t VolumeDim, typename TagsList,
+          typename VarsTagsList, typename DtVarsTagsList>
 struct set_dt_u_minus {
-  static ReturnType apply(
-      const UMinusBcMethod Method, const gsl::not_null<ReturnType*> bc_dt_u_psi,
-      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-          unit_normal_one_form,
-      const Scalar<DataVector>& lapse,
-      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
-      const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
-          inverse_spatial_metric,
-      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
-          deriv_spacetime_metric,
-      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
-      const std::array<DataVector, 4>& char_speeds) noexcept {
+  static ReturnType apply(const UMinusBcMethod Method,
+                          const TempBuffer<TagsList>& buffer,
+                          const Variables<VarsTagsList>& vars,
+                          const Variables<DtVarsTagsList>& dt_vars,
+                          const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+                              unit_normal_one_form) noexcept {
     switch (Method) {
       case UMinusBcMethod::Freezing:
         return make_with_value<ReturnType>(unit_normal_one_form, 0.);
