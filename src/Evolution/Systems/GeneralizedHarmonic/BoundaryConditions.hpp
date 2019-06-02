@@ -322,7 +322,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
 
   /* ------------------------------------------------------------------------
    * ------------------------------------------------------------------------
-   * ---------------- SEND DATA TO MORTAR  ----------------
+   * ---------------- SEND DATA TO MORTAR FOR ANALYTIC BCs ------------------
    * ------------------------------------------------------------------------
    * ------------------------------------------------------------------------
    */
@@ -376,9 +376,10 @@ struct ImposeConstraintPreservingBoundaryConditions {
     // setting BCs on individual characteristic variables
     return apply_impl<Metavariables::system::volume_dim,
                       // Freezing BCs for all dt<UChar>
-                      UPsiBcMethod::Freezing, UZeroBcMethod::Freezing,
-                      UPlusBcMethod::Freezing, UMinusBcMethod::Freezing,
-                      DbTags>::function_impl(box, cache);
+                      UPsiBcMethod::ConstraintPreservingBjorhus,
+                      UZeroBcMethod::Freezing, UPlusBcMethod::Freezing,
+                      UMinusBcMethod::Freezing, DbTags>::function_impl(box,
+                                                                       cache);
   }
 };
 
