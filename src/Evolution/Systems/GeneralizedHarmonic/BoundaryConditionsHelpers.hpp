@@ -335,11 +335,11 @@ void local_variables(
 }
 
 // \brief This struct sets boundary condition on dt<UPsi>
-template <typename ReturnType, size_t VolumeDim, typename TagsList,
-          typename VarsTagsList, typename DtVarsTagsList>
+template <typename ReturnType, size_t VolumeDim>
 struct set_dt_u_psi {
+  template <typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
   static ReturnType apply(const UPsiBcMethod Method,
-                          const TempBuffer<TagsList>& buffer,
+                          TempBuffer<TagsList>& buffer,
                           const Variables<VarsTagsList>& vars,
                           const Variables<DtVarsTagsList>& dt_vars,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
@@ -353,18 +353,18 @@ struct set_dt_u_psi {
     const tnsr::II<DataVector, VolumeDim,
                    Frame::Inertial>& inverse_spatial_metric =
         get<::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    const db::item_type<Tags::Pi<VolumeDim, Frame::Inertial>>& pi =
+    const typename Tags::Pi<VolumeDim, Frame::Inertial>::type& pi =
         get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars);
-    const db::item_type<Tags::Phi<VolumeDim, Frame::Inertial>>& phi =
+    const typename Tags::Phi<VolumeDim, Frame::Inertial>::type& phi =
         get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars);
-    const db::item_type<Tags::UPsi<VolumeDim, Frame::Inertial>>& dt_u_psi_rhs =
+    const typename Tags::UPsi<VolumeDim, Frame::Inertial>::type& dt_u_psi_rhs =
         get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>>(buffer);
     const std::array<DataVector, 4> char_speeds{
         get(get<::Tags::TempScalar<12, DataVector>>(buffer)),
         get(get<::Tags::TempScalar<13, DataVector>>(buffer)),
         get(get<::Tags::TempScalar<14, DataVector>>(buffer)),
         get(get<::Tags::TempScalar<15, DataVector>>(buffer))};
-    const db::item_type<Tags::UPsi<VolumeDim, Frame::Inertial>>& bc_dt_u_psi =
+    auto& bc_dt_u_psi =
         get<::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>>(buffer);
 
     // Switch on prescribed boundary condition method
@@ -396,8 +396,6 @@ struct set_dt_u_psi {
           inverse_spatial_metric,
       const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
       const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
-          deriv_spacetime_metric,
       const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
       const std::array<DataVector, 4>& char_speeds) noexcept;
   static ReturnType apply_dirichlet_constraint_preserving(
@@ -412,24 +410,19 @@ struct set_dt_u_psi {
       const std::array<DataVector, 4>& char_speeds) noexcept;
 };
 
-template <typename ReturnType, size_t VolumeDim, typename DbTags,
-          typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
-ReturnType set_dt_u_psi<ReturnType, VolumeDim, DbTags, TagsList, VarsTagsList,
-                        DtVarsTagsList>::
-    apply_bjorhus_constraint_preserving(
-        const gsl::not_null<ReturnType*> bc_dt_u_psi,
-        const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-            unit_normal_one_form,
-        const Scalar<DataVector>& lapse,
-        const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
-        const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
-            inverse_spatial_metric,
-        const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
-        const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
-        const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
-            deriv_spacetime_metric,
-        const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
-        const std::array<DataVector, 4>& char_speeds) noexcept {
+template <typename ReturnType, size_t VolumeDim>
+ReturnType
+set_dt_u_psi<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
+    const gsl::not_null<ReturnType*> bc_dt_u_psi,
+    const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& unit_normal_one_form,
+    const Scalar<DataVector>& lapse,
+    const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
+    const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
+        inverse_spatial_metric,
+    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
+    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
+    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
+    const std::array<DataVector, 4>& char_speeds) noexcept {
   if (UNLIKELY(get_size(get<0, 0>(*bc_dt_u_psi)) != get_size(get(lapse)))) {
     *bc_dt_u_psi = ReturnType(get_size(get(lapse)));
   }
@@ -437,39 +430,35 @@ ReturnType set_dt_u_psi<ReturnType, VolumeDim, DbTags, TagsList, VarsTagsList,
       raise_or_lower_index(unit_normal_one_form, inverse_spatial_metric);
   for (size_t a = 0; a <= VolumeDim; ++a) {
     for (size_t b = a; b <= VolumeDim; ++b) {
-      bc_dt_u_psi.get(a, b) = dt_u_psi.get(a, b);
+      bc_dt_u_psi->get(a, b) = dt_u_psi.get(a, b);
       for (size_t i = 0; i < VolumeDim; ++i) {
-        bc_dt_u_psi.get(a, b) +=
-            char_speeds[0] * unit_normal_vector.get(i) *
-            (deriv_spacetime_metric.get(i, a, b) - phi.get(i, a, b));
+        bc_dt_u_psi->get(a, b) += char_speeds[0] * unit_normal_vector.get(i) *
+                                  (phi.get(i, a, b) - phi.get(i, a, b));
       }
     }
   }
   return *bc_dt_u_psi;
 }
 
-template <typename ReturnType, size_t VolumeDim, typename DbTags,
-          typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
-ReturnType set_dt_u_psi<ReturnType, VolumeDim, DbTags, TagsList, VarsTagsList,
-                        DtVarsTagsList>::
-    apply_dirichlet_constraint_preserving(
-        const gsl::not_null<ReturnType*> bc_dt_u_psi,
-        const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-            unit_normal_one_form,
-        const Scalar<DataVector>& lapse,
-        const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
-        const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
-        const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
-        const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
-        const std::array<DataVector, 4>& char_speeds) noexcept {
+template <typename ReturnType, size_t VolumeDim>
+ReturnType
+set_dt_u_psi<ReturnType, VolumeDim>::apply_dirichlet_constraint_preserving(
+    const gsl::not_null<ReturnType*> bc_dt_u_psi,
+    const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& unit_normal_one_form,
+    const Scalar<DataVector>& lapse,
+    const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
+    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
+    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
+    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& dt_u_psi,
+    const std::array<DataVector, 4>& char_speeds) noexcept {
   if (UNLIKELY(get_size(get<0, 0>(*bc_dt_u_psi)) != get_size(get(lapse)))) {
     *bc_dt_u_psi = ReturnType(get_size(get(lapse)));
   }
   for (size_t a = 0; a <= VolumeDim; ++a) {
     for (size_t b = a; b <= VolumeDim; ++b) {
-      bc_dt_u_psi.get(a, b) = -get(lapse) * pi.get(a, b);
+      bc_dt_u_psi->get(a, b) = -get(lapse) * pi.get(a, b);
       for (size_t i = 0; i < VolumeDim; ++i) {
-        bc_dt_u_psi.get(a, b) += shift.get(i) * phi.get(i, a, b);
+        bc_dt_u_psi->get(a, b) += shift.get(i) * phi.get(i, a, b);
       }
     }
   }
@@ -477,11 +466,11 @@ ReturnType set_dt_u_psi<ReturnType, VolumeDim, DbTags, TagsList, VarsTagsList,
 }
 
 // \brief This struct sets boundary condition on dt<UZero>
-template <typename ReturnType, size_t VolumeDim, typename TagsList,
-          typename VarsTagsList, typename DtVarsTagsList>
+template <typename ReturnType, size_t VolumeDim>
 struct set_dt_u_zero {
+  template <typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
   static ReturnType apply(const UZeroBcMethod Method,
-                          const TempBuffer<TagsList>& buffer,
+                          TempBuffer<TagsList>& buffer,
                           const Variables<VarsTagsList>& vars,
                           const Variables<DtVarsTagsList>& dt_vars,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
@@ -499,11 +488,11 @@ struct set_dt_u_zero {
 };
 
 // \brief This struct sets boundary condition on dt<UPlus>
-template <typename ReturnType, size_t VolumeDim, typename TagsList,
-          typename VarsTagsList, typename DtVarsTagsList>
+template <typename ReturnType, size_t VolumeDim>
 struct set_dt_u_plus {
+  template <typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
   static ReturnType apply(const UPlusBcMethod Method,
-                          const TempBuffer<TagsList>& buffer,
+                          TempBuffer<TagsList>& buffer,
                           const Variables<VarsTagsList>& vars,
                           const Variables<DtVarsTagsList>& dt_vars,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
@@ -521,11 +510,11 @@ struct set_dt_u_plus {
 };
 
 // \brief This struct sets boundary condition on dt<UMinus>
-template <typename ReturnType, size_t VolumeDim, typename TagsList,
-          typename VarsTagsList, typename DtVarsTagsList>
+template <typename ReturnType, size_t VolumeDim>
 struct set_dt_u_minus {
+  template <typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
   static ReturnType apply(const UMinusBcMethod Method,
-                          const TempBuffer<TagsList>& buffer,
+                          TempBuffer<TagsList>& buffer,
                           const Variables<VarsTagsList>& vars,
                           const Variables<DtVarsTagsList>& dt_vars,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&

@@ -248,18 +248,25 @@ struct ImposeConstraintPreservingBoundaryConditions {
               // ------------------------------- (2.1)
               // Get desired values of dt<Uchar>
               // For now, we set to  (Freezing, Freezing, Freezing)
-              const auto bc_dt_u_psi = make_with_value<
-                  typename Tags::UPsi<VolumeDim, Frame::Inertial>::type>(coords,
-                                                                         0.);
-              const auto bc_dt_u_zero = make_with_value<
-                  typename Tags::UZero<VolumeDim, Frame::Inertial>::type>(
-                  coords, 0.);
-              const auto bc_dt_u_plus = make_with_value<
-                  typename Tags::UPlus<VolumeDim, Frame::Inertial>::type>(
-                  coords, 0.);
-              const auto bc_dt_u_minus = make_with_value<
-                  typename Tags::UMinus<VolumeDim, Frame::Inertial>::type>(
-                  coords, 0.);
+              const auto bc_dt_u_psi = BoundaryConditions_detail::set_dt_u_psi<
+                  typename Tags::UPsi<VolumeDim, Frame::Inertial>::type,
+                  VolumeDim>::apply(UPsiMethod, buffer, vars, dt_vars,
+                                    unit_normal_one_form);
+              const auto bc_dt_u_zero =
+                  BoundaryConditions_detail::set_dt_u_zero<
+                      typename Tags::UZero<VolumeDim, Frame::Inertial>::type,
+                      VolumeDim>::apply(UZeroMethod, buffer, vars, dt_vars,
+                                        unit_normal_one_form);
+              const auto bc_dt_u_plus =
+                  BoundaryConditions_detail::set_dt_u_plus<
+                      typename Tags::UPlus<VolumeDim, Frame::Inertial>::type,
+                      VolumeDim>::apply(UPlusMethod, buffer, vars, dt_vars,
+                                        unit_normal_one_form);
+              const auto bc_dt_u_minus =
+                  BoundaryConditions_detail::set_dt_u_minus<
+                      typename Tags::UMinus<VolumeDim, Frame::Inertial>::type,
+                      VolumeDim>::apply(UMinusMethod, buffer, vars, dt_vars,
+                                        unit_normal_one_form);
               // Convert them to desired values on dt<U>
               const auto bc_dt_all_u =
                   evolved_fields_from_characteristic_fields(
@@ -270,9 +277,6 @@ struct ImposeConstraintPreservingBoundaryConditions {
               // Now store final values of dt<U> in suitable data structure
               // FIXME: How can I extract this list of dt<U> tags directly
               // from `dt_variables_tag`?
-              // const auto bc_dt_ALL_U = make_with_value<
-              //     typename Tags::EvolvedFieldsFromCharacteristicFields<
-              //         VolumeDim, Frame::Inertial>::type>(coords, 0.);
               const tuples::TaggedTuple<
                   db::add_tag_prefix<
                       Metavariables::temporal_id::template step_prefix,
