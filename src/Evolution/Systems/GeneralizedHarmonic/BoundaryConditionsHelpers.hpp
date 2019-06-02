@@ -21,6 +21,7 @@
 #include "Domain/Tags.hpp"
 #include "ErrorHandling/Assert.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/InterfaceActionHelpers.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/FluxCommunicationTypes.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/MortarHelpers.hpp"
@@ -29,6 +30,7 @@
 #include "Parallel/Invoke.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/Tags.hpp"
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
+#include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "Time/Tags.hpp"
 #include "Utilities/ContainerHelpers.hpp"
 #include "Utilities/Gsl.hpp"
@@ -53,7 +55,7 @@ namespace BoundaryConditions_detail {
 enum class UPsiBcMethod {
   AnalyticBc,
   Freezing,
-  ConstraintPreservingNeumann,
+  ConstraintPreservingBjorhus,
   ConstraintPreservingDirichlet,
   Unknown
 };
@@ -115,12 +117,12 @@ template <size_t VolumeDim, typename TagsList, typename DbTags,
 void local_variables(
     gsl::not_null<TempBuffer<TagsList>*> buffer, const db::DataBox<DbTags>& box,
     const Direction<VolumeDim>& direction, const size_t& dimension,
-    const db::item_type<::Tags::Mesh<VolumeDim>>& mesh,
+    const typename ::Tags::Mesh<VolumeDim>::type& mesh,
     const Variables<VarsTagsList>& /* vars */,
     const Variables<DtVarsTagsList>& dt_vars,
     const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
         unit_interface_normal_one_form,
-    const db::item_type<Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>>&
+    const typename Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>::type&
         char_speeds) noexcept {
   //
   // NOTE: variable names below closely follow \cite Lindblom2005qh
@@ -148,6 +150,7 @@ void local_variables(
       // Tags::ConstraintGamma0,
       // Tags::ConstraintGamma1,
       Tags::ConstraintGamma2,
+      // Characteristics
       // Constraints
       Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>,
       Tags::ThreeIndexConstraint<VolumeDim, Frame::Inertial>,
@@ -392,16 +395,18 @@ struct set_dt_u_psi {
                               unit_normal_one_form) noexcept {
     // Not using auto below to enforce a loose test on the quantity being
     // fetched from the buffer
-    const auto& three_index_constraint =
-        get<::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>>(
-            buffer);
-    const Scalar<DataVector>& lapse =
+    const typename Tags::ThreeIndexConstraint<VolumeDim, Frame::Inertial>::type&
+        three_index_constraint =
+            get<::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>>(
+                buffer);
+    const tnsr::A<DataVector, VolumeDim,
+                  Frame::Inertial>& unit_interface_normal_vector =
+        get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    const typename gr::Tags::Lapse<DataVector>::type& lapse =
         get<::Tags::TempScalar<19, DataVector>>(buffer);
-    const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift =
+    const typename gr::Tags::Shift<VolumeDim, Frame::Inertial,
+                                   DataVector>::type& shift =
         get<::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    const tnsr::II<DataVector, VolumeDim,
-                   Frame::Inertial>& inverse_spatial_metric =
-        get<::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>>(buffer);
     const typename Tags::Pi<VolumeDim, Frame::Inertial>::type& pi =
         get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars);
     const typename Tags::Phi<VolumeDim, Frame::Inertial>::type& phi =
@@ -410,24 +415,23 @@ struct set_dt_u_psi {
         char_projected_rhs_dt_u_psi =
             get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>>(
                 buffer);
-    const std::array<DataVector, 4> char_speeds{
-        {get(get<::Tags::TempScalar<12, DataVector>>(buffer)),
-         get(get<::Tags::TempScalar<13, DataVector>>(buffer)),
-         get(get<::Tags::TempScalar<14, DataVector>>(buffer)),
-         get(get<::Tags::TempScalar<15, DataVector>>(buffer))}};
+    const typename Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>::type
+        char_speeds{{get(get<::Tags::TempScalar<12, DataVector>>(buffer)),
+                     get(get<::Tags::TempScalar<13, DataVector>>(buffer)),
+                     get(get<::Tags::TempScalar<14, DataVector>>(buffer)),
+                     get(get<::Tags::TempScalar<15, DataVector>>(buffer))}};
     // Memory allocated for return type
-    auto& bc_dt_u_psi =
+    ReturnType& bc_dt_u_psi =
         get<::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>>(buffer);
 
     // Switch on prescribed boundary condition method
     switch (Method) {
       case UPsiBcMethod::Freezing:
         return make_with_value<ReturnType>(unit_normal_one_form, 0.);
-      case UPsiBcMethod::ConstraintPreservingNeumann:
+      case UPsiBcMethod::ConstraintPreservingBjorhus:
         return apply_bjorhus_constraint_preserving(
-            make_not_null(&bc_dt_u_psi), unit_normal_one_form,
-            inverse_spatial_metric, three_index_constraint,
-            char_projected_rhs_dt_u_psi, char_speeds);
+            make_not_null(&bc_dt_u_psi), unit_interface_normal_vector,
+            three_index_constraint, char_projected_rhs_dt_u_psi, char_speeds);
       case UPsiBcMethod::ConstraintPreservingDirichlet:
         return apply_dirichlet_constraint_preserving(
             make_not_null(&bc_dt_u_psi), lapse, shift, pi, phi);
@@ -440,10 +444,8 @@ struct set_dt_u_psi {
  private:
   static ReturnType apply_bjorhus_constraint_preserving(
       const gsl::not_null<ReturnType*> bc_dt_u_psi,
-      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-          unit_normal_one_form,
-      const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
-          inverse_spatial_metric,
+      const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
+          unit_interface_normal_vector,
       const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
           three_index_constraint,
       const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
@@ -461,25 +463,23 @@ template <typename ReturnType, size_t VolumeDim>
 ReturnType
 set_dt_u_psi<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
     const gsl::not_null<ReturnType*> bc_dt_u_psi,
-    const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& unit_normal_one_form,
-    const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
-        inverse_spatial_metric,
+    const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
+        unit_interface_normal_vector,
     const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
         three_index_constraint,
     const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
         char_projected_rhs_dt_u_psi,
     const std::array<DataVector, 4>& char_speeds) noexcept {
   if (UNLIKELY(get_size(get<0, 0>(*bc_dt_u_psi)) !=
-               get_size(get<0>(unit_normal_one_form)))) {
-    *bc_dt_u_psi = ReturnType(get_size(get<0>(unit_normal_one_form)));
+               get_size(get<0>(unit_interface_normal_vector)))) {
+    *bc_dt_u_psi = ReturnType(get_size(get<0>(unit_interface_normal_vector)));
   }
-  const auto unit_normal_vector =
-      raise_or_lower_index(unit_normal_one_form, inverse_spatial_metric);
   for (size_t a = 0; a <= VolumeDim; ++a) {
     for (size_t b = a; b <= VolumeDim; ++b) {
       bc_dt_u_psi->get(a, b) = char_projected_rhs_dt_u_psi.get(a, b);
       for (size_t i = 0; i < VolumeDim; ++i) {
-        bc_dt_u_psi->get(a, b) += char_speeds[0] * unit_normal_vector.get(i) *
+        bc_dt_u_psi->get(a, b) += char_speeds.at(0) *
+                                  unit_interface_normal_vector.get(i + 1) *
                                   three_index_constraint.get(i, a, b);
       }
     }

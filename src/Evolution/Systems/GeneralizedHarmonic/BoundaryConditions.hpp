@@ -182,10 +182,13 @@ struct ImposeConstraintPreservingBoundaryConditions {
         db::mutate<dt_variables_tag>(
             make_not_null(&box),
             // Function that applies bdry conditions to dt<variables>
-            [&](const gsl::not_null<db::item_type<dt_variables_tag>*>
-                    volume_dt_vars,
-                const double /* time */, const auto& /* boundary_condition */
-                ) noexcept {
+            [
+              &volume_grid_points, &slice_grid_points, &mesh, &dimension,
+              &direction, &buffer, &vars, &dt_vars, &unit_normal_one_form
+            ](const gsl::not_null<db::item_type<dt_variables_tag>*>
+                  volume_dt_vars,
+              const double /* time */, const auto& /* boundary_condition */
+              ) noexcept {
               // ------------------------------- (1)
               // Preliminaries
               ASSERT(
