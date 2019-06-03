@@ -12,6 +12,7 @@
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "DataStructures/DataBox/DataOnSlice.hpp"
+#include "DataStructures/LeviCivitaIterator.hpp"
 #include "DataStructures/TempBuffer.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
@@ -59,7 +60,12 @@ enum class UPsiBcMethod {
   ConstraintPreservingDirichlet,
   Unknown
 };
-enum class UZeroBcMethod { AnalyticBc, Freezing, Unknown };
+enum class UZeroBcMethod {
+  AnalyticBc,
+  Freezing,
+  ConstraintPreservingBjorhus,
+  Unknown
+};
 enum class UPlusBcMethod { AnalyticBc, Freezing, Unknown };
 enum class UMinusBcMethod { AnalyticBc, Freezing, Unknown };
 
@@ -514,14 +520,50 @@ template <typename ReturnType, size_t VolumeDim>
 struct set_dt_u_zero {
   template <typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
   static ReturnType apply(const UZeroBcMethod Method,
-                          TempBuffer<TagsList>& /* buffer */,
+                          TempBuffer<TagsList>& buffer,
                           const Variables<VarsTagsList>& /* vars */,
                           const Variables<DtVarsTagsList>& /* dt_vars */,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
                               unit_normal_one_form) noexcept {
+    // Not using auto below to enforce a loose test on the quantity being
+    // fetched from the buffer
+    const typename Tags::ThreeIndexConstraint<VolumeDim, Frame::Inertial>::type&
+        four_index_constraint =
+            get<::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>>(
+                buffer);
+    const tnsr::A<DataVector, VolumeDim,
+                  Frame::Inertial>& unit_interface_normal_vector =
+        get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    // const typename gr::Tags::Lapse<DataVector>::type& lapse =
+    //     get<::Tags::TempScalar<19, DataVector>>(buffer);
+    // const typename gr::Tags::Shift<VolumeDim, Frame::Inertial,
+    //                                DataVector>::type& shift =
+    //     get<::Tags::TempI<20, VolumeDim, Frame::Inertial,
+    //     DataVector>>(buffer);
+    // const typename Tags::Pi<VolumeDim, Frame::Inertial>::type& pi =
+    //     get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars);
+    // const typename Tags::Phi<VolumeDim, Frame::Inertial>::type& phi =
+    //     get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars);
+    const typename Tags::UZero<VolumeDim, Frame::Inertial>::type&
+        char_projected_rhs_dt_u_zero =
+            get<::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>>(
+                buffer);
+    const typename Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>::type
+        char_speeds{{get(get<::Tags::TempScalar<12, DataVector>>(buffer)),
+                     get(get<::Tags::TempScalar<13, DataVector>>(buffer)),
+                     get(get<::Tags::TempScalar<14, DataVector>>(buffer)),
+                     get(get<::Tags::TempScalar<15, DataVector>>(buffer))}};
+    // Memory allocated for return type
+    ReturnType& bc_dt_u_zero =
+        get<::Tags::Tempiaa<28, VolumeDim, Frame::Inertial, DataVector>>(
+            buffer);
     switch (Method) {
       case UZeroBcMethod::Freezing:
         return make_with_value<ReturnType>(unit_normal_one_form, 0.);
+      case UZeroBcMethod::ConstraintPreservingBjorhus:
+        return apply_bjorhus_constraint_preserving(
+            make_not_null(&bc_dt_u_zero), unit_interface_normal_vector,
+            four_index_constraint, char_projected_rhs_dt_u_zero, char_speeds);
       case UZeroBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method fo UZero not implemented!");
@@ -529,7 +571,58 @@ struct set_dt_u_zero {
   }
 
  private:
+  static ReturnType apply_bjorhus_constraint_preserving(
+      const gsl::not_null<ReturnType*> bc_dt_u_zero,
+      const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
+          unit_interface_normal_vector,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+          four_index_constraint,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+          char_projected_rhs_dt_u_zero,
+      const std::array<DataVector, 4>& char_speeds) noexcept;
 };
+
+template <typename ReturnType, size_t VolumeDim>
+ReturnType
+set_dt_u_zero<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
+    const gsl::not_null<ReturnType*> bc_dt_u_zero,
+    const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
+        unit_interface_normal_vector,
+    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+        four_index_constraint,
+    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+        char_projected_rhs_dt_u_zero,
+    const std::array<DataVector, 4>& char_speeds) noexcept {
+  if (UNLIKELY(get_size(get<0, 0, 0>(*bc_dt_u_zero)) !=
+               get_size(get<0>(unit_interface_normal_vector)))) {
+    *bc_dt_u_zero = ReturnType(get_size(get<0>(unit_interface_normal_vector)));
+  }
+  for (size_t a = 0; a <= VolumeDim; ++a) {
+    for (size_t b = a; b <= VolumeDim; ++b) {
+      for (size_t i = 0; i < VolumeDim; ++i) {
+        bc_dt_u_zero->get(i, a, b) = char_projected_rhs_dt_u_zero.get(i, a, b);
+      }
+      // Lets say this term is T2_{jab} := - n_l N^l n^i C_{ijab}.
+      // But we store C4_{iab} = LeviCivita^{ijk} C_{jkab},
+      // which means  C_{ijab} = LeviCivita^{ijk} C4_{kab}
+      // where C4 is `four_index_constraint`.
+      // therefore, T2_{jab} =  char_speed<UZero> n^i C_{ijab},
+      // = char_speed<UZero> n^i LeviCivita^{ijk} C4_{kab}; i.e.
+      // if LeviCivitaIterator it is indexed by
+      // it[0] <--> i,
+      // it[1] <--> j,
+      // it[2] <--> k, then
+      // T2_{it[1], ab} += char_speed<UZero> n^it[0] it.sign() C4_{it[2], ab};
+      for (LeviCivitaIterator<VolumeDim> it; it; ++it) {
+        bc_dt_u_zero->get(it[1], a, b) +=
+            it.sign() * char_speeds.at(1) *
+            unit_interface_normal_vector.get(it[0] + 1) *
+            four_index_constraint.get(it[2], a, b);
+      }
+    }
+  }
+  return *bc_dt_u_zero;
+}
 
 // \brief This struct sets boundary condition on dt<UPlus>
 template <typename ReturnType, size_t VolumeDim>
