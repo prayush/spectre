@@ -65,6 +65,7 @@ enum class UZeroBcMethod {
   Freezing,
   ConstraintPreservingBjorhus,
   ConstraintPreservingDirichlet,
+  ConstraintPreservingRealDirichlet,
   Unknown
 };
 enum class UPlusBcMethod { AnalyticBc, Freezing, Unknown };
@@ -603,6 +604,11 @@ struct set_dt_u_zero {
             make_not_null(&bc_dt_u_zero), unit_interface_normal_vector,
             unit_normal_one_form, spacetime_unit_normal_vector, lapse, shift,
             inverse_spatial_metric, pi, phi, d_spacetime_metric, d_pi, d_phi);
+      case UZeroBcMethod::ConstraintPreservingRealDirichlet:
+        return apply_real_dirichlet_constraint_preserving(
+            make_not_null(&bc_dt_u_zero), unit_interface_normal_vector,
+            unit_normal_one_form, spacetime_unit_normal_vector, lapse, shift,
+            inverse_spatial_metric, pi, phi, d_pi, d_phi);
       case UZeroBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method fo UZero not implemented!");
@@ -634,6 +640,22 @@ struct set_dt_u_zero {
       const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
       const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
       const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_psi,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_pi,
+      const tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>& d_phi) noexcept;
+  static ReturnType apply_real_dirichlet_constraint_preserving(
+      const gsl::not_null<ReturnType*> bc_dt_u_zero,
+      const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
+          unit_interface_normal_vector,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+          unit_interface_normal_one_form,
+      const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
+          spacetime_unit_normal_vector,
+      const Scalar<DataVector>& lapse,
+      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
+      const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
+          inverse_spatial_metric,
+      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
       const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_pi,
       const tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>& d_phi) noexcept;
 };
@@ -731,6 +753,74 @@ set_dt_u_zero<ReturnType, VolumeDim>::apply_dirichlet_constraint_preserving(
               tmp.get(i) += get(lapse) * spacetime_unit_normal_vector.get(e) *
                             inverse_spatial_metric.get(j, k) *
                             d_psi.get(i, e, k + 1) * phi.get(j, a, b);  // T4
+            }
+          }
+        }
+      }
+      DataVector normal_dot_tmp(get_size(get(lapse)), 0.);
+      for (size_t i = 0; i < VolumeDim; ++i) {
+        normal_dot_tmp += unit_interface_normal_vector.get(i + 1) * tmp.get(i);
+      }
+      for (size_t i = 0; i < VolumeDim; ++i) {
+        bc_dt_u_zero->get(i, a, b) =
+            tmp.get(i) - unit_interface_normal_one_form.get(i) * normal_dot_tmp;
+      }
+    }
+  }
+  return *bc_dt_u_zero;
+}
+
+template <typename ReturnType, size_t VolumeDim>
+ReturnType set_dt_u_zero<ReturnType, VolumeDim>::
+    apply_real_dirichlet_constraint_preserving(
+        const gsl::not_null<ReturnType*> bc_dt_u_zero,
+        const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
+            unit_interface_normal_vector,
+        const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+            unit_interface_normal_one_form,
+        const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
+            spacetime_unit_normal_vector,
+        const Scalar<DataVector>& lapse,
+        const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
+        const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
+            inverse_spatial_metric,
+        const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
+        const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
+        const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_pi,
+        const tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>&
+            d_phi) noexcept {
+  if (UNLIKELY(get_size(get<0, 0, 0>(*bc_dt_u_zero)) != get_size(get(lapse)))) {
+    *bc_dt_u_zero = ReturnType(get_size(get(lapse)));
+  }
+  for (size_t a = 0; a <= VolumeDim; ++a) {
+    for (size_t b = 0; b <= VolumeDim; ++b) {
+      // For a chosen (a, b):
+      //  tmp_i = -N \partial_i \Pi_{ab} (T1)
+      //        + 0.5 N * t^c t^d \phi_{icd} Pi_{ab} (T2)
+      //        + N^j \partial_i \Phi_{jab} (T3)
+      //        + N t^e g^{jk} \psi_{iek} \Phi_{jab} (T4)
+      // and,
+      //  bc_dt_u_zero_{iab} = tmp_i - n_i n^k tmp_k (for a chosen (a, b))
+      tnsr::i<DataVector, VolumeDim, Frame::Inertial> tmp(get_size(get(lapse)));
+      for (size_t i = 0; i < VolumeDim; ++i) {
+        tmp.get(i) = -get(lapse) * d_pi.get(i, a, b);  // T1
+        // (subtract dLapse*Pi)
+        for (size_t c = 0; c <= VolumeDim; ++c) {
+          for (size_t d = 0; d <= VolumeDim; ++d) {
+            tmp.get(i) += 0.5 * get(lapse) *  // T2
+                          spacetime_unit_normal_vector.get(c) *
+                          spacetime_unit_normal_vector.get(d) *
+                          phi.get(i, c, d) * pi.get(a, b);
+          }
+        }
+        for (size_t j = 0; j < VolumeDim; ++j) {
+          tmp.get(i) += shift.get(j) * d_phi.get(i, j, a, b);  // T3
+          // (add d_k Shift^j \Phi_{jab})
+          for (size_t k = 0; k < VolumeDim; ++k) {
+            for (size_t e = 0; e <= VolumeDim; ++e) {
+              tmp.get(i) += get(lapse) * spacetime_unit_normal_vector.get(e) *
+                            inverse_spatial_metric.get(j, k) *
+                            phi.get(i, e, k + 1) * phi.get(j, a, b);  // T4
             }
           }
         }
