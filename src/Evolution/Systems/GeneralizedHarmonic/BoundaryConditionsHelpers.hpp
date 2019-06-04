@@ -69,7 +69,12 @@ enum class UZeroBcMethod {
   Unknown
 };
 enum class UPlusBcMethod { AnalyticBc, Freezing, Unknown };
-enum class UMinusBcMethod { AnalyticBc, Freezing, Unknown };
+enum class UMinusBcMethod {
+  AnalyticBc,
+  Freezing,
+  ConstraintPreservingBjorhus,
+  Unknown
+};
 
 template <size_t VolumeDim>
 using all_local_vars = tmpl::list<
@@ -107,7 +112,7 @@ using all_local_vars = tmpl::list<
     // fields
     ::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>,
     ::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>,
-    ::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>,
+    // ::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>,
     ::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>,
     // Constraint damping parameter
     ::Tags::TempScalar<26, DataVector>,
@@ -285,8 +290,8 @@ void local_variables(
       get<Tags::UPsi<VolumeDim, Frame::Inertial>>(char_projected_dt_u);
   get<::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
       get<Tags::UZero<VolumeDim, Frame::Inertial>>(char_projected_dt_u);
-  get<::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
-      get<Tags::UPlus<VolumeDim, Frame::Inertial>>(char_projected_dt_u);
+  // get<::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
+  //     get<Tags::UPlus<VolumeDim, Frame::Inertial>>(char_projected_dt_u);
   get<::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
       get<Tags::UMinus<VolumeDim, Frame::Inertial>>(char_projected_dt_u);
   // Spatial derivatives of evolved variables: Psi, Pi and Phi
@@ -417,7 +422,7 @@ struct set_dt_u_psi {
                           const Variables<VarsTagsList>& vars,
                           const Variables<DtVarsTagsList>& /* dt_vars */,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-                              unit_normal_one_form) noexcept {
+                          /* unit_normal_one_form */) noexcept {
     // Not using auto below to enforce a loose test on the quantity being
     // fetched from the buffer
     const typename Tags::ThreeIndexConstraint<VolumeDim, Frame::Inertial>::type&
@@ -452,7 +457,7 @@ struct set_dt_u_psi {
     // Switch on prescribed boundary condition method
     switch (Method) {
       case UPsiBcMethod::Freezing:
-        return make_with_value<ReturnType>(unit_normal_one_form, 0.);
+        return bc_dt_u_psi;
       case UPsiBcMethod::ConstraintPreservingBjorhus:
         return apply_bjorhus_constraint_preserving(
             make_not_null(&bc_dt_u_psi), unit_interface_normal_vector,
@@ -594,7 +599,7 @@ struct set_dt_u_zero {
             buffer);
     switch (Method) {
       case UZeroBcMethod::Freezing:
-        return make_with_value<ReturnType>(unit_normal_one_form, 0.);
+        return bc_dt_u_zero;
       case UZeroBcMethod::ConstraintPreservingBjorhus:
         return apply_bjorhus_constraint_preserving(
             make_not_null(&bc_dt_u_zero), unit_interface_normal_vector,
@@ -843,14 +848,16 @@ template <typename ReturnType, size_t VolumeDim>
 struct set_dt_u_plus {
   template <typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
   static ReturnType apply(const UPlusBcMethod Method,
-                          TempBuffer<TagsList>& /* buffer */,
+                          TempBuffer<TagsList>& buffer,
                           const Variables<VarsTagsList>& /* vars */,
                           const Variables<DtVarsTagsList>& /* dt_vars */,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-                              unit_normal_one_form) noexcept {
+                          /* unit_normal_one_form */) noexcept {
+    ReturnType& bc_dt_u_plus =
+        get<::Tags::Tempaa<29, VolumeDim, Frame::Inertial, DataVector>>(buffer);
     switch (Method) {
       case UPlusBcMethod::Freezing:
-        return make_with_value<ReturnType>(unit_normal_one_form, 0.);
+        return bc_dt_u_plus;
       case UPlusBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method fo UPlus not implemented!");
@@ -865,14 +872,68 @@ template <typename ReturnType, size_t VolumeDim>
 struct set_dt_u_minus {
   template <typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
   static ReturnType apply(const UMinusBcMethod Method,
-                          TempBuffer<TagsList>& /* buffer */,
+                          TempBuffer<TagsList>& buffer,
                           const Variables<VarsTagsList>& /* vars */,
                           const Variables<DtVarsTagsList>& /* dt_vars */,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-                              unit_normal_one_form) noexcept {
+                          /* unit_normal_one_form */) noexcept {
+    // Not using auto below to enforce a loose test on the quantity being
+    // fetched from the buffer
+    const tnsr::A<DataVector, VolumeDim,
+                  Frame::Inertial>& unit_interface_normal_vector =
+        get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    const typename Tags::FourIndexConstraint<VolumeDim, Frame::Inertial>::type&
+        four_index_constraint =
+            get<::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>>(
+                buffer);
+    const typename Tags::UMinus<VolumeDim, Frame::Inertial>::type&
+        char_projected_rhs_dt_u_minus =
+            get<::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>>(
+                buffer);
+    const typename Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>::type
+        char_speeds{{get(get<::Tags::TempScalar<12, DataVector>>(buffer)),
+                     get(get<::Tags::TempScalar<13, DataVector>>(buffer)),
+                     get(get<::Tags::TempScalar<14, DataVector>>(buffer)),
+                     get(get<::Tags::TempScalar<15, DataVector>>(buffer))}};
+
+    // spacetime unit vector t^a
+    // const auto& spacetime_unit_normal_vector =
+    //     get<::Tags::TempA<7, VolumeDim, Frame::Inertial,
+    //     DataVector>>(buffer);
+    // const typename gr::Tags::Lapse<DataVector>::type& lapse =
+    //     get<::Tags::TempScalar<19, DataVector>>(buffer);
+    // const typename gr::Tags::Shift<VolumeDim, Frame::Inertial,
+    //                                DataVector>::type& shift =
+    //     get<::Tags::TempI<20, VolumeDim, Frame::Inertial,
+    //     DataVector>>(buffer);
+    // const auto& inverse_spatial_metric =
+    //     get<::Tags::TempII<21, VolumeDim, Frame::Inertial,
+    //     DataVector>>(buffer);
+    //
+    // const typename Tags::Pi<VolumeDim, Frame::Inertial>::type& pi =
+    //     get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars);
+    // const typename Tags::Phi<VolumeDim, Frame::Inertial>::type& phi =
+    //     get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars);
+    // const auto& d_spacetime_metric =
+    //     get<::Tags::Tempiaa<31, VolumeDim, Frame::Inertial, DataVector>>(
+    //         buffer);
+    // const auto& d_pi =
+    //     get<::Tags::Tempiaa<32, VolumeDim, Frame::Inertial, DataVector>>(
+    //         buffer);
+    // const auto& d_phi =
+    //     get<::Tags::Tempijaa<33, VolumeDim, Frame::Inertial, DataVector>>(
+    //         buffer);
+
+    // Memory allocated for return type
+    ReturnType& bc_dt_u_minus =
+        get<::Tags::Tempaa<30, VolumeDim, Frame::Inertial, DataVector>>(buffer);
     switch (Method) {
       case UMinusBcMethod::Freezing:
-        return make_with_value<ReturnType>(unit_normal_one_form, 0.);
+        return bc_dt_u_minus;
+      case UMinusBcMethod::ConstraintPreservingBjorhus:
+        return apply_bjorhus_constraint_preserving(
+            make_not_null(&bc_dt_u_minus), unit_interface_normal_vector,
+            four_index_constraint, char_projected_rhs_dt_u_minus, char_speeds);
       case UMinusBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method fo UMinus not implemented!");
@@ -880,7 +941,36 @@ struct set_dt_u_minus {
   }
 
  private:
+  static ReturnType apply_bjorhus_constraint_preserving(
+      const gsl::not_null<ReturnType*> bc_dt_u_minus,
+      const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
+          unit_interface_normal_vector,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+          four_index_constraint,
+      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
+          char_projected_rhs_dt_u_minus,
+      const std::array<DataVector, 4>& char_speeds) noexcept;
 };
+
+template <typename ReturnType, size_t VolumeDim>
+ReturnType
+set_dt_u_minus<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
+    const gsl::not_null<ReturnType*> bc_dt_u_minus,
+    const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
+        unit_interface_normal_vector,
+    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+        four_index_constraint,
+    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
+        char_projected_rhs_dt_u_minus,
+    const std::array<DataVector, 4>& char_speeds) noexcept {
+  if (UNLIKELY(get_size(get<0, 0>(*bc_dt_u_minus)) !=
+               get_size(get<0>(unit_interface_normal_vector)))) {
+    *bc_dt_u_minus = ReturnType(get_size(get<0>(unit_interface_normal_vector)));
+  }
+
+  return *bc_dt_u_minus;
+}
+
 }  // namespace BoundaryConditions_detail
 }  // namespace Actions
 }  // namespace GeneralizedHarmonic
