@@ -78,12 +78,12 @@ enum class UMinusBcMethod {
 
 template <size_t VolumeDim>
 using all_local_vars = tmpl::list<
-    // timelike and spacelike SPACETIME vectors, l^a and k^a
-    ::Tags::TempA<0, VolumeDim, Frame::Inertial, DataVector>,
-    ::Tags::TempA<1, VolumeDim, Frame::Inertial, DataVector>,
     // timelike and spacelike SPACETIME oneforms, l_a and k_a
-    ::Tags::Tempa<2, VolumeDim, Frame::Inertial, DataVector>,
-    ::Tags::Tempa<3, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::Tempa<0, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::Tempa<1, VolumeDim, Frame::Inertial, DataVector>,
+    // timelike and spacelike SPACETIME vectors, l^a and k^a
+    ::Tags::TempA<2, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::TempA<3, VolumeDim, Frame::Inertial, DataVector>,
     // SPACETIME form of interface normal (vector and oneform)
     ::Tags::Tempa<4, VolumeDim, Frame::Inertial, DataVector>,
     ::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>,
@@ -101,9 +101,9 @@ using all_local_vars = tmpl::list<
     ::Tags::TempScalar<14, DataVector>, ::Tags::TempScalar<15, DataVector>,
     // Characteristics of Constraints
     ::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>,
-    ::Tags::Tempa<36, VolumeDim, Frame::Inertial, DataVector>,
-    ::Tags::Tempia<34, VolumeDim, Frame::Inertial, DataVector>,   // C_{ja}
-    ::Tags::Tempa<35, VolumeDim, Frame::Inertial, DataVector>,    // F_a
+    ::Tags::Tempa<34, VolumeDim, Frame::Inertial, DataVector>,
+    // ::Tags::Tempia<35, VolumeDim, Frame::Inertial, DataVector>,   // C_{ja}
+    // ::Tags::Tempa<36, VolumeDim, Frame::Inertial, DataVector>,    // F_a
     ::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>,  // C_{jab}
     // e^{ijk} C_{jkab}
     ::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>,
@@ -230,14 +230,14 @@ void local_variables(
   // 3) Extract variable storage out of the buffer now
   // timelike and spacelike SPACETIME vectors, l^a and k^a
   auto& local_outgoing_null_one_form =
-      get<::Tags::TempA<0, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+      get<::Tags::Tempa<0, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
   auto& local_incoming_null_one_form =
-      get<::Tags::TempA<1, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+      get<::Tags::Tempa<1, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
   // timelike and spacelike SPACETIME oneforms, l_a and k_a
   auto& local_outgoing_null_vector =
-      get<::Tags::Tempa<2, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+      get<::Tags::TempA<2, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
   auto& local_incoming_null_vector =
-      get<::Tags::Tempa<3, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+      get<::Tags::TempA<3, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
   // SPACETIME form of interface normal (vector and oneform)
   auto& local_interface_normal_one_form =
       get<::Tags::Tempa<4, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
@@ -254,31 +254,22 @@ void local_variables(
   auto& interface_normal_dot_shift =
       get<::Tags::TempScalar<8, DataVector>>(*buffer);
   // spacetime projection operator P_ab, P^ab, and P^a_b
-  auto& local_projection_ab =
-      get<::Tags::TempAA<9, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
   auto& local_projection_AB =
+      get<::Tags::TempAA<9, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  auto& local_projection_ab =
       get<::Tags::Tempaa<10, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
   auto& local_projection_Ab =
       get<::Tags::TempAb<11, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
-  // Char speeds
-  auto& local_char_speed_u_psi =
-      get<::Tags::TempScalar<12, DataVector>>(*buffer);
-  auto& local_char_speed_u_plus =
-      get<::Tags::TempScalar<13, DataVector>>(*buffer);
-  auto& local_char_speed_u_minus =
-      get<::Tags::TempScalar<14, DataVector>>(*buffer);
-  auto& local_char_speed_u_zero =
-      get<::Tags::TempScalar<15, DataVector>>(*buffer);
+  // 4.4) Characteristic speeds
+  get(get<::Tags::TempScalar<12, DataVector>>(*buffer)) = char_speeds.at(0);
+  get(get<::Tags::TempScalar<13, DataVector>>(*buffer)) = char_speeds.at(1);
+  get(get<::Tags::TempScalar<14, DataVector>>(*buffer)) = char_speeds.at(2);
+  get(get<::Tags::TempScalar<15, DataVector>>(*buffer)) = char_speeds.at(3);
   // constraint characteristics
-  get<::Tags::Tempa<35, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
-      get<Tags::FConstraint<VolumeDim, Frame::Inertial>>(vars_on_this_slice);
-  get<::Tags::Tempia<34, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
-      get<Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>>(
-          vars_on_this_slice);
   auto& local_constraint_char_zero_minus =
       get<::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
   auto& local_constraint_char_zero_plus =
-      get<::Tags::Tempa<36, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+      get<::Tags::Tempa<34, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
   // 4.6) c^\hat{3}_{jab} = C_{jab} = \partial_j\psi_{ab} - \Phi_{jab}
   get<::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
       get<Tags::ThreeIndexConstraint<VolumeDim, Frame::Inertial>>(
@@ -320,15 +311,19 @@ void local_variables(
   // Constraint damping parameters
   get<::Tags::TempScalar<26, DataVector>>(*buffer) =
       get<Tags::ConstraintGamma2>(vars_on_this_slice);
-  // Preallocated memory for output
+  // Preallocated memory for output, fill with zeros
   auto& _bc_upsi =
       get<::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  std::fill(_bc_upsi.begin(), _bc_upsi.end(), 0.);
   auto& _bc_uzero =
       get<::Tags::Tempiaa<28, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  std::fill(_bc_uzero.begin(), _bc_uzero.end(), 0.);
   auto& _bc_uplus =
       get<::Tags::Tempaa<29, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  std::fill(_bc_uplus.begin(), _bc_uplus.end(), 0.);
   auto& _bc_uminus =
       get<::Tags::Tempaa<30, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  std::fill(_bc_uminus.begin(), _bc_uminus.end(), 0.);
 
   // 4) Compute intermediate variables now
   // 4.1) Spacetime form of interface normal (vector and oneform)
@@ -366,11 +361,11 @@ void local_variables(
     for (size_t b = 0; b < VolumeDim + 1; ++b) {
       local_projection_ab.get(a, b) =
           spacetime_metric.get(a, b) +
-          spacetime_normal_one_form.get(a) * spacetime_normal_one_form.get(b) +
+          spacetime_normal_one_form.get(a) * spacetime_normal_one_form.get(b) -
           local_interface_normal_one_form.get(a) *
               local_interface_normal_one_form.get(b);
       local_projection_Ab.get(a, b) =
-          spacetime_normal_one_form.get(a) * spacetime_normal_vector.get(b) +
+          spacetime_normal_one_form.get(a) * spacetime_normal_vector.get(b) -
           local_interface_normal_one_form.get(a) *
               local_interface_normal_vector.get(b);
       if (UNLIKELY(a == b)) {
@@ -378,17 +373,11 @@ void local_variables(
       }
       local_projection_AB.get(a, b) =
           inverse_spacetime_metric.get(a, b) +
-          spacetime_normal_vector.get(a) * spacetime_normal_vector.get(b) +
+          spacetime_normal_vector.get(a) * spacetime_normal_vector.get(b) -
           local_interface_normal_vector.get(a) *
               local_interface_normal_vector.get(b);
     }
   }
-  // 4.4) Characteristic speeds
-  get(local_char_speed_u_psi) = char_speeds.at(0);
-  get(local_char_speed_u_zero) = char_speeds.at(1);
-  get(local_char_speed_u_plus) = char_speeds.at(2);
-  get(local_char_speed_u_minus) = char_speeds.at(3);
-
   // 4.5) c^{\hat{0}-}_a = F_a + n^k C_{ka}
   for (size_t a = 0; a < VolumeDim + 1; ++a) {
     local_constraint_char_zero_minus.get(a) = f_constraint.get(a);
@@ -400,11 +389,6 @@ void local_variables(
           unit_interface_normal_vector.get(i) * two_index_constraint.get(i, a);
     }
   }
-  // fill preallocated memory with zeros
-  std::fill(_bc_upsi.begin(), _bc_upsi.end(), 0.);
-  std::fill(_bc_uzero.begin(), _bc_uzero.end(), 0.);
-  std::fill(_bc_uplus.begin(), _bc_uplus.end(), 0.);
-  std::fill(_bc_uminus.begin(), _bc_uminus.end(), 0.);
 }
 
 // \brief This struct sets boundary condition on dt<UPsi>
@@ -874,20 +858,10 @@ struct set_dt_u_minus {
                           /* unit_normal_one_form */) noexcept {
     // Not using auto below to enforce a loose test on the quantity being
     // fetched from the buffer
-    const tnsr::A<DataVector, VolumeDim,
-                  Frame::Inertial>& unit_interface_normal_vector =
-        get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    const typename Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>::type&
-        two_index_constraint =
-            get<::Tags::Tempia<34, VolumeDim, Frame::Inertial, DataVector>>(
-                buffer);
-    const typename Tags::FConstraint<VolumeDim,
-                                     Frame::Inertial>::type& f_constraint =
-        get<::Tags::Tempa<35, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    const typename Tags::FourIndexConstraint<VolumeDim, Frame::Inertial>::type&
-        four_index_constraint =
-            get<::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>>(
-                buffer);
+    // const tnsr::A<DataVector, VolumeDim,
+    //               Frame::Inertial>& unit_interface_normal_vector =
+    //     get<::Tags::TempA<5, VolumeDim, Frame::Inertial,
+    //     DataVector>>(buffer);
     const typename Tags::UMinus<VolumeDim, Frame::Inertial>::type&
         char_projected_rhs_dt_u_minus =
             get<::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>>(
@@ -898,38 +872,28 @@ struct set_dt_u_minus {
                      get(get<::Tags::TempScalar<14, DataVector>>(buffer)),
                      get(get<::Tags::TempScalar<15, DataVector>>(buffer))}};
 
-    // spacetime unit vector t^a
-    // const auto& spacetime_unit_normal_vector =
-    //     get<::Tags::TempA<7, VolumeDim, Frame::Inertial,
-    //     DataVector>>(buffer);
-    // const typename gr::Tags::Lapse<DataVector>::type& lapse =
-    //     get<::Tags::TempScalar<19, DataVector>>(buffer);
-    // const typename gr::Tags::Shift<VolumeDim, Frame::Inertial,
-    //                                DataVector>::type& shift =
-    //     get<::Tags::TempI<20, VolumeDim, Frame::Inertial,
-    //     DataVector>>(buffer);
-    // const auto& inverse_spatial_metric =
-    //     get<::Tags::TempII<21, VolumeDim, Frame::Inertial,
-    //     DataVector>>(buffer);
-    //
-    // const typename Tags::Pi<VolumeDim, Frame::Inertial>::type& pi =
-    //     get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars);
-    // const typename Tags::Phi<VolumeDim, Frame::Inertial>::type& phi =
-    //     get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars);
-    // const auto& d_spacetime_metric =
-    //     get<::Tags::Tempiaa<31, VolumeDim, Frame::Inertial, DataVector>>(
-    //         buffer);
-    // const auto& d_pi =
-    //     get<::Tags::Tempiaa<32, VolumeDim, Frame::Inertial, DataVector>>(
-    //         buffer);
-    // const auto& d_phi =
-    //     get<::Tags::Tempijaa<33, VolumeDim, Frame::Inertial, DataVector>>(
-    //         buffer);
-
-    const auto& local_constraint_char_zero_minus =
+    // timelike and spacelike SPACETIME vectors, l^a and k^a
+    const auto& outgoing_null_one_form =
+        get<::Tags::Tempa<0, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    const auto& incoming_null_one_form =
+        get<::Tags::Tempa<1, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    // timelike and spacelike SPACETIME oneforms, l_a and k_a
+    const auto& outgoing_null_vector =
+        get<::Tags::TempA<2, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    const auto& incoming_null_vector =
+        get<::Tags::TempA<3, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    // spacetime projection operator P_ab, P^ab, and P^a_b
+    const auto& projection_AB =
+        get<::Tags::TempAA<9, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    const auto& projection_ab =
+        get<::Tags::Tempaa<10, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    const auto& projection_Ab =
+        get<::Tags::TempAb<11, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    // constraint characteristics
+    const auto& constraint_char_zero_minus =
         get<::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    const auto& local_constraint_char_zero_plus =
-        get<::Tags::Tempa<36, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    const auto& constraint_char_zero_plus =
+        get<::Tags::Tempa<34, VolumeDim, Frame::Inertial, DataVector>>(buffer);
 
     // Memory allocated for return type
     ReturnType& bc_dt_u_minus =
@@ -939,9 +903,10 @@ struct set_dt_u_minus {
         return bc_dt_u_minus;
       case UMinusBcMethod::ConstraintPreservingBjorhus:
         return apply_bjorhus_constraint_preserving(
-            make_not_null(&bc_dt_u_minus), unit_interface_normal_vector,
-            two_index_constraint, f_constraint, four_index_constraint,
-            local_constraint_char_zero_plus, local_constraint_char_zero_minus,
+            make_not_null(&bc_dt_u_minus), incoming_null_one_form,
+            outgoing_null_one_form, incoming_null_vector, outgoing_null_vector,
+            projection_ab, projection_Ab, projection_AB,
+            constraint_char_zero_plus, constraint_char_zero_minus,
             char_projected_rhs_dt_u_minus, char_speeds);
       case UMinusBcMethod::Unknown:
       default:
@@ -952,17 +917,21 @@ struct set_dt_u_minus {
  private:
   static ReturnType apply_bjorhus_constraint_preserving(
       const gsl::not_null<ReturnType*> bc_dt_u_minus,
+      const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+          incoming_null_one_form,
+      const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+          outgoing_null_one_form,
       const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
-          unit_interface_normal_vector,
-      const tnsr::ia<DataVector, VolumeDim, Frame::Inertial>&
-          two_index_constraint,
-      const tnsr::a<DataVector, VolumeDim, Frame::Inertial>& f_constraint,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
-          four_index_constraint,
+          incoming_null_vector,
+      const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
+          outgoing_null_vector,
+      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& projection_ab,
+      const tnsr::Ab<DataVector, VolumeDim, Frame::Inertial>& projection_Ab,
+      const tnsr::AA<DataVector, VolumeDim, Frame::Inertial>& projection_AB,
       const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
-          local_constraint_char_zero_plus,
+          constraint_char_zero_plus,
       const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
-          local_constraint_char_zero_minus,
+          constraint_char_zero_minus,
       const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
           char_projected_rhs_dt_u_minus,
       const std::array<DataVector, 4>& char_speeds) noexcept;
@@ -972,25 +941,61 @@ template <typename ReturnType, size_t VolumeDim>
 ReturnType
 set_dt_u_minus<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
     const gsl::not_null<ReturnType*> bc_dt_u_minus,
-    const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
-        unit_interface_normal_vector,
-    const tnsr::ia<DataVector, VolumeDim, Frame::Inertial>&
-        two_index_constraint,
-    const tnsr::a<DataVector, VolumeDim, Frame::Inertial>& f_constraint,
-    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
-        four_index_constraint,
     const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
-        local_constraint_char_zero_plus,
+        incoming_null_one_form,
     const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
-        local_constraint_char_zero_minus,
+        outgoing_null_one_form,
+    const tnsr::A<DataVector, VolumeDim, Frame::Inertial>& incoming_null_vector,
+    const tnsr::A<DataVector, VolumeDim, Frame::Inertial>& outgoing_null_vector,
+    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& projection_ab,
+    const tnsr::Ab<DataVector, VolumeDim, Frame::Inertial>& projection_Ab,
+    const tnsr::AA<DataVector, VolumeDim, Frame::Inertial>& projection_AB,
+    const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+        constraint_char_zero_plus,
+    const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+        constraint_char_zero_minus,
     const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
         char_projected_rhs_dt_u_minus,
     const std::array<DataVector, 4>& char_speeds) noexcept {
   if (UNLIKELY(get_size(get<0, 0>(*bc_dt_u_minus)) !=
-               get_size(get<0>(unit_interface_normal_vector)))) {
-    *bc_dt_u_minus = ReturnType(get_size(get<0>(unit_interface_normal_vector)));
+               get_size(get<0>(incoming_null_one_form)))) {
+    *bc_dt_u_minus = ReturnType(get_size(get<0>(incoming_null_one_form)));
   }
-
+  const double mMu = 0.;  // hard-coded value from SpEC Bbh input file Mu = 0
+  for (size_t a = 0; a <= VolumeDim; ++a) {
+    for (size_t b = a; b <= VolumeDim; ++b) {
+      for (size_t c = 0; c <= VolumeDim; ++c) {
+        for (size_t d = 0; d <= VolumeDim; ++d) {
+          bc_dt_u_minus->get(a, b) +=
+              0.25 *
+              (incoming_null_vector.get(c) * incoming_null_vector.get(d) *
+                   outgoing_null_one_form.get(a) *
+                   outgoing_null_one_form.get(b) -
+               incoming_null_vector.get(c) * projection_Ab.get(d, a) *
+                   outgoing_null_one_form.get(b) -
+               incoming_null_vector.get(c) * projection_Ab.get(d, b) *
+                   outgoing_null_one_form.get(a) -
+               incoming_null_vector.get(d) * projection_Ab.get(c, a) *
+                   outgoing_null_one_form.get(b) -
+               incoming_null_vector.get(d) * projection_Ab.get(c, b) *
+                   outgoing_null_one_form.get(a) +
+               2.0 * projection_AB.get(c, d) * projection_ab.get(a, b)) *
+              char_projected_rhs_dt_u_minus.get(c, d);
+        }
+      }
+      for (size_t c = 0; c <= VolumeDim; ++c) {
+        bc_dt_u_minus->get(a, b) +=
+            0.5 * char_speeds.at(3) *
+            (constraint_char_zero_minus.get(c) -
+             mMu * constraint_char_zero_plus.get(c)) *
+            (0.5 * outgoing_null_one_form.get(a) *
+                 outgoing_null_one_form.get(b) * incoming_null_vector.get(c) +
+             projection_ab.get(a, b) * outgoing_null_vector.get(c) -
+             projection_Ab.get(c, b) * outgoing_null_one_form.get(a) -
+             projection_Ab.get(c, a) * outgoing_null_one_form.get(b));
+      }
+    }
+  }
   return *bc_dt_u_minus;
 }
 
