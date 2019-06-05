@@ -99,9 +99,13 @@ using all_local_vars = tmpl::list<
     // Char speeds
     ::Tags::TempScalar<12, DataVector>, ::Tags::TempScalar<13, DataVector>,
     ::Tags::TempScalar<14, DataVector>, ::Tags::TempScalar<15, DataVector>,
-    // Constraints
+    // Characteristics of Constraints
     ::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>,
-    ::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::Tempa<36, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::Tempia<34, VolumeDim, Frame::Inertial, DataVector>,   // C_{ja}
+    ::Tags::Tempa<35, VolumeDim, Frame::Inertial, DataVector>,    // F_a
+    ::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>,  // C_{jab}
+    // e^{ijk} C_{jkab}
     ::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>,
     // 3+1 geometric quantities: lapse, shift, inverse
     // 3-metric
@@ -124,7 +128,9 @@ using all_local_vars = tmpl::list<
     // derivatives of psi, pi, phi
     ::Tags::Tempiaa<31, VolumeDim, Frame::Inertial, DataVector>,
     ::Tags::Tempiaa<32, VolumeDim, Frame::Inertial, DataVector>,
-    ::Tags::Tempijaa<33, VolumeDim, Frame::Inertial, DataVector>>;
+    ::Tags::Tempijaa<33, VolumeDim, Frame::Inertial, DataVector>
+    // <34> and <35> defined above
+    >;
 
 // \brief This function computes intermediate variables needed for
 // Bjorhus-type constraint preserving boundary conditions for the
@@ -207,12 +213,6 @@ void local_variables(
   const auto& two_index_constraint =
       get<Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>>(
           vars_on_this_slice);
-  const auto& three_index_constraint =
-      get<Tags::ThreeIndexConstraint<VolumeDim, Frame::Inertial>>(
-          vars_on_this_slice);
-  const auto& four_index_constraint =
-      get<Tags::FourIndexConstraint<VolumeDim, Frame::Inertial>>(
-          vars_on_this_slice);
   const auto& f_constraint =
       get<Tags::FConstraint<VolumeDim, Frame::Inertial>>(vars_on_this_slice);
   // storage for DT<UChar> = CharProjection(dt<U>)
@@ -270,12 +270,23 @@ void local_variables(
   auto& local_char_speed_u_zero =
       get<::Tags::TempScalar<15, DataVector>>(*buffer);
   // constraint characteristics
+  get<::Tags::Tempa<35, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
+      get<Tags::FConstraint<VolumeDim, Frame::Inertial>>(vars_on_this_slice);
+  get<::Tags::Tempia<34, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
+      get<Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>>(
+          vars_on_this_slice);
   auto& local_constraint_char_zero_minus =
       get<::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
-  auto& local_constraint_char_three =
-      get<::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
-  auto& local_constraint_char_four =
-      get<::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  auto& local_constraint_char_zero_plus =
+      get<::Tags::Tempa<36, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
+  // 4.6) c^\hat{3}_{jab} = C_{jab} = \partial_j\psi_{ab} - \Phi_{jab}
+  get<::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
+      get<Tags::ThreeIndexConstraint<VolumeDim, Frame::Inertial>>(
+          vars_on_this_slice);
+  // 4.7) c^\hat{4}_{ijab} = C_{ijab}
+  get<::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
+      get<Tags::FourIndexConstraint<VolumeDim, Frame::Inertial>>(
+          vars_on_this_slice);
   // lapse, shift and inverse spatial_metric
   get<::Tags::TempScalar<19, DataVector>>(*buffer) =
       get<gr::Tags::Lapse<DataVector>>(vars_on_this_slice);
@@ -381,29 +392,12 @@ void local_variables(
   // 4.5) c^{\hat{0}-}_a = F_a + n^k C_{ka}
   for (size_t a = 0; a < VolumeDim + 1; ++a) {
     local_constraint_char_zero_minus.get(a) = f_constraint.get(a);
+    local_constraint_char_zero_plus.get(a) = f_constraint.get(a);
     for (size_t i = 0; i < VolumeDim; ++i) {
       local_constraint_char_zero_minus.get(a) +=
           unit_interface_normal_vector.get(i) * two_index_constraint.get(i, a);
-    }
-  }
-  // 4.6) c^\hat{3}_{jab} = C_{jab} = \partial_j\psi_{ab} - \Phi_{jab}
-  for (size_t i = 0; i < VolumeDim; ++i) {
-    for (size_t a = 0; a < VolumeDim + 1; ++a) {
-      // due to symmetry, loop over b \in [a, Dim + 1] instead of [0, Dim + 1]
-      for (size_t b = a; b < VolumeDim + 1; ++b) {
-        local_constraint_char_three.get(i, a, b) =
-            three_index_constraint.get(i, a, b);
-      }
-    }
-  }
-  // 4.7) c^\hat{4}_{ijab} = C_{ijab}
-  for (size_t i = 0; i < VolumeDim; ++i) {
-    for (size_t a = 0; a < VolumeDim + 1; ++a) {
-      // due to symmetry, loop over b \in [a, Dim + 1] instead of [0, Dim + 1]
-      for (size_t b = a; b < VolumeDim + 1; ++b) {
-        local_constraint_char_four.get(i, a, b) =
-            four_index_constraint.get(i, a, b);
-      }
+      local_constraint_char_zero_plus.get(a) -=
+          unit_interface_normal_vector.get(i) * two_index_constraint.get(i, a);
     }
   }
   // fill preallocated memory with zeros
@@ -685,22 +679,23 @@ set_dt_u_zero<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
       for (size_t i = 0; i < VolumeDim; ++i) {
         bc_dt_u_zero->get(i, a, b) = char_projected_rhs_dt_u_zero.get(i, a, b);
       }
-      // Lets say this term is T2_{jab} := - n_l N^l n^i C_{ijab}.
-      // But we store C4_{iab} = LeviCivita^{ijk} C_{jkab},
-      // which means  C_{ijab} = LeviCivita^{ijk} C4_{kab}
+      // Lets say this term is T2_{kab} := - n_l N^l n^j C_{jkab}.
+      // But we store C4_{iab} = LeviCivita^{ijk} dphi_{jkab},
+      // which means  C_{jkab} = LeviCivita^{ijk} C4_{iab}
       // where C4 is `four_index_constraint`.
-      // therefore, T2_{jab} =  char_speed<UZero> n^i C_{ijab},
-      // = char_speed<UZero> n^i LeviCivita^{ijk} C4_{kab}; i.e.
-      // if LeviCivitaIterator it is indexed by
+      // therefore, T2_{kab} =  char_speed<UZero> n^j C_{jkab}
+      // (since char_speed<UZero> = - n_l N^l), and therefore:
+      // T2_{kab} = char_speed<UZero> n^j LeviCivita^{ijk} C4_{iab}.
+      // Let LeviCivitaIterator be indexed by
       // it[0] <--> i,
       // it[1] <--> j,
       // it[2] <--> k, then
-      // T2_{it[1], ab} += char_speed<UZero> n^it[0] it.sign() C4_{it[2], ab};
+      // T2_{it[2], ab} += char_speed<UZero> n^it[1] it.sign() C4_{it[0], ab};
       for (LeviCivitaIterator<VolumeDim> it; it; ++it) {
-        bc_dt_u_zero->get(it[1], a, b) +=
+        bc_dt_u_zero->get(it[2], a, b) +=
             it.sign() * char_speeds.at(1) *
-            unit_interface_normal_vector.get(it[0] + 1) *
-            four_index_constraint.get(it[2], a, b);
+            unit_interface_normal_vector.get(it[1] + 1) *
+            four_index_constraint.get(it[0], a, b);
       }
     }
   }
@@ -882,6 +877,13 @@ struct set_dt_u_minus {
     const tnsr::A<DataVector, VolumeDim,
                   Frame::Inertial>& unit_interface_normal_vector =
         get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    const typename Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>::type&
+        two_index_constraint =
+            get<::Tags::Tempia<34, VolumeDim, Frame::Inertial, DataVector>>(
+                buffer);
+    const typename Tags::FConstraint<VolumeDim,
+                                     Frame::Inertial>::type& f_constraint =
+        get<::Tags::Tempa<35, VolumeDim, Frame::Inertial, DataVector>>(buffer);
     const typename Tags::FourIndexConstraint<VolumeDim, Frame::Inertial>::type&
         four_index_constraint =
             get<::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>>(
@@ -924,6 +926,11 @@ struct set_dt_u_minus {
     //     get<::Tags::Tempijaa<33, VolumeDim, Frame::Inertial, DataVector>>(
     //         buffer);
 
+    const auto& local_constraint_char_zero_minus =
+        get<::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    const auto& local_constraint_char_zero_plus =
+        get<::Tags::Tempa<36, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+
     // Memory allocated for return type
     ReturnType& bc_dt_u_minus =
         get<::Tags::Tempaa<30, VolumeDim, Frame::Inertial, DataVector>>(buffer);
@@ -933,7 +940,9 @@ struct set_dt_u_minus {
       case UMinusBcMethod::ConstraintPreservingBjorhus:
         return apply_bjorhus_constraint_preserving(
             make_not_null(&bc_dt_u_minus), unit_interface_normal_vector,
-            four_index_constraint, char_projected_rhs_dt_u_minus, char_speeds);
+            two_index_constraint, f_constraint, four_index_constraint,
+            local_constraint_char_zero_plus, local_constraint_char_zero_minus,
+            char_projected_rhs_dt_u_minus, char_speeds);
       case UMinusBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method fo UMinus not implemented!");
@@ -945,8 +954,15 @@ struct set_dt_u_minus {
       const gsl::not_null<ReturnType*> bc_dt_u_minus,
       const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
           unit_interface_normal_vector,
+      const tnsr::ia<DataVector, VolumeDim, Frame::Inertial>&
+          two_index_constraint,
+      const tnsr::a<DataVector, VolumeDim, Frame::Inertial>& f_constraint,
       const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
           four_index_constraint,
+      const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+          local_constraint_char_zero_plus,
+      const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+          local_constraint_char_zero_minus,
       const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
           char_projected_rhs_dt_u_minus,
       const std::array<DataVector, 4>& char_speeds) noexcept;
@@ -958,8 +974,15 @@ set_dt_u_minus<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
     const gsl::not_null<ReturnType*> bc_dt_u_minus,
     const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
         unit_interface_normal_vector,
+    const tnsr::ia<DataVector, VolumeDim, Frame::Inertial>&
+        two_index_constraint,
+    const tnsr::a<DataVector, VolumeDim, Frame::Inertial>& f_constraint,
     const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
         four_index_constraint,
+    const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+        local_constraint_char_zero_plus,
+    const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+        local_constraint_char_zero_minus,
     const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
         char_projected_rhs_dt_u_minus,
     const std::array<DataVector, 4>& char_speeds) noexcept {
