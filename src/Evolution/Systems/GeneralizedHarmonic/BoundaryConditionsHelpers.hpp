@@ -73,6 +73,7 @@ enum class UMinusBcMethod {
   AnalyticBc,
   Freezing,
   ConstraintPreservingBjorhus,
+  ConstraintPreservingPhysicalBjorhus,
   Unknown
 };
 
@@ -478,13 +479,12 @@ set_dt_u_psi<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
     const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
         char_projected_rhs_dt_u_psi,
     const std::array<DataVector, 4>& char_speeds) noexcept {
-  if (UNLIKELY(get_size(get<0, 0>(*bc_dt_u_psi)) !=
-               get_size(get<0>(unit_interface_normal_vector)))) {
-    *bc_dt_u_psi = ReturnType(get_size(get<0>(unit_interface_normal_vector)));
-  }
+  ASSERT(get_size(get<0, 0>(*bc_dt_u_psi)) ==
+             get_size(get<0>(unit_interface_normal_vector)),
+         "Size of input variables and temporary memory do not match.");
   for (size_t a = 0; a <= VolumeDim; ++a) {
     for (size_t b = a; b <= VolumeDim; ++b) {
-      bc_dt_u_psi->get(a, b) = char_projected_rhs_dt_u_psi.get(a, b);
+      bc_dt_u_psi->get(a, b) += char_projected_rhs_dt_u_psi.get(a, b);
       for (size_t i = 0; i < VolumeDim; ++i) {
         bc_dt_u_psi->get(a, b) += char_speeds.at(0) *
                                   unit_interface_normal_vector.get(i + 1) *
@@ -503,12 +503,11 @@ set_dt_u_psi<ReturnType, VolumeDim>::apply_dirichlet_constraint_preserving(
     const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
     const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
     const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi) noexcept {
-  if (UNLIKELY(get_size(get<0, 0>(*bc_dt_u_psi)) != get_size(get(lapse)))) {
-    *bc_dt_u_psi = ReturnType(get_size(get(lapse)));
-  }
+  ASSERT(get_size(get<0, 0>(*bc_dt_u_psi)) == get_size(get(lapse)),
+         "Size of input variables and temporary memory do not match.");
   for (size_t a = 0; a <= VolumeDim; ++a) {
     for (size_t b = a; b <= VolumeDim; ++b) {
-      bc_dt_u_psi->get(a, b) = -get(lapse) * pi.get(a, b);
+      bc_dt_u_psi->get(a, b) -= get(lapse) * pi.get(a, b);
       for (size_t i = 0; i < VolumeDim; ++i) {
         bc_dt_u_psi->get(a, b) += shift.get(i) * phi.get(i, a, b);
       }
@@ -654,14 +653,13 @@ set_dt_u_zero<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
     const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
         char_projected_rhs_dt_u_zero,
     const std::array<DataVector, 4>& char_speeds) noexcept {
-  if (UNLIKELY(get_size(get<0, 0, 0>(*bc_dt_u_zero)) !=
-               get_size(get<0>(unit_interface_normal_vector)))) {
-    *bc_dt_u_zero = ReturnType(get_size(get<0>(unit_interface_normal_vector)));
-  }
+  ASSERT(get_size(get<0, 0, 0>(*bc_dt_u_zero)) ==
+             get_size(get<0>(unit_interface_normal_vector)),
+         "Size of input variables and temporary memory do not match.");
   for (size_t a = 0; a <= VolumeDim; ++a) {
     for (size_t b = a; b <= VolumeDim; ++b) {
       for (size_t i = 0; i < VolumeDim; ++i) {
-        bc_dt_u_zero->get(i, a, b) = char_projected_rhs_dt_u_zero.get(i, a, b);
+        bc_dt_u_zero->get(i, a, b) += char_projected_rhs_dt_u_zero.get(i, a, b);
       }
       // Lets say this term is T2_{kab} := - n_l N^l n^j C_{jkab}.
       // But we store C4_{iab} = LeviCivita^{ijk} dphi_{jkab},
@@ -705,9 +703,8 @@ set_dt_u_zero<ReturnType, VolumeDim>::apply_dirichlet_constraint_preserving(
     const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_psi,
     const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_pi,
     const tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>& d_phi) noexcept {
-  if (UNLIKELY(get_size(get<0, 0, 0>(*bc_dt_u_zero)) != get_size(get(lapse)))) {
-    *bc_dt_u_zero = ReturnType(get_size(get(lapse)));
-  }
+  ASSERT(get_size(get<0, 0, 0>(*bc_dt_u_zero)) == get_size(get(lapse)),
+         "Size of input variables and temporary memory do not match.");
   for (size_t a = 0; a <= VolumeDim; ++a) {
     for (size_t b = 0; b <= VolumeDim; ++b) {
       // For a chosen (a, b):
@@ -746,7 +743,7 @@ set_dt_u_zero<ReturnType, VolumeDim>::apply_dirichlet_constraint_preserving(
         normal_dot_tmp += unit_interface_normal_vector.get(i + 1) * tmp.get(i);
       }
       for (size_t i = 0; i < VolumeDim; ++i) {
-        bc_dt_u_zero->get(i, a, b) =
+        bc_dt_u_zero->get(i, a, b) +=
             tmp.get(i) - unit_interface_normal_one_form.get(i) * normal_dot_tmp;
       }
     }
@@ -773,9 +770,8 @@ ReturnType set_dt_u_zero<ReturnType, VolumeDim>::
         const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_pi,
         const tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>&
             d_phi) noexcept {
-  if (UNLIKELY(get_size(get<0, 0, 0>(*bc_dt_u_zero)) != get_size(get(lapse)))) {
-    *bc_dt_u_zero = ReturnType(get_size(get(lapse)));
-  }
+  ASSERT(get_size(get<0, 0, 0>(*bc_dt_u_zero)) == get_size(get(lapse)),
+         "Size of input variables and temporary memory do not match.");
   for (size_t a = 0; a <= VolumeDim; ++a) {
     for (size_t b = 0; b <= VolumeDim; ++b) {
       // For a chosen (a, b):
@@ -814,7 +810,7 @@ ReturnType set_dt_u_zero<ReturnType, VolumeDim>::
         normal_dot_tmp += unit_interface_normal_vector.get(i + 1) * tmp.get(i);
       }
       for (size_t i = 0; i < VolumeDim; ++i) {
-        bc_dt_u_zero->get(i, a, b) =
+        bc_dt_u_zero->get(i, a, b) +=
             tmp.get(i) - unit_interface_normal_one_form.get(i) * normal_dot_tmp;
       }
     }
@@ -957,10 +953,9 @@ set_dt_u_minus<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
     const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
         char_projected_rhs_dt_u_minus,
     const std::array<DataVector, 4>& char_speeds) noexcept {
-  if (UNLIKELY(get_size(get<0, 0>(*bc_dt_u_minus)) !=
-               get_size(get<0>(incoming_null_one_form)))) {
-    *bc_dt_u_minus = ReturnType(get_size(get<0>(incoming_null_one_form)));
-  }
+  ASSERT(get_size(get<0, 0>(*bc_dt_u_minus)) ==
+             get_size(get<0>(incoming_null_one_form)),
+         "Size of input variables and temporary memory do not match.");
   const double mMu = 0.;  // hard-coded value from SpEC Bbh input file Mu = 0
   for (size_t a = 0; a <= VolumeDim; ++a) {
     for (size_t b = a; b <= VolumeDim; ++b) {
