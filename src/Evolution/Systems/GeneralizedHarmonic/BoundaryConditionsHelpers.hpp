@@ -14,6 +14,7 @@
 #include "DataStructures/DataBox/DataOnSlice.hpp"
 #include "DataStructures/LeviCivitaIterator.hpp"
 #include "DataStructures/TempBuffer.hpp"
+#include "DataStructures/Tensor/EagerMath/DeterminantAndInverse.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "DataStructures/VariablesHelpers.hpp"
@@ -48,25 +49,26 @@ struct Magnitude;
 /// \endcond
 
 namespace GeneralizedHarmonic {
-// c.f. SpEC `ComputeRicci.cpp`
-template <size_t SpatialDim, typename Frame, typename DataType>
-tnsr::ii<DataType, SpatialDim, Frame> spatial_ricci_tensor_from_KST_vars(
-    const tnsr::ijj<DataType, SpatialDim, Frame>& kst_var_D,
-    const tnsr::ijkk<DataType, SpatialDim, Frame>& d_kst_var_D,
-    const tnsr::II<DataType, SpatialDim, Frame>&
+// Eq. (2.20) of Kidder, Scheel & Teukolsky (KST) [gr-qc/0105031v1]
+// Compute R_{ij} from D_(k,i,j) = (1/2) \partial_k g_(ij)
+template <size_t VolumeDim, typename Frame, typename DataType>
+tnsr::ii<DataType, VolumeDim, Frame> spatial_ricci_tensor_from_KST_vars(
+    const tnsr::ijj<DataType, VolumeDim, Frame>& kst_var_D,
+    const tnsr::ijkk<DataType, VolumeDim, Frame>& d_kst_var_D,
+    const tnsr::II<DataType, VolumeDim, Frame>&
         inverse_spatial_metric) noexcept {
-  auto ricci = make_with_value<tnsr::ii<DataType, SpatialDim, Frame>>(
+  auto ricci = make_with_value<tnsr::ii<DataType, VolumeDim, Frame>>(
       inverse_spatial_metric, 0.);
 
   // New variable to avoid recomputing stuff in nested loops
-  tnsr::ijj<DataType, SpatialDim, Frame> Dudd(
+  tnsr::ijj<DataType, VolumeDim, Frame> Dudd(
       get_size(get<0, 0>(inverse_spatial_metric)));
 
-  for (int k = 0; k < SpatialDim; ++k) {
-    for (int i = 0; i < SpatialDim; ++i) {
-      for (int j = i; j < SpatialDim; ++j) {  // Symmetry
+  for (size_t k = 0; k < VolumeDim; ++k) {
+    for (size_t i = 0; i < VolumeDim; ++i) {
+      for (size_t j = i; j < VolumeDim; ++j) {  // Symmetry
         Dudd.get(k, i, j) = 0.;
-        for (int l = 0; l < SpatialDim; ++l)
+        for (size_t l = 0; l < VolumeDim; ++l)
           Dudd.get(k, i, j) +=
               inverse_spatial_metric.get(k, l) * kst_var_D.get(l, i, j);
       }
@@ -74,13 +76,13 @@ tnsr::ii<DataType, SpatialDim, Frame> spatial_ricci_tensor_from_KST_vars(
   }
 
   // New variable to avoid recomputing stuff in nested loops
-  tnsr::ijk<DataType, SpatialDim, Frame> Dddu(
+  tnsr::ijk<DataType, VolumeDim, Frame> Dddu(
       get_size(get<0, 0>(inverse_spatial_metric)));
-  for (int k = 0; k < SpatialDim; ++k) {
-    for (int i = 0; i < SpatialDim; ++i) {
-      for (int j = 0; j < SpatialDim; ++j) {
+  for (size_t k = 0; k < VolumeDim; ++k) {
+    for (size_t i = 0; i < VolumeDim; ++i) {
+      for (size_t j = 0; j < VolumeDim; ++j) {
         Dddu.get(i, j, k) = 0.;
-        for (int l = 0; l < SpatialDim; ++l)
+        for (size_t l = 0; l < VolumeDim; ++l)
           Dddu.get(i, j, k) +=
               inverse_spatial_metric.get(k, l) * kst_var_D.get(i, j, l);
       }
@@ -88,34 +90,34 @@ tnsr::ii<DataType, SpatialDim, Frame> spatial_ricci_tensor_from_KST_vars(
   }
 
   // New variable to avoid recomputing stuff in nested loops
-  tnsr::i<DataType, SpatialDim, Frame> Dtr1(
+  tnsr::i<DataType, VolumeDim, Frame> Dtr1(
       get_size(get<0, 0>(inverse_spatial_metric)));
   //  kst_var_D.get(i,m,n)*inverse_spatial_metric.get(m,n)
-  for (int i = 0; i < SpatialDim; ++i) {
+  for (size_t i = 0; i < VolumeDim; ++i) {
     Dtr1.get(i) = 0.;
-    for (int j = 0; j < SpatialDim; ++j)
+    for (size_t j = 0; j < VolumeDim; ++j)
       Dtr1.get(i) += Dddu.get(i, j, j);
   }
   //   kst_var_D.get(m,n,i)*inverse_spatial_metric.get(m,n)
-  tnsr::i<DataType, SpatialDim, Frame> Dtr2(
+  tnsr::i<DataType, VolumeDim, Frame> Dtr2(
       get_size(get<0, 0>(inverse_spatial_metric)));
-  for (int i = 0; i < SpatialDim; ++i) {
+  for (size_t i = 0; i < VolumeDim; ++i) {
     Dtr2.get(i) = 0.;
-    for (int j = 0; j < SpatialDim; ++j)
+    for (size_t j = 0; j < VolumeDim; ++j)
       Dtr2.get(i) += Dudd.get(j, j, i);
   }
 
   const auto Dtr1up = raise_or_lower_index(Dtr1, inverse_spatial_metric);
   const auto Dtr2up = raise_or_lower_index(Dtr2, inverse_spatial_metric);
 
-  for (int i = 0; i < SpatialDim; ++i) {
-    for (int j = i; j < SpatialDim; ++j) {  // Symmetry
+  for (size_t i = 0; i < VolumeDim; ++i) {
+    for (size_t j = i; j < VolumeDim; ++j) {  // Symmetry
       ricci.get(i, j) = 0.;
-      for (int p = 0; p < SpatialDim; ++p) {
+      for (size_t p = 0; p < VolumeDim; ++p) {
         ricci.get(i, j) += (kst_var_D.get(p, i, j) - kst_var_D.get(i, j, p) -
-                        kst_var_D.get(j, i, p)) *
-                       (2.0 * Dtr2up.get(p) - Dtr1up.get(p));
-        for (int q = 0; q < SpatialDim; ++q) {
+                            kst_var_D.get(j, i, p)) *
+                           (2.0 * Dtr2up.get(p) - Dtr1up.get(p));
+        for (size_t q = 0; q < VolumeDim; ++q) {
           ricci.get(i, j) +=
               0.5 * inverse_spatial_metric.get(p, q) *
                   (d_kst_var_D.get(j, q, p, i) + d_kst_var_D.get(i, q, p, j) -
@@ -131,6 +133,150 @@ tnsr::ii<DataType, SpatialDim, Frame> spatial_ricci_tensor_from_KST_vars(
   }
 
   return ricci;
+}
+
+// Eq. (2.19) of Kidder, Scheel & Teukolsky (KST) [gr-qc/0105031v1]
+// Compute \Gamma^k_{ij} from D_(k,i,j) = (1/2) \partial_k g_(ij)
+template <size_t VolumeDim, typename Frame, typename DataType>
+tnsr::Ijj<DataType, VolumeDim, Frame>
+spatial_christoffel_second_kind_from_KST_vars(
+    const tnsr::ijj<DataType, VolumeDim, Frame>& kst_var_D,
+    const tnsr::II<DataType, VolumeDim, Frame>&
+        inverse_spatial_metric) noexcept {
+  tnsr::ijj<DataType, VolumeDim, Frame> christoffel_first_kind{
+      get_size(get<0, 0>(inverse_spatial_metric))};
+  for (size_t k = 0; k < VolumeDim; ++k) {
+    for (size_t i = 0; i < VolumeDim; ++i) {
+      for (size_t j = i; j < VolumeDim; ++j) {  // Symmetry
+        christoffel_first_kind.get(k, i, j) = kst_var_D.get(i, j, k) +
+                                              kst_var_D.get(j, i, k) -
+                                              kst_var_D.get(k, i, j);
+      }
+    }
+  }
+  auto christoffel_second_kind =
+      make_with_value<tnsr::Ijj<DataType, VolumeDim, Frame>>(
+          inverse_spatial_metric, 0.);
+  // raise first index
+  for (size_t k = 0; k < VolumeDim; ++k) {
+    for (size_t i = 0; i < VolumeDim; ++i) {
+      for (size_t j = 0; j < VolumeDim; ++j) {
+        for (size_t l = 0; l < VolumeDim; ++l) {
+          christoffel_second_kind.get(k, i, j) +=
+              inverse_spatial_metric.get(k, l) *
+              christoffel_first_kind.get(l, i, j);
+        }
+      }
+    }
+  }
+  return christoffel_second_kind;
+}
+
+// Spatial projection tensors
+template <size_t VolumeDim, typename Frame, typename DataType, typename RetType>
+void spatial_projection_tensor(
+    const gsl::not_null<RetType*> projection_tensor,
+    const tnsr::II<DataType, VolumeDim, Frame>& inverse_spatial_metric,
+    const tnsr::A<DataType, VolumeDim, Frame>& normal_vector) noexcept {
+  for (size_t i = 0; i < VolumeDim; ++i) {
+    for (size_t j = i; j < VolumeDim; ++j) {
+      projection_tensor->get(i, j) =
+          inverse_spatial_metric.get(i, j) -
+          normal_vector.get(i + 1) * normal_vector.get(j + 1);
+    }
+  }
+}
+template <size_t VolumeDim, typename Frame, typename DataType, typename RetType>
+void spatial_projection_tensor(
+    const gsl::not_null<RetType*> projection_tensor,
+    const tnsr::ii<DataType, VolumeDim, Frame>& spatial_metric,
+    const tnsr::a<DataType, VolumeDim, Frame>& normal_one_form) noexcept {
+  for (size_t i = 0; i < VolumeDim; ++i) {
+    for (size_t j = i; j < VolumeDim; ++j) {
+      projection_tensor->get(i, j) =
+          spatial_metric.get(i, j) -
+          normal_one_form.get(i + 1) * normal_one_form.get(j + 1);
+    }
+  }
+}
+template <size_t VolumeDim, typename Frame, typename DataType, typename RetType>
+void spatial_projection_tensor(
+    const gsl::not_null<RetType*> projection_tensor,
+    const tnsr::A<DataType, VolumeDim, Frame>& normal_vector,
+    const tnsr::a<DataType, VolumeDim, Frame>& normal_one_form) noexcept {
+  for (size_t i = 0; i < VolumeDim; ++i) {
+    projection_tensor->get(i, i) = 0.;
+    for (size_t j = 0; j < VolumeDim; ++j) {
+      projection_tensor->get(i, j) =
+          -normal_vector.get(i + 1) * normal_one_form.get(j + 1);
+    }
+  }
+}
+
+// This computes U8(+/-)_{ij} = [P^(a_i P^b)_j - (1/2) P_{ij} P^{ab}] *
+//                              [E_{ab} -/+ \epsilon_{a}{}^{cd} n_d B_{cb}]
+//
+// Note that U8+_{ij} is proportional to the Newman-Penrose Psi4
+//       and U8-_{ij} is proportional to the Newman-Penrose Psi0
+//
+// Here
+// U8(a,b)     = U8_{ab}
+// ni(a)       = n_a      (unit normal)
+// nI(a)       = n^a
+// PIJ(a,b)    = P^{ab}   (projection operator = g^{ab} - n^a n^b)
+// Pij(a,b)    = P_{ab}   (projection operator = g_{ab} - n_a n_b)
+// PIj(a,b)    = P^a_b    (projection operator = g^a_b  - n^a n_b)
+// K(a,b)      = K_{ab}
+// Ricci(a,b)  = Ricci_{ab}
+// Invg(a,b)   = g^{ab}
+// CdK(a,b)(c) = \nabla_c K_{ab}
+template <size_t VolumeDim, typename Frame, typename DataType, typename RetType>
+void weyl_propagating(
+    const gsl::not_null<RetType*> U8,
+    const tnsr::ii<DataType, VolumeDim, Frame>& ricci,
+    const tnsr::ii<DataType, VolumeDim, Frame>& extrinsic_curvature,
+    const tnsr::II<DataType, VolumeDim, Frame>& inverse_spatial_metric,
+    const tnsr::ijj<DataType, VolumeDim, Frame>& CdK,
+    const tnsr::a<DataType, VolumeDim, Frame>& /* unit_normal */,
+    const tnsr::A<DataType, VolumeDim, Frame>& unit_interface_normal_vector,
+    const tnsr::II<DataType, VolumeDim, Frame>& projection_IJ,
+    const tnsr::ii<DataType, VolumeDim, Frame>& projection_ij,
+    const tnsr::Ij<DataType, VolumeDim, Frame>& projection_Ij,
+    const int sign) noexcept {
+  // Fill temp with unprojected quantity
+  tnsr::ii<DataType, VolumeDim, Frame> temp(
+      get_size(get<0>(unit_interface_normal_vector)));
+  for (size_t a = 0; a < VolumeDim; ++a) {
+    for (size_t b = a; b < VolumeDim; ++b) {  // Symmetry
+      temp.get(a, b) = ricci.get(a, b);
+      for (size_t c = 0; c < VolumeDim; ++c) {
+        temp.get(a, b) -=
+            sign * unit_interface_normal_vector.get(c) *
+            (CdK.get(c, a, b) - 0.5 * (CdK.get(b, a, c) + CdK.get(a, b, c)));
+        for (size_t d = 0; d < VolumeDim; ++d) {
+          temp.get(a, b) +=
+              inverse_spatial_metric.get(c, d) *
+              (extrinsic_curvature.get(a, b) * extrinsic_curvature.get(c, d) -
+               extrinsic_curvature.get(a, c) * extrinsic_curvature.get(d, b));
+        }
+      }
+    }
+  }
+
+  // Now project
+  for (size_t i = 0; i < VolumeDim; ++i) {
+    for (size_t j = i; j < VolumeDim; ++j) {  // Symmetry
+      U8->get(i, j) = 0.;
+      for (size_t a = 0; a < VolumeDim; ++a) {
+        for (size_t b = 0; b < VolumeDim; ++b) {
+          U8->get(i, j) +=
+              (projection_Ij.get(a, i) * projection_Ij.get(b, j) -
+               0.5 * projection_IJ.get(a, b) * projection_ij.get(i, j)) *
+              temp.get(a, b);
+        }
+      }
+    }
+  }
 }
 }  // namespace GeneralizedHarmonic
 
@@ -208,7 +354,7 @@ using all_local_vars = tmpl::list<
     ::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>,
     // ::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>,
     ::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>,
-    // Constraint damping parameter
+    // Constraint damping parameter gamma2
     ::Tags::TempScalar<26, DataVector>,
     // Preallocated memory to store boundary conditions
     ::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>,
@@ -950,10 +1096,15 @@ struct set_dt_u_minus {
                           /* unit_normal_one_form */) noexcept {
     // Not using auto below to enforce a loose test on the quantity being
     // fetched from the buffer
+    const typename Tags::ConstraintGamma2::type& constraint_gamma2 =
+        get<::Tags::TempScalar<26, DataVector>>(buffer);
     const typename Tags::ThreeIndexConstraint<VolumeDim, Frame::Inertial>::type&
         three_index_constraint =
             get<::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>>(
                 buffer);
+    const tnsr::a<DataVector, VolumeDim,
+                  Frame::Inertial>& unit_interface_normal_one_form =
+        get<::Tags::Tempa<4, VolumeDim, Frame::Inertial, DataVector>>(buffer);
     const tnsr::A<DataVector, VolumeDim,
                   Frame::Inertial>& unit_interface_normal_vector =
         get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(buffer);
@@ -1001,16 +1152,11 @@ struct set_dt_u_minus {
     const auto& inverse_spacetime_metric =
         get<::Tags::TempAA<36, VolumeDim, Frame::Inertial, DataVector>>(buffer);
 
-    const typename Tags::Pi<VolumeDim, Frame::Inertial>::type& pi =
-        get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars);
     const typename Tags::Phi<VolumeDim, Frame::Inertial>::type& phi =
         get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars);
-    const auto& d_spacetime_metric =
-        get<::Tags::Tempiaa<31, VolumeDim, Frame::Inertial, DataVector>>(
-            buffer);
-    const auto& d_pi =
-        get<::Tags::Tempiaa<32, VolumeDim, Frame::Inertial, DataVector>>(
-            buffer);
+    // const auto& d_pi =
+    //     get<::Tags::Tempiaa<32, VolumeDim, Frame::Inertial, DataVector>>(
+    //         buffer);
     const auto& d_phi =
         get<::Tags::Tempijaa<33, VolumeDim, Frame::Inertial, DataVector>>(
             buffer);
@@ -1035,14 +1181,12 @@ struct set_dt_u_minus {
             constraint_char_zero_plus, constraint_char_zero_minus,
             char_projected_rhs_dt_u_minus, char_speeds);
         return apply_bjorhus_constraint_preserving_physical(
-            make_not_null(&bc_dt_u_minus), unit_interface_normal_vector,
-            spacetime_unit_normal_vector, incoming_null_one_form,
-            outgoing_null_one_form, incoming_null_vector, outgoing_null_vector,
-            projection_ab, projection_Ab, projection_AB, inverse_spatial_metric,
-            extrinsic_curvature, inverse_spacetime_metric,
-            three_index_constraint, constraint_char_zero_plus,
-            constraint_char_zero_minus, char_projected_rhs_dt_u_minus, d_pi,
-            d_phi, char_speeds);
+            make_not_null(&bc_dt_u_minus), constraint_gamma2,
+            unit_interface_normal_one_form, unit_interface_normal_vector,
+            spacetime_unit_normal_vector, projection_ab, projection_Ab,
+            projection_AB, inverse_spatial_metric, extrinsic_curvature,
+            inverse_spacetime_metric, three_index_constraint,
+            char_projected_rhs_dt_u_minus, phi, d_phi, char_speeds);
       case UMinusBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method fo UMinus not implemented!");
@@ -1072,18 +1216,13 @@ struct set_dt_u_minus {
       const std::array<DataVector, 4>& char_speeds) noexcept;
   static ReturnType apply_bjorhus_constraint_preserving_physical(
       const gsl::not_null<ReturnType*> bc_dt_u_minus,
+      const Scalar<DataVector>& gamma2,
+      const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+          unit_interface_normal_one_form,
       const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
           unit_interface_normal_vector,
       const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
           spacetime_unit_normal_vector,
-      const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
-          incoming_null_one_form,
-      const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
-          outgoing_null_one_form,
-      const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
-          incoming_null_vector,
-      const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
-          outgoing_null_vector,
       const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& projection_ab,
       const tnsr::Ab<DataVector, VolumeDim, Frame::Inertial>& projection_Ab,
       const tnsr::AA<DataVector, VolumeDim, Frame::Inertial>& projection_AB,
@@ -1095,13 +1234,9 @@ struct set_dt_u_minus {
           inverse_spacetime_metric,
       const typename Tags::ThreeIndexConstraint<
           VolumeDim, Frame::Inertial>::type& three_index_constraint,
-      const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
-          constraint_char_zero_plus,
-      const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
-          constraint_char_zero_minus,
       const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
           char_projected_rhs_dt_u_minus,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_pi,
+      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
       const tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>& d_phi,
       const std::array<DataVector, 4>& char_speeds) noexcept;
 };
@@ -1171,18 +1306,13 @@ template <typename ReturnType, size_t VolumeDim>
 ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
     apply_bjorhus_constraint_preserving_physical(
         const gsl::not_null<ReturnType*> bc_dt_u_minus,
+        const Scalar<DataVector>& gamma2,
+        const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+            unit_interface_normal_one_form,
         const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
             unit_interface_normal_vector,
         const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
             spacetime_unit_normal_vector,
-        const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
-            incoming_null_one_form,
-        const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
-            outgoing_null_one_form,
-        const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
-            incoming_null_vector,
-        const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
-            outgoing_null_vector,
         const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& projection_ab,
         const tnsr::Ab<DataVector, VolumeDim, Frame::Inertial>& projection_Ab,
         const tnsr::AA<DataVector, VolumeDim, Frame::Inertial>& projection_AB,
@@ -1194,23 +1324,17 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
             inverse_spacetime_metric,
         const typename Tags::ThreeIndexConstraint<
             VolumeDim, Frame::Inertial>::type& three_index_constraint,
-        const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
-            constraint_char_zero_plus,
-        const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
-            constraint_char_zero_minus,
         const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
             char_projected_rhs_dt_u_minus,
-        const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_pi,
+        const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
         const tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>& d_phi,
         const std::array<DataVector, 4>& char_speeds) noexcept {
   //-------------------------------------------------------------------
   // Add in physical boundary condition
   //-------------------------------------------------------------------
-  ASSERT(get_size(get<0, 0>(*bc_dt_u_minus)) ==
-             get_size(get<0>(incoming_null_one_form)),
+  ASSERT(get_size(get<0, 0>(*bc_dt_u_minus)) == get_size(get(gamma2)),
          "Size of input variables and temporary memory do not match.");
   // hard-coded value from SpEC Bbh input file Mu = MuPhys = 0
-  const double mMu = 0.;
   const double mMuPhys = 0.;
   const bool mAdjustPhysUsingC4 = true;
   const bool mGamma2InPhysBc = true;
@@ -1219,7 +1343,7 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
   // (2001) https://arxiv.org/pdf/gr-qc/0105031.pdf. We will refer to this
   // article as KST henceforth, and use the abbreviation in variable names
   // to disambiguate their origin.
-#if 0
+  // #if 0
   auto U8p = make_with_value<tnsr::ii<DataVector, VolumeDim, Frame::Inertial>>(
       unit_interface_normal_vector, 0.);
   auto U8m = make_with_value<tnsr::ii<DataVector, VolumeDim, Frame::Inertial>>(
@@ -1227,18 +1351,16 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
   {
     // Tensor<DataMesh> Kij =
     //     ComputeLowerExtrinsicCurvatureFromSpacetimeMetric(Invpsi, kappa);
-    // Tensor<DataMesh> kst_D(VolumeDim, "211", mesh);
-    // Tensor<Tensor<DataMesh>> d_kst_D(TensorStructure(VolumeDim, "211"),
-    //                                TensorStructure(VolumeDim, "d"), mesh);
+    // D_(k,i,j) = (1/2) \partial_k g_(ij) and its derivative
     tnsr::ijj<DataVector, VolumeDim, Frame::Inertial> kst_D(
-        get_size(get<0>(incoming_null_one_form)));
+        get_size(get(gamma2)));
     tnsr::ijkk<DataVector, VolumeDim, Frame::Inertial> d_kst_D(
-        get_size(get<0>(incoming_null_one_form)));
-    for (int i = 0; i < VolumeDim; ++i) {
-      for (int j = i; j < VolumeDim; ++j) {
-        for (int k = 0; k < VolumeDim; ++k) {
+        get_size(get(gamma2)));
+    for (size_t i = 0; i < VolumeDim; ++i) {
+      for (size_t j = i; j < VolumeDim; ++j) {
+        for (size_t k = 0; k < VolumeDim; ++k) {
           kst_D.get(k, i, j) = 0.5 * phi.get(k, i + 1, j + 1);
-          for (int l = 0; l < VolumeDim; ++l) {
+          for (size_t l = 0; l < VolumeDim; ++l) {
             d_kst_D.get(l, k, i, j) = 0.5 * d_phi.get(l, k, i + 1, j + 1);
           }
         }
@@ -1246,29 +1368,29 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
     }
 
     // ComputeRicciFromD(kst_D, d_kst_D, Invg, Ricci3);
-    const auto ricci_3 =
-        GeneralizedHarmonic::spatial_ricci_tensor_from_KST_vars(
-            kst_D, d_kst_D, inverse_spatial_metric);
+    auto ricci_3 = GeneralizedHarmonic::spatial_ricci_tensor_from_KST_vars(
+        kst_D, d_kst_D, inverse_spatial_metric);
 
     // Tensor<Tensor<DataMesh>> CdK(TensorStructure(VolumeDim, "11"),
     //                              TensorStructure(VolumeDim, "d"), mesh);
     tnsr::ijj<DataVector, VolumeDim, Frame::Inertial> CdK(
-        get_size(get<0>(incoming_null_one_form)));
+        get_size(get(gamma2)));
     {
-      Tensor<DataMesh> Gamma2(VolumeDim, "211", mesh);
-      ComputeChristoffelSecondKindFromD(KstD, Invg, Gamma2);
+      const auto christoffel_second_kind =
+          GeneralizedHarmonic::spatial_christoffel_second_kind_from_KST_vars(
+              kst_D, inverse_spatial_metric);
       // Ordinary derivative first
-      for (int i = 0; i < VolumeDim; ++i) {
-        for (int j = i; j < VolumeDim; ++j) {
-          for (int k = 0; k < VolumeDim; ++k) {
+      for (size_t i = 0; i < VolumeDim; ++i) {
+        for (size_t j = i; j < VolumeDim; ++j) {
+          for (size_t k = 0; k < VolumeDim; ++k) {
             CdK.get(k, i, j) = 0.5 * d_phi.get(k, 0, i + 1, j + 1);
-            for (int mu = 0; mu <= VolumeDim; ++mu) {
+            for (size_t mu = 0; mu <= VolumeDim; ++mu) {
               CdK.get(k, i, j) +=
                   0.5 *
                   (d_phi.get(k, i, j + 1, mu) + d_phi.get(k, j, i + 1, mu)) *
                   spacetime_unit_normal_vector.get(mu);
-              for (int nu = 0; nu <= VolumeDim; ++nu) {
-                for (int a = 0; a <= VolumeDim; ++a) {
+              for (size_t nu = 0; nu <= VolumeDim; ++nu) {
+                for (size_t a = 0; a <= VolumeDim; ++a) {
                   CdK.get(k, i, j) -=
                       0.5 * (phi.get(i, j + 1, mu) + phi.get(j, i + 1, mu)) *
                       spacetime_unit_normal_vector.get(nu) *
@@ -1283,13 +1405,14 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
         }
       }
       // Now add gamma terms
-      for (int i = 0; i < VolumeDim; ++i) {
-        for (int j = i; j < VolumeDim; ++j) {
-          for (int k = 0; k < VolumeDim; ++k) {
-            for (int l = 0; l < VolumeDim; ++l) {
-              CdK.get(k, i, j) -=
-                  Gamma2(l, i, k) * extrinsic_curvature.get(l, j) +
-                  Gamma2(l, j, k) * extrinsic_curvature.get(l, i);
+      for (size_t i = 0; i < VolumeDim; ++i) {
+        for (size_t j = i; j < VolumeDim; ++j) {
+          for (size_t k = 0; k < VolumeDim; ++k) {
+            for (size_t l = 0; l < VolumeDim; ++l) {
+              CdK.get(k, i, j) -= christoffel_second_kind.get(l, i, k) *
+                                      extrinsic_curvature.get(l, j) +
+                                  christoffel_second_kind.get(l, j, k) *
+                                      extrinsic_curvature.get(l, i);
             }
           }
         }
@@ -1303,10 +1426,10 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
       // from scratch.
 
       // Add some 4-index constraint terms to 3Ricci.
-      for (int i = 0; i < VolumeDim; ++i) {
-        for (int j = i; j < VolumeDim; ++j) {
-          for (int k = 0; k < VolumeDim; ++k) {
-            for (int l = 0; l < VolumeDim; ++l) {
+      for (size_t i = 0; i < VolumeDim; ++i) {
+        for (size_t j = i; j < VolumeDim; ++j) {
+          for (size_t k = 0; k < VolumeDim; ++k) {
+            for (size_t l = 0; l < VolumeDim; ++l) {
               ricci_3.get(i, j) +=
                   0.5 * inverse_spatial_metric.get(k, l) *
                   (d_kst_D.get(i, k, l, j) - d_kst_D.get(k, i, l, j) +
@@ -1318,10 +1441,10 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
 
       // Add more 4-index constraint terms to 3Ricci
       // These compensate for some of the CdK terms.
-      for (int i = 0; i < VolumeDim; ++i) {
-        for (int j = i; j < VolumeDim; ++j) {
-          for (int a = 0; a <= VolumeDim; ++a) {
-            for (int k = 0; k < VolumeDim; ++k) {
+      for (size_t i = 0; i < VolumeDim; ++i) {
+        for (size_t j = i; j < VolumeDim; ++j) {
+          for (size_t a = 0; a <= VolumeDim; ++a) {
+            for (size_t k = 0; k < VolumeDim; ++k) {
               ricci_3.get(i, j) +=
                   0.5 * unit_interface_normal_vector.get(k + 1) *
                   spacetime_unit_normal_vector.get(a) *
@@ -1333,33 +1456,73 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
       }
     }
 
-    Tensor<DataMesh> P3IJ(VolumeDim, "11", mesh);
-    Tensor<DataMesh> P3ij(VolumeDim, "11", mesh);
-    Tensor<DataMesh> P3Ij(VolumeDim, "12", mesh);
-    TransverseProjectionOperator(P3IJ, nI, Invg);
-    Tensor<DataMesh> g(VolumeDim, "11", mesh);
-    for (int i = 0; i < VolumeDim; ++i) {
-      for (int j = i; j < VolumeDim; ++j) {
-        g(i, j) = psi(i + 1, j + 1);
-      }
-    }
-    TransverseProjectionOperator(P3ij, ni, g);
-    TransverseProjectionOperatorUpDown(P3Ij, nI, ni);
-    ComputeWeylPropagating(Ricci3, Kij, Invg, CdK, ni, nI, P3IJ, P3ij, P3Ij, 1,
-                           U8p);
-    ComputeWeylPropagating(Ricci3, Kij, Invg, CdK, ni, nI, P3IJ, P3ij, P3Ij, -1,
-                           U8m);
+    TempBuffer<tmpl::list<
+        // spatial projection operators P_ij, P^ij, and P^i_j
+        ::Tags::TempII<0, VolumeDim, Frame::Inertial, DataVector>,
+        ::Tags::Tempii<1, VolumeDim, Frame::Inertial, DataVector>,
+        ::Tags::TempIj<2, VolumeDim, Frame::Inertial, DataVector>>>
+        local_buffer(get_size(get<0>(unit_interface_normal_vector)));
+    auto& spatial_projection_IJ =
+        get<::Tags::TempII<0, VolumeDim, Frame::Inertial, DataVector>>(
+            local_buffer);
+    auto& spatial_projection_ij =
+        get<::Tags::Tempii<1, VolumeDim, Frame::Inertial, DataVector>>(
+            local_buffer);
+    auto& spatial_projection_Ij =
+        get<::Tags::TempIj<2, VolumeDim, Frame::Inertial, DataVector>>(
+            local_buffer);
+
+    // Make spatial projection operators
+    GeneralizedHarmonic::spatial_projection_tensor(
+        make_not_null(&spatial_projection_IJ), inverse_spatial_metric,
+        unit_interface_normal_vector);
+    GeneralizedHarmonic::spatial_projection_tensor(
+        make_not_null(&spatial_projection_ij),
+        determinant_and_inverse(inverse_spatial_metric).second,
+        unit_interface_normal_one_form);
+    GeneralizedHarmonic::spatial_projection_tensor(
+        make_not_null(&spatial_projection_Ij), unit_interface_normal_vector,
+        unit_interface_normal_one_form);
+
+    GeneralizedHarmonic::weyl_propagating(
+        make_not_null(&U8p), ricci_3, extrinsic_curvature,
+        inverse_spatial_metric, CdK, unit_interface_normal_one_form,
+        unit_interface_normal_vector, spatial_projection_IJ,
+        spatial_projection_ij, spatial_projection_Ij, 1);
+    GeneralizedHarmonic::weyl_propagating(
+        make_not_null(&U8m), ricci_3, extrinsic_curvature,
+        inverse_spatial_metric, CdK, unit_interface_normal_one_form,
+        unit_interface_normal_vector, spatial_projection_IJ,
+        spatial_projection_ij, spatial_projection_Ij, -1);
+    // Tensor<DataMesh> P3IJ(VolumeDim, "11", mesh);
+    // Tensor<DataMesh> P3ij(VolumeDim, "11", mesh);
+    // Tensor<DataMesh> P3Ij(VolumeDim, "12", mesh);
+    // TransverseProjectionOperator(P3IJ, nI, Invg);
+    // Tensor<DataMesh> g(VolumeDim, "11", mesh);
+    // for (int i = 0; i < VolumeDim; ++i) {
+    //   for (int j = i; j < VolumeDim; ++j) {
+    //     g(i, j) = psi(i + 1, j + 1);
+    //   }
+    // }
+    // TransverseProjectionOperator(P3ij, ni, g);
+    // TransverseProjectionOperatorUpDown(P3Ij, nI, ni);
+    // ComputeWeylPropagating(Ricci3, Kij, Invg, CdK, ni, nI, P3IJ, P3ij, P3Ij,
+    // 1,
+    //                        U8p);
+    // ComputeWeylPropagating(Ricci3, Kij, Invg, CdK, ni, nI, P3IJ, P3ij, P3Ij,
+    // -1,
+    //                        U8m);
   }
-// #endif
+  // #endif
 
   auto U3p = make_with_value<tnsr::aa<DataVector, VolumeDim, Frame::Inertial>>(
       unit_interface_normal_vector, 0.);
   auto U3m = make_with_value<tnsr::aa<DataVector, VolumeDim, Frame::Inertial>>(
       unit_interface_normal_vector, 0.);
-  for (int mu = 0; mu <= VolumeDim; ++mu) {
-    for (int nu = mu; nu <= VolumeDim; ++nu) {
-      for (int i = 0; i < VolumeDim; ++i) {
-        for (int j = 0; j < VolumeDim; ++j) {
+  for (size_t mu = 0; mu <= VolumeDim; ++mu) {
+    for (size_t nu = mu; nu <= VolumeDim; ++nu) {
+      for (size_t i = 0; i < VolumeDim; ++i) {
+        for (size_t j = 0; j < VolumeDim; ++j) {
           U3p.get(mu, nu) += 2.0 * projection_Ab.get(i + 1, mu) *
                              projection_Ab.get(j + 1, nu) * U8p.get(i, j);
           U3m.get(mu, nu) += 2.0 * projection_Ab.get(i + 1, mu) *
@@ -1371,16 +1534,16 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
   // Impose physical boundary condition
   if (mGamma2InPhysBc) {
     DataVector tmp(get_size(get<0>(unit_interface_normal_vector)));
-    for (int mu = 0; mu <= VolumeDim; ++mu) {
-      for (int nu = mu; nu <= VolumeDim; ++nu) {
-        for (int a = 0; a <= VolumeDim; ++a) {
-          for (int b = 0; b <= VolumeDim; ++b) {
+    for (size_t mu = 0; mu <= VolumeDim; ++mu) {
+      for (size_t nu = mu; nu <= VolumeDim; ++nu) {
+        for (size_t a = 0; a <= VolumeDim; ++a) {
+          for (size_t b = 0; b <= VolumeDim; ++b) {
             tmp = 0.;
-            for (int i = 0; i < VolumeDim; ++i) {
+            for (size_t i = 0; i < VolumeDim; ++i) {
               tmp += unit_interface_normal_vector.get(i + 1) *
                      three_index_constraint.get(i, a, b);
             }
-            tmp *= gamma2;
+            tmp *= get(gamma2);
             bc_dt_u_minus->get(mu, nu) +=
                 (projection_Ab.get(a, mu) * projection_Ab.get(b, nu) -
                  0.5 * projection_ab.get(mu, nu) * projection_AB.get(a, b)) *
@@ -1392,10 +1555,10 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
       }
     }
   } else {
-    for (int mu = 0; mu <= VolumeDim; ++mu) {
-      for (int nu = mu; nu <= VolumeDim; ++nu) {
-        for (int a = 0; a <= VolumeDim; ++a) {
-          for (int b = 0; b <= VolumeDim; ++b) {
+    for (size_t mu = 0; mu <= VolumeDim; ++mu) {
+      for (size_t nu = mu; nu <= VolumeDim; ++nu) {
+        for (size_t a = 0; a <= VolumeDim; ++a) {
+          for (size_t b = 0; b <= VolumeDim; ++b) {
             bc_dt_u_minus->get(mu, nu) +=
                 (projection_Ab.get(a, mu) * projection_Ab.get(b, nu) -
                  0.5 * projection_ab.get(mu, nu) * projection_AB.get(a, b)) *
@@ -1406,7 +1569,7 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
       }
     }
   }
-#endif
+  // #endif
 
   return *bc_dt_u_minus;
 }
