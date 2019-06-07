@@ -20,7 +20,7 @@
 #include "Domain/IndexToSliceAt.hpp"
 #include "Domain/Tags.hpp"
 #include "ErrorHandling/Assert.hpp"
-#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditionsHelpers.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditionsImpl.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/InterfaceActionHelpers.hpp"
