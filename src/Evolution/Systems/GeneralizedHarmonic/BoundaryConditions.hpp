@@ -142,6 +142,10 @@ struct ImposeConstraintPreservingBoundaryConditions {
       const auto& external_bdry_char_speeds = db::get<::Tags::Interface<
           ::Tags::BoundaryDirectionsExterior<VolumeDim>,
           Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>>>(box);
+      const auto& external_bdry_inertial_coords = db::get<
+          ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
+                            ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(
+          box);
 
       // ------------------------------- (2)
       // Apply the boundary condition
@@ -163,6 +167,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
             data_on_slice(volume_all_at_vars, mesh.extents(), dimension,
                           index_to_slice_at(mesh.extents(), direction));
         const auto& char_speeds = external_bdry_char_speeds.at(direction);
+        const auto& inertial_coords =
+            external_bdry_inertial_coords.at(direction);
         // ------------------------------- (2)
         // Create a TempTensor that stores all temporaries computed
         // here and elsewhere
@@ -184,7 +190,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
             // Function that applies bdry conditions to dt<variables>
             [
               &volume_grid_points, &slice_grid_points, &mesh, &dimension,
-              &direction, &buffer, &vars, &dt_vars, &unit_normal_one_form
+              &direction, &buffer, &vars, &dt_vars, &unit_normal_one_form,
+              &inertial_coords
             ](const gsl::not_null<db::item_type<dt_variables_tag>*>
                   volume_dt_vars,
               const double /* time */, const auto& /* boundary_condition */
@@ -220,7 +227,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
                   BoundaryConditions_detail::set_dt_u_minus<
                       typename Tags::UMinus<VolumeDim, Frame::Inertial>::type,
                       VolumeDim>::apply(UMinusMethod, buffer, vars, dt_vars,
-                                        unit_normal_one_form);
+                                        inertial_coords, unit_normal_one_form);
               // Convert them to desired values on dt<U>
               const auto bc_dt_all_u =
                   evolved_fields_from_characteristic_fields(
