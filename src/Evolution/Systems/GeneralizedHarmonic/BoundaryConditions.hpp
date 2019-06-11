@@ -166,7 +166,15 @@ struct ImposeConstraintPreservingBoundaryConditions {
         const auto dt_vars =
             data_on_slice(volume_all_at_vars, mesh.extents(), dimension,
                           index_to_slice_at(mesh.extents(), direction));
+        // Get characteristic speeds
         const auto& char_speeds = external_bdry_char_speeds.at(direction);
+        // Treatment for external boundaries that are within a horizon, and
+        // all characteristic fields are outgoing (toward the singularity)
+        if (BoundaryConditions_detail::min_characteristic_speed<VolumeDim>(
+                char_speeds) > 0.) {
+          continue;
+        }
+        // Get boundary coordinates
         const auto& inertial_coords =
             external_bdry_inertial_coords.at(direction);
         // ------------------------------- (2)
@@ -191,7 +199,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
             [
               &volume_grid_points, &slice_grid_points, &mesh, &dimension,
               &direction, &buffer, &vars, &dt_vars, &unit_normal_one_form,
-              &inertial_coords
+              &inertial_coords, &char_speeds
             ](const gsl::not_null<db::item_type<dt_variables_tag>*>
                   volume_dt_vars,
               const double /* time */, const auto& /* boundary_condition */
@@ -208,26 +216,46 @@ struct ImposeConstraintPreservingBoundaryConditions {
               //
               // ------------------------------- (2.1)
               // Get desired values of dt<Uchar>
-              // For now, we set to  (Freezing, Freezing, Freezing)
-              const auto bc_dt_u_psi = BoundaryConditions_detail::set_dt_u_psi<
-                  typename Tags::UPsi<VolumeDim, Frame::Inertial>::type,
-                  VolumeDim>::apply(UPsiMethod, buffer, vars, dt_vars,
-                                    unit_normal_one_form);
+              const auto bc_dt_u_psi =
+                  BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
+                      get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial,
+                                         DataVector>>(buffer),
+                      BoundaryConditions_detail::set_dt_u_psi<
+                          typename Tags::UPsi<VolumeDim, Frame::Inertial>::type,
+                          VolumeDim>::apply(UPsiMethod, buffer, vars, dt_vars,
+                                            unit_normal_one_form),
+                      char_speeds.at(0));
               const auto bc_dt_u_zero =
-                  BoundaryConditions_detail::set_dt_u_zero<
-                      typename Tags::UZero<VolumeDim, Frame::Inertial>::type,
-                      VolumeDim>::apply(UZeroMethod, buffer, vars, dt_vars,
-                                        unit_normal_one_form);
+                  BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
+                      get<::Tags::Tempiaa<23, VolumeDim, Frame::Inertial,
+                                          DataVector>>(buffer),
+                      BoundaryConditions_detail::set_dt_u_zero<
+                          typename Tags::UZero<VolumeDim,
+                                               Frame::Inertial>::type,
+                          VolumeDim>::apply(UZeroMethod, buffer, vars, dt_vars,
+                                            unit_normal_one_form),
+                      char_speeds.at(1));
               const auto bc_dt_u_plus =
-                  BoundaryConditions_detail::set_dt_u_plus<
-                      typename Tags::UPlus<VolumeDim, Frame::Inertial>::type,
-                      VolumeDim>::apply(UPlusMethod, buffer, vars, dt_vars,
-                                        unit_normal_one_form);
+                  BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
+                      get<::Tags::Tempaa<24, VolumeDim, Frame::Inertial,
+                                         DataVector>>(buffer),
+                      BoundaryConditions_detail::set_dt_u_plus<
+                          typename Tags::UPlus<VolumeDim,
+                                               Frame::Inertial>::type,
+                          VolumeDim>::apply(UPlusMethod, buffer, vars, dt_vars,
+                                            unit_normal_one_form),
+                      char_speeds.at(2));
               const auto bc_dt_u_minus =
-                  BoundaryConditions_detail::set_dt_u_minus<
-                      typename Tags::UMinus<VolumeDim, Frame::Inertial>::type,
-                      VolumeDim>::apply(UMinusMethod, buffer, vars, dt_vars,
-                                        inertial_coords, unit_normal_one_form);
+                  BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
+                      get<::Tags::Tempaa<25, VolumeDim, Frame::Inertial,
+                                         DataVector>>(buffer),
+                      BoundaryConditions_detail::set_dt_u_minus<
+                          typename Tags::UMinus<VolumeDim,
+                                                Frame::Inertial>::type,
+                          VolumeDim>::apply(UMinusMethod, buffer, vars, dt_vars,
+                                            inertial_coords,
+                                            unit_normal_one_form),
+                      char_speeds.at(3));
               // Convert them to desired values on dt<U>
               const auto bc_dt_all_u =
                   evolved_fields_from_characteristic_fields(
@@ -383,7 +411,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
     // setting BCs on individual characteristic variables
     return apply_impl<Metavariables::system::volume_dim,
                       // Constraint preserving Bjorhus-type BC
-                      UPsiBcMethod::ConstraintPreservingBjorhus,
+                      UPsiBcMethod::Freezing,
                       // Freezing BC
                       UZeroBcMethod::Freezing,
                       // dont change choice for UPlus below, unless

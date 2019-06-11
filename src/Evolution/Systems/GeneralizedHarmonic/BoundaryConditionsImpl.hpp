@@ -122,7 +122,7 @@ using all_local_vars = tmpl::list<
     // fields
     ::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>,
     ::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>,
-    // ::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>,
+    ::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>,
     ::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>,
     // Constraint damping parameter gamma2
     ::Tags::TempScalar<26, DataVector>,
@@ -305,8 +305,8 @@ void local_variables(
       get<Tags::UPsi<VolumeDim, Frame::Inertial>>(char_projected_dt_u);
   get<::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
       get<Tags::UZero<VolumeDim, Frame::Inertial>>(char_projected_dt_u);
-  // get<::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
-  //     get<Tags::UPlus<VolumeDim, Frame::Inertial>>(char_projected_dt_u);
+  get<::Tags::Tempaa<24, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
+      get<Tags::UPlus<VolumeDim, Frame::Inertial>>(char_projected_dt_u);
   get<::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
       get<Tags::UMinus<VolumeDim, Frame::Inertial>>(char_projected_dt_u);
   // Spatial derivatives of evolved variables: Psi, Pi and Phi

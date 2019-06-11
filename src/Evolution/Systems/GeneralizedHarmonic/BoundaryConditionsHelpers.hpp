@@ -49,6 +49,37 @@ struct Magnitude;
 /// \endcond
 
 namespace GeneralizedHarmonic {
+namespace Actions {
+namespace BoundaryConditions_detail {
+template <size_t VolumeDim>
+double min_characteristic_speed(
+    const typename GeneralizedHarmonic::Tags::CharacteristicSpeeds<
+        VolumeDim, Frame::Inertial>::type& char_speeds) noexcept {
+  std::array<double, 4> min_speeds{
+      {min(char_speeds.at(0)), min(char_speeds.at(1)), min(char_speeds.at(2)),
+       min(char_speeds.at(3))}};
+  return *std::min_element(min_speeds.begin(), min_speeds.end());
+}
+
+template <typename T, typename DataType>
+T set_bc_when_char_speed_is_negative(const T& rhs_char_dt_u,
+                                     const T& desired_bc_dt_u,
+                                     const DataType& char_speed_u) noexcept {
+  auto bc_dt_u = rhs_char_dt_u;
+  auto it1 = bc_dt_u.begin();
+  auto it2 = desired_bc_dt_u.begin();
+  for (; it2 != desired_bc_dt_u.end(); ++it1, ++it2) {
+    for (size_t i = 0; i < it1->size(); ++i) {
+      if (char_speed_u[i] < 0.) {
+        (*it1)[i] = (*it2)[i];
+      }
+    }
+  }
+  return bc_dt_u;
+}
+}  // namespace BoundaryConditions_detail
+}  // namespace Actions
+
 // Eq. (2.20) of Kidder, Scheel & Teukolsky (KST) [gr-qc/0105031v1]
 // Compute R_{ij} from D_(k,i,j) = (1/2) \partial_k g_(ij)
 template <size_t VolumeDim, typename Frame, typename DataType>
