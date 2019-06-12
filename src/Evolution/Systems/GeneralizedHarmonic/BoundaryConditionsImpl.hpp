@@ -134,9 +134,10 @@ using all_local_vars = tmpl::list<
     // derivatives of psi, pi, phi
     ::Tags::Tempiaa<31, VolumeDim, Frame::Inertial, DataVector>,
     ::Tags::Tempiaa<32, VolumeDim, Frame::Inertial, DataVector>,
-    ::Tags::Tempijaa<33, VolumeDim, Frame::Inertial, DataVector>
+    ::Tags::Tempijaa<33, VolumeDim, Frame::Inertial, DataVector>,
     // <34>, <35>, <36> defined above
-    >;
+    // mapped coordinates
+    ::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>;
 
 // \brief This function computes intermediate variables needed for
 // Bjorhus-type constraint preserving boundary conditions for the
@@ -183,7 +184,9 @@ void local_variables(
       Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>,
       Tags::ThreeIndexConstraint<VolumeDim, Frame::Inertial>,
       Tags::FourIndexConstraint<VolumeDim, Frame::Inertial>,
-      Tags::FConstraint<VolumeDim, Frame::Inertial>
+      Tags::FConstraint<VolumeDim, Frame::Inertial>,
+      ::Tags::MappedCoordinates<::Tags::ElementMap<3, Frame::Inertial>,
+                                ::Tags::LogicalCoordinates<3>>
       //
       >;
   const auto vars_on_this_slice = db::data_on_slice(
@@ -337,6 +340,12 @@ void local_variables(
   auto& _bc_uminus =
       get<::Tags::Tempaa<30, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
   std::fill(_bc_uminus.begin(), _bc_uminus.end(), 0.);
+
+  // Coordinates
+  get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(*buffer) = get<
+      ::Tags::MappedCoordinates<::Tags::ElementMap<VolumeDim, Frame::Inertial>,
+                                ::Tags::LogicalCoordinates<VolumeDim>>>(
+      vars_on_this_slice);
 
   // 4) Compute intermediate variables now
   // 4.1) Spacetime form of interface normal (vector and oneform)

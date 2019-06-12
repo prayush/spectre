@@ -20,6 +20,7 @@
 #include "Domain/IndexToSliceAt.hpp"
 #include "Domain/Tags.hpp"
 #include "ErrorHandling/Assert.hpp"
+#include "ErrorHandling/Error.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditionsImpl.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
@@ -29,6 +30,7 @@
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Tags.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
 #include "Parallel/Invoke.hpp"
+#include "Parallel/Printf.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/Tags.hpp"
 #include "Time/Tags.hpp"
 #include "Utilities/ContainerHelpers.hpp"
@@ -133,17 +135,17 @@ struct ImposeConstraintPreservingBoundaryConditions {
           db::get<::Tags::Mesh<VolumeDim>>(box);
       const size_t volume_grid_points = mesh.extents().product();
       const auto& unit_normal_one_forms = db::get<
-          ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
+          ::Tags::Interface<::Tags::BoundaryDirectionsInterior<VolumeDim>,
                             ::Tags::Normalized<::Tags::UnnormalizedFaceNormal<
                                 VolumeDim, Frame::Inertial>>>>(box);
       const auto& external_bdry_vars = db::get<::Tags::Interface<
-          ::Tags::BoundaryDirectionsExterior<VolumeDim>, variables_tag>>(box);
+          ::Tags::BoundaryDirectionsInterior<VolumeDim>, variables_tag>>(box);
       const auto& volume_all_at_vars = db::get<dt_variables_tag>(box);
       const auto& external_bdry_char_speeds = db::get<::Tags::Interface<
-          ::Tags::BoundaryDirectionsExterior<VolumeDim>,
+          ::Tags::BoundaryDirectionsInterior<VolumeDim>,
           Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>>>(box);
       const auto& external_bdry_inertial_coords = db::get<
-          ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
+          ::Tags::Interface<::Tags::BoundaryDirectionsInterior<VolumeDim>,
                             ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(
           box);
 
@@ -168,7 +170,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
                           index_to_slice_at(mesh.extents(), direction));
         // Get characteristic speeds
         const auto& char_speeds = external_bdry_char_speeds.at(direction);
-        // Treatment for external boundaries that are within a horizon, and
+        // For external boundaries that are within a horizon,
         // all characteristic fields are outgoing (toward the singularity)
         if (BoundaryConditions_detail::min_characteristic_speed<VolumeDim>(
                 char_speeds) > 0.) {
@@ -193,6 +195,76 @@ struct ImposeConstraintPreservingBoundaryConditions {
             make_not_null(&buffer), box, direction, dimension, mesh, vars,
             dt_vars, unit_normal_one_form, char_speeds);
 
+        {
+          // Are there incoming char speeds on the inner boundary?
+          const auto& x =
+              get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(
+                  buffer);
+          // If radius of surface is less than 10, then assume we are on an
+          // inner boundary. FIX ME
+          const auto& min_r_squared =
+              min(square(get<0>(x)) + square(get<1>(x)) + square(get<2>(x)));
+          const auto min_inertial_r_squared =
+              min(square(get<0>(inertial_coords)) +
+                  square(get<1>(inertial_coords)) +
+                  square(get<2>(inertial_coords)));
+          if (min_r_squared < 100.0) {
+            const auto& min_speed =
+                BoundaryConditions_detail::min_characteristic_speed<VolumeDim>(
+                    char_speeds);
+            if (min_speed < 0.0) {
+              Parallel::printf(
+                  "WARNING: Incoming char speeds on INNER boundary\n");
+              Parallel::printf(
+                  "  Min speed %f at min (inertial) radius %f (%f)\n\n",
+                  min_speed, sqrt(min_r_squared), sqrt(min_inertial_r_squared));
+              // Is the face normal outward facing, really?
+              for (size_t i = 0; i < 10; ++i) {
+                Parallel::printf(
+                    " >> (random pt (%f, %f, %f)) unnormalized_normal_{x,y,z}: "
+                    "(%f, %f, "
+                    "%f)\n",
+                    get<0>(x)[i], get<1>(x)[i], get<2>(x)[i],
+                    get<0>(unit_normal_one_form)[i],
+                    get<1>(unit_normal_one_form)[i],
+                    get<2>(unit_normal_one_form)[i]);
+                Parallel::printf(
+                    "     (same random pt) char speeds (psi, 0, +, -): %f, %f, "
+                    "%f, %f\n\n",
+                    char_speeds.at(0)[i], char_speeds.at(1)[i],
+                    char_speeds.at(2)[i], char_speeds.at(3)[i]);
+              }
+              // ERROR("Aborting for above reason...");
+            }
+          } else {
+            const auto& min_speed =
+                BoundaryConditions_detail::min_characteristic_speed<VolumeDim>(
+                    char_speeds);
+            if (min_speed < 0.0) {
+              Parallel::printf(
+                  "WARNING: Incoming char speeds on OUTER boundary\n");
+              Parallel::printf(
+                  "  Min speed %f at min (inertial) radius %f (%f)\n\n",
+                  min_speed, sqrt(min_r_squared), sqrt(min_inertial_r_squared));
+              // Is the face normal outward facing, really?
+              for (size_t i = 0; i < 10; ++i) {
+                Parallel::printf(
+                    " >> (random pt (%f, %f, %f)) unnormalized_normal_{x,y,z}: "
+                    "(%f, %f, "
+                    "%f)\n",
+                    get<0>(x)[i], get<1>(x)[i], get<2>(x)[i],
+                    get<0>(unit_normal_one_form)[i],
+                    get<1>(unit_normal_one_form)[i],
+                    get<2>(unit_normal_one_form)[i]);
+                Parallel::printf(
+                    "     (same random pt) char speeds (psi, 0, +, -): %f, %f, "
+                    "%f, %f\n\n",
+                    char_speeds.at(0)[i], char_speeds.at(1)[i],
+                    char_speeds.at(2)[i], char_speeds.at(3)[i]);
+              }
+            }
+          }
+        }
         db::mutate<dt_variables_tag>(
             make_not_null(&box),
             // Function that applies bdry conditions to dt<variables>
