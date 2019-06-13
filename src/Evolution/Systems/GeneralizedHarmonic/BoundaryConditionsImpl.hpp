@@ -469,6 +469,8 @@ struct set_dt_u_psi {
       default:
         ASSERT(false, "Requested BC method fo UPsi not implemented!");
     }
+    // dummy return to suppress compiler warning
+    return ReturnType{};
   }
 
  private:
@@ -616,6 +618,8 @@ struct set_dt_u_zero {
       default:
         ASSERT(false, "Requested BC method fo UZero not implemented!");
     }
+    // dummy return to suppress compiler warning
+    return ReturnType{};
   }
 
  private:
@@ -858,6 +862,8 @@ struct set_dt_u_plus {
       default:
         ASSERT(false, "Requested BC method fo UPlus not implemented!");
     }
+    // dummy return to suppress compiler warning
+    return ReturnType{};
   }
 
  private:
@@ -995,6 +1001,8 @@ struct set_dt_u_minus {
       default:
         ASSERT(false, "Requested BC method fo UMinus not implemented!");
     }
+    // dummy return to suppress compiler warning
+    return ReturnType{};
   }
 
  private:
