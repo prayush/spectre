@@ -28,6 +28,7 @@
 #include "NumericalAlgorithms/DiscontinuousGalerkin/FluxCommunicationTypes.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/MortarHelpers.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Tags.hpp"
+#include "Parallel/Abort.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
 #include "Parallel/Invoke.hpp"
 #include "Parallel/Printf.hpp"
@@ -195,8 +196,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
             make_not_null(&buffer), box, direction, dimension, mesh, vars,
             dt_vars, unit_normal_one_form, char_speeds);
 
-        {
-          // Are there incoming char speeds on the inner boundary?
+        // FIXME: Are there incoming char speeds on the inner boundary?
+        {  // {{{
           const auto& x =
               get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(
                   buffer);
@@ -208,18 +209,21 @@ struct ImposeConstraintPreservingBoundaryConditions {
               min(square(get<0>(inertial_coords)) +
                   square(get<1>(inertial_coords)) +
                   square(get<2>(inertial_coords)));
-          if (min_r_squared < 100.0) {
+          if (min_r_squared < 25.0) {
             const auto& min_speed =
                 BoundaryConditions_detail::min_characteristic_speed<VolumeDim>(
                     char_speeds);
-            if (min_speed < 0.0) {
+            if (min_speed >= 0.0) {
+              Parallel::abort("Min(CharSpeeds<U>) > 0: WHY are still here?...");
+            } else if (min_speed < 0.0) {
               Parallel::printf(
-                  "WARNING: Incoming char speeds on INNER boundary\n");
+                  "\nWARNING: Incoming char speeds on INNER boundary at t=%f\n",
+                  db::get<::Tags::Time>(box).value());
               Parallel::printf(
                   "  Min speed %f at min (inertial) radius %f (%f)\n\n",
                   min_speed, sqrt(min_r_squared), sqrt(min_inertial_r_squared));
               // Is the face normal outward facing, really?
-              for (size_t i = 0; i < 10; ++i) {
+              for (size_t i = 0; i < 5; ++i) {
                 Parallel::printf(
                     " >> (random pt (%f, %f, %f)) unnormalized_normal_{x,y,z}: "
                     "(%f, %f, "
@@ -229,42 +233,22 @@ struct ImposeConstraintPreservingBoundaryConditions {
                     get<1>(unit_normal_one_form)[i],
                     get<2>(unit_normal_one_form)[i]);
                 Parallel::printf(
+                    "     (same random pt) r dot normal (should be NEGative): "
+                    "%f\n",
+                    get<0>(x)[i] * get<0>(unit_normal_one_form)[i] +
+                        get<1>(x)[i] * get<1>(unit_normal_one_form)[i] +
+                        get<2>(x)[i] * get<2>(unit_normal_one_form)[i]);
+                Parallel::printf(
                     "     (same random pt) char speeds (psi, 0, +, -): %f, %f, "
-                    "%f, %f\n\n",
+                    "%f, %f\n",
                     char_speeds.at(0)[i], char_speeds.at(1)[i],
                     char_speeds.at(2)[i], char_speeds.at(3)[i]);
               }
-              // ERROR("Aborting for above reason...");
-            }
-          } else {
-            const auto& min_speed =
-                BoundaryConditions_detail::min_characteristic_speed<VolumeDim>(
-                    char_speeds);
-            if (min_speed < 0.0) {
-              Parallel::printf(
-                  "WARNING: Incoming char speeds on OUTER boundary\n");
-              Parallel::printf(
-                  "  Min speed %f at min (inertial) radius %f (%f)\n\n",
-                  min_speed, sqrt(min_r_squared), sqrt(min_inertial_r_squared));
-              // Is the face normal outward facing, really?
-              for (size_t i = 0; i < 10; ++i) {
-                Parallel::printf(
-                    " >> (random pt (%f, %f, %f)) unnormalized_normal_{x,y,z}: "
-                    "(%f, %f, "
-                    "%f)\n",
-                    get<0>(x)[i], get<1>(x)[i], get<2>(x)[i],
-                    get<0>(unit_normal_one_form)[i],
-                    get<1>(unit_normal_one_form)[i],
-                    get<2>(unit_normal_one_form)[i]);
-                Parallel::printf(
-                    "     (same random pt) char speeds (psi, 0, +, -): %f, %f, "
-                    "%f, %f\n\n",
-                    char_speeds.at(0)[i], char_speeds.at(1)[i],
-                    char_speeds.at(2)[i], char_speeds.at(3)[i]);
-              }
+              Parallel::abort("Aborting for above reason...");
             }
           }
-        }
+        }  // }}}
+
         db::mutate<dt_variables_tag>(
             make_not_null(&box),
             // Function that applies bdry conditions to dt<variables>
@@ -287,7 +271,12 @@ struct ImposeConstraintPreservingBoundaryConditions {
               // Compute desired values of dt_volume_vars
               //
               // ------------------------------- (2.1)
-              // Get desired values of dt<Uchar>
+              // Get desired values of CharProjection<dt<U>>
+              //
+              // At all points on the interface where the char speed of any
+              // (given) characteristic field is +ve, we "do nothing", and
+              // when its -ve, we apply Bjorhus BCs. This is achieved through
+              // `set_bc_when_char_speed_is_negative`.
               const auto bc_dt_u_psi =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
                       get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial,
@@ -359,6 +348,68 @@ struct ImposeConstraintPreservingBoundaryConditions {
                           bc_dt_all_u)));
               const auto slice_data_ = variables_from_tagged_tuple(bc_dt_tuple);
               const auto* slice_data = slice_data_.data();
+
+              // FIXME: In case no boundary condition was needed, i.e. on the
+              // inner domain boundary, we check here that really no changes
+              // were made to dt<U> on the external boundaries...
+              {  // {{{
+                 // First, get dt<U> after BC has been applied
+                 // const auto applied_bc_dt_psi =
+                 //     get<gr::Tags::SpacetimeMetric<VolumeDim,
+                 //     Frame::Inertial,
+                 //                                   DataVector>>(bc_dt_all_u);
+                 // const auto applied_bc_dt_pi =
+                 //     get<Tags::Pi<VolumeDim, Frame::Inertial>>(bc_dt_all_u);
+                 // const auto applied_bc_dt_phi =
+                 //     get<Tags::Phi<VolumeDim, Frame::Inertial>>(bc_dt_all_u);
+                 // // Second, get dt<U> before BC has been applied
+                 // const auto& rhs_dt_psi =
+                 //     get<::Tags::dt<gr::Tags::SpacetimeMetric<
+                 //         VolumeDim, Frame::Inertial, DataVector>>>(dt_vars);
+                 // const auto& rhs_dt_pi =
+                 //     get<::Tags::dt<Tags::Pi<VolumeDim, Frame::Inertial>>>(
+                 //         dt_vars);
+                 // const auto& rhs_dt_phi =
+                 //     get<::Tags::dt<Tags::Phi<VolumeDim, Frame::Inertial>>>(
+                 //         dt_vars);
+                 // Third, take their difference
+                 // double max_diff = 0.;
+                 // double min_field = 1.e99;
+                 // for (size_t a = 0; a <= VolumeDim; ++a) {
+                 //   for (size_t b = 0; b <= VolumeDim; ++b) {
+                 //     // First, PSI
+                 //     double diff_ = max(abs(applied_bc_dt_psi.get(a, b) -
+                 //                            rhs_dt_psi.get(a, b)));
+                 //     max_diff = (diff_ > max_diff) ? diff_ : max_diff;
+                 //
+                 //     double min_ = min(abs(applied_bc_dt_psi.get(a, b)));
+                 //     min_field = (min_ < min_field) ? min_ : min_field;
+                 //     // Second, PI
+                 //     diff_ = max(
+                 //         abs(applied_bc_dt_pi.get(a, b) - rhs_dt_pi.get(a,
+                 //         b)));
+                 //     max_diff = (diff_ > max_diff) ? diff_ : max_diff;
+                 //
+                 //     min_ = min(abs(applied_bc_dt_pi.get(a, b)));
+                 //     min_field = (min_ < min_field) ? min_ : min_field;
+                 //     // Third, PHI
+                 //     for (size_t i = 0; i < VolumeDim; ++i) {
+                 //       diff_ = max(abs(applied_bc_dt_phi.get(i, a, b) -
+                 //                       rhs_dt_phi.get(i, a, b)));
+                 //       max_diff = (diff_ > max_diff) ? diff_ : max_diff;
+                 //
+                 //       min_ = min(abs(applied_bc_dt_phi.get(i, a, b)));
+                 //       min_field = (min_ < min_field) ? min_ : min_field;
+                 //     }
+                 //   }
+                 // }
+                 //
+                 // Parallel::printf(
+                 //     " >> Maximum difference between pre-BC and post-BC
+                 //     values" " of dt<U>: %.12e\n", max_diff);
+                 // Parallel::printf(" >> Minimum abs value of dt<U>: %.12e\n",
+                 //                  min_field);
+              }  // }}}
 
               // ------------------------------- (2.4)
               // Assign BC values of dt_volume_vars on external boundary
