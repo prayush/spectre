@@ -70,7 +70,7 @@ T set_bc_when_char_speed_is_negative(const T& rhs_char_dt_u,
   auto it2 = desired_bc_dt_u.begin();
   for (; it2 != desired_bc_dt_u.end(); ++it1, ++it2) {
     for (size_t i = 0; i < it1->size(); ++i) {
-      if (char_speed_u[i] < 0.) {
+      if (char_speed_u[i] <= 0.) {
         (*it1)[i] = (*it2)[i];
       }
     }
