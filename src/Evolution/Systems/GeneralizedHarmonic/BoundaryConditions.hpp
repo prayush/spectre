@@ -174,7 +174,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
         // For external boundaries that are within a horizon,
         // all characteristic fields are outgoing (toward the singularity)
         if (BoundaryConditions_detail::min_characteristic_speed<VolumeDim>(
-                char_speeds) > 0.) {
+                char_speeds) >= 0.) {
           continue;
         }
         // Get boundary coordinates
@@ -214,7 +214,10 @@ struct ImposeConstraintPreservingBoundaryConditions {
                 BoundaryConditions_detail::min_characteristic_speed<VolumeDim>(
                     char_speeds);
             if (min_speed >= 0.0) {
-              Parallel::abort("Min(CharSpeeds<U>) > 0: WHY are still here?...");
+              Parallel::printf(
+                  "Min(CharSpeeds<U>) > 0 at t=%f: WHY are still here?...",
+                  db::get<::Tags::Time>(box).value());
+              Parallel::abort("Aborting for above reason...");
             } else if (min_speed < 0.0) {
               Parallel::printf(
                   "\nWARNING: Incoming char speeds on INNER boundary at t=%f\n",
