@@ -20,6 +20,7 @@
 #include "Evolution/EventsAndTriggers/Event.hpp"
 #include "Evolution/EventsAndTriggers/EventsAndTriggers.hpp"  // IWYU pragma: keep
 #include "Evolution/EventsAndTriggers/Tags.hpp"
+#include "Evolution/Systems/ScalarWave/BoundaryConditions.hpp"
 #include "Evolution/Systems/ScalarWave/Equations.hpp"  // IWYU pragma: keep // for UpwindFlux
 #include "Evolution/Systems/ScalarWave/System.hpp"
 #include "IO/Observer/Actions.hpp"            // IWYU pragma: keep
@@ -114,7 +115,9 @@ struct EvolutionMetavars {
       Actions::ComputeTimeDerivative,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
           Tags::BoundaryDirectionsInterior<Dim>>,
-      dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
+      // dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
+      ScalarWave::Actions::ImposeConstraintPreservingBoundaryConditions<
+          EvolutionMetavars>,
       dg::Actions::ReceiveDataForFluxes<EvolutionMetavars>,
       tmpl::conditional_t<local_time_stepping, tmpl::list<>,
                           dg::Actions::ApplyFluxes>,
@@ -152,12 +155,7 @@ struct EvolutionMetavars {
       "The analytic solution is: PlaneWave\n"
       "The numerical flux is:    UpwindFlux\n"};
 
-  enum class Phase {
-    Initialization,
-    RegisterWithObserver,
-    Evolve,
-    Exit
-  };
+  enum class Phase { Initialization, RegisterWithObserver, Evolve, Exit };
 
   static Phase determine_next_phase(
       const Phase& current_phase,
