@@ -352,68 +352,6 @@ struct ImposeConstraintPreservingBoundaryConditions {
               const auto slice_data_ = variables_from_tagged_tuple(bc_dt_tuple);
               const auto* slice_data = slice_data_.data();
 
-              // FIXME: In case no boundary condition was needed, i.e. on the
-              // inner domain boundary, we check here that really no changes
-              // were made to dt<U> on the external boundaries...
-              {  // {{{
-                 // First, get dt<U> after BC has been applied
-                 // const auto applied_bc_dt_psi =
-                 //     get<gr::Tags::SpacetimeMetric<VolumeDim,
-                 //     Frame::Inertial,
-                 //                                   DataVector>>(bc_dt_all_u);
-                 // const auto applied_bc_dt_pi =
-                 //     get<Tags::Pi<VolumeDim, Frame::Inertial>>(bc_dt_all_u);
-                 // const auto applied_bc_dt_phi =
-                 //     get<Tags::Phi<VolumeDim, Frame::Inertial>>(bc_dt_all_u);
-                 // // Second, get dt<U> before BC has been applied
-                 // const auto& rhs_dt_psi =
-                 //     get<::Tags::dt<gr::Tags::SpacetimeMetric<
-                 //         VolumeDim, Frame::Inertial, DataVector>>>(dt_vars);
-                 // const auto& rhs_dt_pi =
-                 //     get<::Tags::dt<Tags::Pi<VolumeDim, Frame::Inertial>>>(
-                 //         dt_vars);
-                 // const auto& rhs_dt_phi =
-                 //     get<::Tags::dt<Tags::Phi<VolumeDim, Frame::Inertial>>>(
-                 //         dt_vars);
-                 // Third, take their difference
-                 // double max_diff = 0.;
-                 // double min_field = 1.e99;
-                 // for (size_t a = 0; a <= VolumeDim; ++a) {
-                 //   for (size_t b = 0; b <= VolumeDim; ++b) {
-                 //     // First, PSI
-                 //     double diff_ = max(abs(applied_bc_dt_psi.get(a, b) -
-                 //                            rhs_dt_psi.get(a, b)));
-                 //     max_diff = (diff_ > max_diff) ? diff_ : max_diff;
-                 //
-                 //     double min_ = min(abs(applied_bc_dt_psi.get(a, b)));
-                 //     min_field = (min_ < min_field) ? min_ : min_field;
-                 //     // Second, PI
-                 //     diff_ = max(
-                 //         abs(applied_bc_dt_pi.get(a, b) - rhs_dt_pi.get(a,
-                 //         b)));
-                 //     max_diff = (diff_ > max_diff) ? diff_ : max_diff;
-                 //
-                 //     min_ = min(abs(applied_bc_dt_pi.get(a, b)));
-                 //     min_field = (min_ < min_field) ? min_ : min_field;
-                 //     // Third, PHI
-                 //     for (size_t i = 0; i < VolumeDim; ++i) {
-                 //       diff_ = max(abs(applied_bc_dt_phi.get(i, a, b) -
-                 //                       rhs_dt_phi.get(i, a, b)));
-                 //       max_diff = (diff_ > max_diff) ? diff_ : max_diff;
-                 //
-                 //       min_ = min(abs(applied_bc_dt_phi.get(i, a, b)));
-                 //       min_field = (min_ < min_field) ? min_ : min_field;
-                 //     }
-                 //   }
-                 // }
-                 //
-                 // Parallel::printf(
-                 //     " >> Maximum difference between pre-BC and post-BC
-                 //     values" " of dt<U>: %.12e\n", max_diff);
-                 // Parallel::printf(" >> Minimum abs value of dt<U>: %.12e\n",
-                 //                  min_field);
-              }  // }}}
-
               // ------------------------------- (2.4)
               // Assign BC values of dt_volume_vars on external boundary
               // slices of volume variables
@@ -535,17 +473,18 @@ struct ImposeConstraintPreservingBoundaryConditions {
       const ParallelComponent* const /*meta*/) noexcept {
     // Here be user logic that determines / selects from various options for
     // setting BCs on individual characteristic variables
-    return apply_impl<Metavariables::system::volume_dim,
-                      // Constraint preserving Bjorhus-type BC
-                      UPsiBcMethod::Freezing,
-                      // Freezing BC
-                      UZeroBcMethod::Freezing,
-                      // dont change choice for UPlus below, unless
-                      // all analytic BCs are being requested
-                      UPlusBcMethod::Freezing,
-                      // Freezing BC
-                      UMinusBcMethod::Freezing, DbTags>::function_impl(box,
-                                                                       cache);
+    return apply_impl<
+        Metavariables::system::volume_dim,
+        // Constraint preserving Bjorhus-type BC
+        UPsiBcMethod::ConstraintPreservingBjorhus,
+        // Freezing BC
+        UZeroBcMethod::ConstraintPreservingBjorhus,
+        // dont change choice for UPlus below, unless
+        // all analytic BCs are being requested
+        UPlusBcMethod::Freezing,
+        // Freezing BC
+        UMinusBcMethod::ConstraintPreservingPhysicalBjorhusGaugeSommerfeld,
+        DbTags>::function_impl(box, cache);
   }
 };
 

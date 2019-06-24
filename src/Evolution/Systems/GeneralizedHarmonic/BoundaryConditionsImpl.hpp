@@ -1171,14 +1171,11 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
   // (2001) https://arxiv.org/pdf/gr-qc/0105031.pdf. We will refer to this
   // article as KST henceforth, and use the abbreviation in variable names
   // to disambiguate their origin.
-  // #if 0
   auto U8p = make_with_value<tnsr::ii<DataVector, VolumeDim, Frame::Inertial>>(
       unit_interface_normal_vector, 0.);
   auto U8m = make_with_value<tnsr::ii<DataVector, VolumeDim, Frame::Inertial>>(
       unit_interface_normal_vector, 0.);
   {
-    // Tensor<DataMesh> Kij =
-    //     ComputeLowerExtrinsicCurvatureFromSpacetimeMetric(Invpsi, kappa);
     // D_(k,i,j) = (1/2) \partial_k g_(ij) and its derivative
     tnsr::ijj<DataVector, VolumeDim, Frame::Inertial> kst_D(
         get_size(get(gamma2)));
@@ -1199,8 +1196,6 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
     auto ricci_3 = GeneralizedHarmonic::spatial_ricci_tensor_from_KST_vars(
         kst_D, d_kst_D, inverse_spatial_metric);
 
-    // Tensor<Tensor<DataMesh>> CdK(TensorStructure(VolumeDim, "11"),
-    //                              TensorStructure(VolumeDim, "d"), mesh);
     tnsr::ijj<DataVector, VolumeDim, Frame::Inertial> CdK(
         get_size(get(gamma2)));
     {
@@ -1322,26 +1317,7 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
         inverse_spatial_metric, CdK, unit_interface_normal_one_form,
         unit_interface_normal_vector, spatial_projection_IJ,
         spatial_projection_ij, spatial_projection_Ij, -1);
-    // Tensor<DataMesh> P3IJ(VolumeDim, "11", mesh);
-    // Tensor<DataMesh> P3ij(VolumeDim, "11", mesh);
-    // Tensor<DataMesh> P3Ij(VolumeDim, "12", mesh);
-    // TransverseProjectionOperator(P3IJ, nI, Invg);
-    // Tensor<DataMesh> g(VolumeDim, "11", mesh);
-    // for (size_t i = 0; i < VolumeDim; ++i) {
-    //   for (size_t j = i; j < VolumeDim; ++j) {
-    //     g(i, j) = psi(i + 1, j + 1);
-    //   }
-    // }
-    // TransverseProjectionOperator(P3ij, ni, g);
-    // TransverseProjectionOperatorUpDown(P3Ij, nI, ni);
-    // ComputeWeylPropagating(Ricci3, Kij, Invg, CdK, ni, nI, P3IJ, P3ij, P3Ij,
-    // 1,
-    //                        U8p);
-    // ComputeWeylPropagating(Ricci3, Kij, Invg, CdK, ni, nI, P3IJ, P3ij, P3Ij,
-    // -1,
-    //                        U8m);
   }
-  // #endif
 
   auto U3p = make_with_value<tnsr::aa<DataVector, VolumeDim, Frame::Inertial>>(
       unit_interface_normal_vector, 0.);
@@ -1397,8 +1373,6 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
       }
     }
   }
-  // #endif
-
   return *bc_dt_u_minus;
 }
 
@@ -1421,46 +1395,6 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::apply_gauge_sommerfeld(
              get_size(get<0>(incoming_null_one_form)),
          "Size of input variables and temporary memory do not match.");
   const double GaugeBcCoeff = 1.;
-
-#if 0
-  // get options
-  OptionParser gp(mGaugeBcOpts,Help());
-  const std::string SpatialMapName = gp.Get<std::string>("Map");
-  const double GaugeBcCoeff = gp.Get<double>("Coefficient", 1.0);
-  // get (inverse) inertial coordinate radius of boundary
-  MyVector<DataMesh> InertialCoords;
-  if (SpatialMapName == "") {
-    InertialCoords = Box.Get<MyVector<DataMesh>>("GlobalCoords");
-  } else {
-    const MyVector<DataMesh>& MovingCoords =
-        Box.Get<MyVector<DataMesh>>("GlobalCoords");
-    const SpatialCoordMap& SpatialMap =
-        Box.Root().Get<SpatialCoordMap>(SpatialMapName);
-    const double t = Box.Root().Get<double>("Time");
-    InertialCoords = SpatialMap.MappedCoords(MovingCoords, t, Box);
-  }
-  DataMesh InertialRadius(mesh, 0.0);
-  for (size_t i = 0; i < VolumeDim; ++i)
-    InertialRadius += sqr(InertialCoords[i]);
-  InertialRadius = sqrt(InertialRadius);
-
-  // add in gauge BC
-  for (size_t a = 0; a <= VolumeDim; ++a) {
-    for (size_t b = a; b <= VolumeDim; ++b) {
-      for (size_t c = 0; c <= VolumeDim; ++c) {
-        for (size_t d = 0; d <= VolumeDim; ++d) {
-          BcDtUm(a, b) +=
-              0.5 *
-              (ui(a) * PIj(c, b) * vI(d) + ui(b) * PIj(c, a) * vI(d) -
-               0.5 * ui(a) * vi(b) * uI(c) * vI(d) -
-               0.5 * ui(b) * vi(a) * uI(c) * vI(d) -
-               0.5 * ui(a) * ui(b) * vI(c) * vI(d)) *
-              (gamma2 - GaugeBcCoeff / InertialRadius) * RhsUpsi(c, d);
-        }
-      }
-    }
-  }
-#endif
 
   DataVector inertial_radius(get_size(get<0>(inertial_coords)), 0.);
   for (size_t i = 0; i < VolumeDim; ++i) {
