@@ -23,7 +23,8 @@
 #include "IO/Observer/Actions.hpp"  // IWYU pragma: keep
 #include "IO/Observer/Helpers.hpp"
 #include "IO/Observer/ObserverComponent.hpp"  // IWYU pragma: keep
-#include "IO/Observer/Tags.hpp"               // IWYU pragma: keep
+#include "IO/Observer/RegisterObservers.hpp"
+#include "IO/Observer/Tags.hpp"  // IWYU pragma: keep
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/ApplyBoundaryFluxesLocalTimeStepping.hpp"  // IWYU pragma: keep
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/ApplyFluxes.hpp"  // IWYU pragma: keep
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/ComputeNonconservativeBoundaryFluxes.hpp"  // IWYU pragma: keep
@@ -32,8 +33,9 @@
 #include "NumericalAlgorithms/DiscontinuousGalerkin/NumericalFluxes/LocalLaxFriedrichs.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Tags.hpp"
 #include "Options/Options.hpp"
-#include "Parallel/GotoAction.hpp"  // IWYU pragma: keep
+#include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/InitializationFunctions.hpp"
+#include "Parallel/PhaseDependentActionList.hpp"
 #include "Parallel/Reduction.hpp"
 #include "Parallel/RegisterDerivedClassesWithCharm.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/KerrSchild.hpp"  // IWYU pragma: keep
@@ -99,15 +101,15 @@ struct EvolutionMetavars {
                  OptionTags::EventsAndTriggers<events, triggers>>;
   using domain_creator_tag = OptionTags::DomainCreator<dim, Inertial>;
 
+  using step_choosers = tmpl::list<StepChoosers::Registrars::Cfl<dim, Inertial>,
+                                   StepChoosers::Registrars::Constant,
+                                   StepChoosers::Registrars::Increase>;
+
   struct ObservationType {};
   using element_observation_type = ObservationType;
 
   using observed_reduction_data_tags = observers::collect_reduction_data_tags<
       tmpl::list<GeneralizedHarmonic::Actions::Observe>>;
-
-  using step_choosers = tmpl::list<StepChoosers::Registrars::Cfl<dim, Inertial>,
-                                   StepChoosers::Registrars::Constant,
-                                   StepChoosers::Registrars::Increase>;
 
   using compute_rhs = tmpl::flatten<tmpl::list<
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
@@ -127,29 +129,52 @@ struct EvolutionMetavars {
                           tmpl::list<>>,
       Actions::UpdateU>>;
 
-  struct EvolvePhaseStart;
+  enum class Phase {
+    Initialization,
+    InitializeTimeStepperHistory,
+    RegisterWithObserver,
+    Evolve,
+    Exit
+  };
+
   using component_list = tmpl::list<
       observers::Observer<EvolutionMetavars>,
       observers::ObserverWriter<EvolutionMetavars>,
       DgElementArray<
-          EvolutionMetavars, GeneralizedHarmonic::Actions::Initialize<dim>,
-          tmpl::flatten<tmpl::list<
-              SelfStart::self_start_procedure<compute_rhs, update_variables>,
-              Actions::Label<EvolvePhaseStart>, Actions::AdvanceTime,
-              GeneralizedHarmonic::Actions::Observe,
-              Actions::RunEventsAndTriggers,
-              tmpl::conditional_t<local_time_stepping,
-                                  Actions::ChangeStepSize<step_choosers>,
-                                  tmpl::list<>>,
-              compute_rhs, update_variables,
-              Actions::Goto<EvolvePhaseStart>>>>>;
+          EvolutionMetavars,
+          tmpl::list<
+              Parallel::PhaseActions<
+                  Phase, Phase::Initialization,
+                  tmpl::list<GeneralizedHarmonic::Actions::Initialize<dim>>>,
+
+              Parallel::PhaseActions<
+                  Phase, Phase::InitializeTimeStepperHistory,
+                  tmpl::flatten<tmpl::list<SelfStart::self_start_procedure<
+                      compute_rhs, update_variables>>>>,
+
+              Parallel::PhaseActions<
+                  Phase, Phase::RegisterWithObserver,
+                  tmpl::list<Actions::AdvanceTime,
+                             observers::Actions::RegisterWithObservers<
+                                 observers::RegisterObservers<
+                                     element_observation_type>>,
+                             Parallel::Actions::TerminatePhase>>,
+
+              Parallel::PhaseActions<
+                  Phase, Phase::Evolve,
+                  tmpl::flatten<tmpl::list<
+                      GeneralizedHarmonic::Actions::Observe,
+                      Actions::RunEventsAndTriggers,
+                      tmpl::conditional_t<
+                          local_time_stepping,
+                          Actions::ChangeStepSize<step_choosers>, tmpl::list<>>,
+                      compute_rhs, update_variables, Actions::AdvanceTime>>>>,
+          GeneralizedHarmonic::Actions::Initialize<dim>::AddOptionsToDataBox>>;
 
   static constexpr OptionString help{
       "Evolve a generalized harmonic analytic solution.\n\n"
       "The analytic solution is: KerrSchild\n"
       "The numerical flux is:    UpwindFlux\n"};
-
-  enum class Phase { Initialization, RegisterWithObserver, Evolve, Exit };
 
   static Phase determine_next_phase(
       const Phase& current_phase,
@@ -157,6 +182,8 @@ struct EvolutionMetavars {
           EvolutionMetavars>& /*cache_proxy*/) noexcept {
     switch (current_phase) {
       case Phase::Initialization:
+        return Phase::InitializeTimeStepperHistory;
+      case Phase::InitializeTimeStepperHistory:
         return Phase::RegisterWithObserver;
       case Phase::RegisterWithObserver:
         return Phase::Evolve;

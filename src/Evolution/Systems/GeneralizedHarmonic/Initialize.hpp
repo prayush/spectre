@@ -26,6 +26,7 @@
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "NumericalAlgorithms/LinearOperators/Divergence.tpp"
 #include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"
+#include "Parallel/AddOptionsToDataBox.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
 #include "PointwiseFunctions/AnalyticData/Tags.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/Tags.hpp"
@@ -48,11 +49,32 @@ struct has_analytic_solution_alias<
     T, cpp17::void_t<typename T::analytic_solution_tag>> : std::true_type {};
 }  // namespace detail
 
-// Note:  I've left the Dim and System template parameters until it is clear
-// whether or not what remains is specific to this system, and what might be
-// applicable to more than one system
 template <size_t Dim>
 struct Initialize {
+  struct InitialExtents : db::SimpleTag {
+    static std::string name() noexcept { return "InitialExtents"; }
+    using type = std::vector<std::array<size_t, Dim>>;
+  };
+  struct Domain : db::SimpleTag {
+    static std::string name() noexcept { return "Domain"; }
+    using type = ::Domain<Dim, Frame::Inertial>;
+  };
+  struct InitialTime : db::SimpleTag {
+    static std::string name() noexcept { return "InitialTime"; }
+    using type = double;
+  };
+  struct InitialTimeDelta : db::SimpleTag {
+    static std::string name() noexcept { return "InitialTimeDelta"; }
+    using type = double;
+  };
+  struct InitialSlabSize : db::SimpleTag {
+    static std::string name() noexcept { return "InitialSlabSize"; }
+    using type = double;
+  };
+
+  using AddOptionsToDataBox = Parallel::ForwardAllOptionsToDataBox<tmpl::list<
+      InitialExtents, Domain, InitialTime, InitialTimeDelta, InitialSlabSize>>;
+
   template <typename Metavariables>
   struct ConstraintsTags {
     using Inertial = Frame::Inertial;
@@ -257,44 +279,31 @@ struct Initialize {
     }
   };
 
-  template <class Metavariables>
-  using return_tag_list =
-      tmpl::append<typename Initialization::Domain<Dim>::simple_tags,
-                   typename VariablesTags<Metavariables>::simple_tags,
-                   typename Initialization::GeneralizedHarmonicInterface<
-                       typename Metavariables::system>::simple_tags,
-                   typename Initialization::Evolution<
-                       typename Metavariables::system>::simple_tags,
-                   typename ConstraintsTags<Metavariables>::simple_tags,
-                   typename Initialization::DiscontinuousGalerkin<
-                       Metavariables>::simple_tags,
-                   typename Initialization::MinMod<Dim>::simple_tags,
-                   typename Initialization::Domain<Dim>::compute_tags,
-                   typename VariablesTags<Metavariables>::compute_tags,
-                   typename Initialization::GeneralizedHarmonicInterface<
-                       typename Metavariables::system>::compute_tags,
-                   typename Initialization::Evolution<
-                       typename Metavariables::system>::compute_tags,
-                   typename ConstraintsTags<Metavariables>::compute_tags,
-                   typename Initialization::DiscontinuousGalerkin<
-                       Metavariables>::compute_tags,
-                   typename Initialization::MinMod<Dim>::compute_tags>;
-
-  template <typename... InboxTags, typename Metavariables, typename ActionList,
-            typename ParallelComponent>
-  static auto apply(const db::DataBox<tmpl::list<>>& /*box*/,
+  template <typename DbTagsList, typename... InboxTags, typename Metavariables,
+            typename ActionList, typename ParallelComponent,
+            Requires<tmpl::list_contains_v<DbTagsList, Domain>> = nullptr>
+  static auto apply(db::DataBox<DbTagsList>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
                     const Parallel::ConstGlobalCache<Metavariables>& cache,
                     const ElementIndex<Dim>& array_index,
                     const ActionList /*meta*/,
-                    const ParallelComponent* const /*meta*/,
-                    std::vector<std::array<size_t, Dim>> initial_extents,
-                    Domain<Dim, Frame::Inertial> domain,
-                    const double initial_time, const double initial_dt,
-                    const double initial_slab_size) noexcept {
+                    const ParallelComponent* const /*meta*/) noexcept {
+    const auto initial_extents = db::get<InitialExtents>(box);
+    const auto initial_time = db::get<InitialTime>(box);
+    const auto initial_dt = db::get<InitialTimeDelta>(box);
+    const auto initial_slab_size = db::get<InitialSlabSize>(box);
+    ::Domain<Dim, Frame::Inertial> domain{};
+    db::mutate<Domain>(
+        make_not_null(&box), [&domain](const auto domain_ptr) noexcept {
+          domain = std::move(*domain_ptr);
+        });
+    auto initial_box =
+        db::create_from<typename AddOptionsToDataBox::simple_tags>(
+            std::move(box));
+
     using system = typename Metavariables::system;
     auto domain_box = Initialization::Domain<Dim>::initialize(
-        db::DataBox<tmpl::list<>>{}, array_index, initial_extents, domain);
+        std::move(initial_box), array_index, initial_extents, domain);
     auto variables_box = VariablesTags<Metavariables>::initialize(
         std::move(domain_box), cache, initial_time);
     auto domain_interface_box =
@@ -310,7 +319,19 @@ struct Initialize {
             std::move(constraints_box), initial_extents);
     auto limiter_box =
         Initialization::MinMod<Dim>::initialize(std::move(dg_box));
-    return std::make_tuple(std::move(limiter_box));
+    return std::make_tuple(std::move(limiter_box), true);
+  }
+
+  template <typename DbTagsList, typename... InboxTags, typename Metavariables,
+            typename ActionList, typename ParallelComponent,
+            Requires<not tmpl::list_contains_v<DbTagsList, Domain>> = nullptr>
+  static std::tuple<db::DataBox<DbTagsList>&&, bool> apply(
+      db::DataBox<DbTagsList>& box,
+      const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+      const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+      const ElementIndex<Dim>& /*array_index*/, const ActionList /*meta*/,
+      const ParallelComponent* const /*meta*/) {
+    return {std::move(box), true};
   }
 };
 }  // namespace Actions
