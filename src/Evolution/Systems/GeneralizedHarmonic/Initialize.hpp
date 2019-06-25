@@ -315,7 +315,7 @@ struct Initialize {
     auto constraints_box =
         ConstraintsTags<Metavariables>::initialize(std::move(evolution_box));
     auto dg_box =
-        Initialization::DiscontinuousGalerkin<Metavariables>::initialize(
+        Initialization::DiscontinuousGalerkin<Metavariables, false>::initialize(
             std::move(constraints_box), initial_extents);
     auto limiter_box =
         Initialization::MinMod<Dim>::initialize(std::move(dg_box));
