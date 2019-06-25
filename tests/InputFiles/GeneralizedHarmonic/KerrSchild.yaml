@@ -27,6 +27,11 @@ AnalyticSolution:
 NumericalFlux:
   UpwindFlux:
 
+Filtering:
+  ExpFilter0:
+    Alpha: 36.0
+    HalfPower: 8
+
 EventsAndTriggers:
   ? PastTime: 1.0
   : - Completion
