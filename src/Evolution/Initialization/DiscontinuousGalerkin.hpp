@@ -53,7 +53,7 @@ namespace Initialization {
 ///   * Tags::Mortars<Tags::MortarSize<dim - 1>, dim>
 /// - Removes: nothing
 /// - Modifies: nothing
-template <typename Metavariables>
+template <typename Metavariables, bool AddFluxBoundaryConditionMortars = true>
 struct DiscontinuousGalerkin {
   static constexpr size_t dim = Metavariables::system::volume_dim;
   using temporal_id_tag = typename Metavariables::temporal_id;
@@ -106,17 +106,20 @@ struct DiscontinuousGalerkin {
       }
     }
 
-    for (const auto& direction : element.external_boundaries()) {
-      const auto mortar_id =
-          std::make_pair(direction, ElementId<dim>::external_boundary_id());
-      mortar_data[mortar_id];
-      // Since no communication needs to happen for boundary conditions,
-      // the temporal id is not advanced on the boundary, so we set it equal
-      // to the current temporal id in the element
-      mortar_next_temporal_ids.insert({mortar_id, temporal_id});
-      mortar_meshes.emplace(mortar_id, mesh.slice_away(direction.dimension()));
-      mortar_sizes.emplace(mortar_id,
-                           make_array<dim - 1>(Spectral::MortarSize::Full));
+    if (AddFluxBoundaryConditionMortars) {
+      for (const auto& direction : element.external_boundaries()) {
+        const auto mortar_id =
+            std::make_pair(direction, ElementId<dim>::external_boundary_id());
+        mortar_data[mortar_id];
+        // Since no communication needs to happen for boundary conditions,
+        // the temporal id is not advanced on the boundary, so we set it equal
+        // to the current temporal id in the element
+        mortar_next_temporal_ids.insert({mortar_id, temporal_id});
+        mortar_meshes.emplace(mortar_id,
+                              mesh.slice_away(direction.dimension()));
+        mortar_sizes.emplace(mortar_id,
+                             make_array<dim - 1>(Spectral::MortarSize::Full));
+      }
     }
 
     return db::create_from<
