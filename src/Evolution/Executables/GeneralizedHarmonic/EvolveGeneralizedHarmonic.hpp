@@ -15,6 +15,12 @@
 #include "Evolution/EventsAndTriggers/Actions/RunEventsAndTriggers.hpp"  // IWYU pragma: keep
 #include "Evolution/EventsAndTriggers/Event.hpp"
 #include "Evolution/EventsAndTriggers/EventsAndTriggers.hpp"  // IWYU pragma: keep
+#include "Evolution/Initialization/DiscontinuousGalerkin.hpp"
+#include "Evolution/Initialization/Domain.hpp"
+#include "Evolution/Initialization/Evolution.hpp"
+#include "Evolution/Initialization/Interface.hpp"
+#include "Evolution/Initialization/Limiter.hpp"
+#include "Evolution/Initialization/NonconservativeSystem.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Equations.hpp"  // IWYU pragma: keep // for UpwindFlux
 #include "Evolution/Systems/GeneralizedHarmonic/Initialize.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Observe.hpp"
@@ -38,6 +44,7 @@
 #include "Parallel/PhaseDependentActionList.hpp"
 #include "Parallel/Reduction.hpp"
 #include "Parallel/RegisterDerivedClassesWithCharm.hpp"
+#include "ParallelAlgorithms/Initialization/Actions/RemoveOptionsAndTerminatePhase.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/KerrSchild.hpp"  // IWYU pragma: keep
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/WrappedGr.hpp"  // IWYU pragma: keep
 #include "PointwiseFunctions/AnalyticSolutions/Tags.hpp"
@@ -137,15 +144,52 @@ struct EvolutionMetavars {
     Exit
   };
 
+  using initialization_actions = tmpl::list<
+      Initialization::Actions::Domain<dim>,
+      Initialization::Actions::NonconservativeSystem,
+      GeneralizedHarmonic::Actions::InitializeGHAnd3Plus1VariablesTags<dim>,
+      Initialization::Actions::Interface<
+          system,
+          Initialization::slice_tags_to_face<
+              typename system::variables_tag,
+              gr::Tags::SpatialMetricCompute<dim, Inertial, DataVector>,
+              gr::Tags::DetAndInverseSpatialMetricCompute<dim, Inertial,
+                                                          DataVector>,
+              gr::Tags::ShiftCompute<dim, Inertial, DataVector>,
+              gr::Tags::LapseCompute<dim, Inertial, DataVector>>,
+          Initialization::slice_tags_to_exterior<
+              gr::Tags::SpatialMetricCompute<dim, Inertial, DataVector>,
+              gr::Tags::DetAndInverseSpatialMetricCompute<dim, Inertial,
+                                                          DataVector>,
+              gr::Tags::ShiftCompute<dim, Inertial, DataVector>,
+              gr::Tags::LapseCompute<dim, Inertial, DataVector>>,
+          Initialization::face_compute_tags<
+              ::Tags::BoundaryCoordinates<dim, Inertial>,
+              GeneralizedHarmonic::Tags::ConstraintGamma0Compute<dim, Inertial>,
+              GeneralizedHarmonic::Tags::ConstraintGamma1Compute<dim, Inertial>,
+              GeneralizedHarmonic::Tags::ConstraintGamma2Compute<dim, Inertial>,
+              GeneralizedHarmonic::CharacteristicFieldsCompute<dim, Inertial>,
+              GeneralizedHarmonic::CharacteristicSpeedsCompute<dim, Inertial>>,
+          Initialization::exterior_compute_tags<
+              GeneralizedHarmonic::Tags::ConstraintGamma0Compute<dim, Inertial>,
+              GeneralizedHarmonic::Tags::ConstraintGamma1Compute<dim, Inertial>,
+              GeneralizedHarmonic::Tags::ConstraintGamma2Compute<dim, Inertial>,
+              GeneralizedHarmonic::CharacteristicFieldsCompute<dim, Inertial>,
+              GeneralizedHarmonic::CharacteristicSpeedsCompute<dim, Inertial>>>,
+      Initialization::Actions::Evolution<system>,
+      GeneralizedHarmonic::Actions::InitializeConstraintsTags<dim>,
+      Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavars>,
+      Initialization::Actions::Minmod<dim>,
+      Initialization::Actions::RemoveOptionsAndTerminatePhase>;
+
   using component_list = tmpl::list<
       observers::Observer<EvolutionMetavars>,
       observers::ObserverWriter<EvolutionMetavars>,
       DgElementArray<
           EvolutionMetavars,
           tmpl::list<
-              Parallel::PhaseActions<
-                  Phase, Phase::Initialization,
-                  tmpl::list<GeneralizedHarmonic::Actions::Initialize<dim>>>,
+              Parallel::PhaseActions<Phase, Phase::Initialization,
+                                     initialization_actions>,
 
               Parallel::PhaseActions<
                   Phase, Phase::InitializeTimeStepperHistory,
@@ -154,8 +198,7 @@ struct EvolutionMetavars {
 
               Parallel::PhaseActions<
                   Phase, Phase::RegisterWithObserver,
-                  tmpl::list<Actions::AdvanceTime,
-                             observers::Actions::RegisterWithObservers<
+                  tmpl::list<observers::Actions::RegisterWithObservers<
                                  observers::RegisterObservers<
                                      element_observation_type>>,
                              Parallel::Actions::TerminatePhase>>,
@@ -169,7 +212,8 @@ struct EvolutionMetavars {
                           local_time_stepping,
                           Actions::ChangeStepSize<step_choosers>, tmpl::list<>>,
                       compute_rhs, update_variables, Actions::AdvanceTime>>>>,
-          GeneralizedHarmonic::Actions::Initialize<dim>::AddOptionsToDataBox>>;
+          Parallel::ForwardAllOptionsToDataBox<
+              Initialization::option_tags<initialization_actions>>>>;
 
   static constexpr OptionString help{
       "Evolve a generalized harmonic analytic solution.\n\n"
