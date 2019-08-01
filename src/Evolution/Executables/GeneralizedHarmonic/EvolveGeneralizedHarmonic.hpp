@@ -12,6 +12,7 @@
 #include "ErrorHandling/FloatingPointExceptions.hpp"
 #include "Evolution/Actions/ComputeTimeDerivative.hpp"  // IWYU pragma: keep
 #include "Evolution/DiscontinuousGalerkin/DgElementArray.hpp"  // IWYU pragma: keep
+#include "Evolution/DiscontinuousGalerkin/Filtering.hpp"
 #include "Evolution/EventsAndTriggers/Actions/RunEventsAndTriggers.hpp"  // IWYU pragma: keep
 #include "Evolution/EventsAndTriggers/Event.hpp"
 #include "Evolution/EventsAndTriggers/EventsAndTriggers.hpp"  // IWYU pragma: keep
@@ -20,6 +21,7 @@
 #include "Evolution/Initialization/Interface.hpp"
 #include "Evolution/Initialization/Limiter.hpp"
 #include "Evolution/Initialization/NonconservativeSystem.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Equations.hpp"  // IWYU pragma: keep // for UpwindFlux
 #include "Evolution/Systems/GeneralizedHarmonic/Initialize.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Observe.hpp"
@@ -125,7 +127,9 @@ struct EvolutionMetavars {
       Actions::ComputeTimeDerivative,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
           Tags::BoundaryDirectionsInterior<dim>>,
-      dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
+      // dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
+      GeneralizedHarmonic::Actions::
+          ImposeConstraintPreservingBoundaryConditions<EvolutionMetavars>,
       dg::Actions::ReceiveDataForFluxes<EvolutionMetavars>,
       tmpl::conditional_t<local_time_stepping, tmpl::list<>,
                           dg::Actions::ApplyFluxes>,
@@ -134,7 +138,9 @@ struct EvolutionMetavars {
       tmpl::conditional_t<local_time_stepping,
                           dg::Actions::ApplyBoundaryFluxesLocalTimeStepping,
                           tmpl::list<>>,
-      Actions::UpdateU>>;
+      Actions::UpdateU,
+      dg::Actions::ExponentialFilter<
+          0, typename system::variables_tag::type::tags_list>>>;
 
   enum class Phase {
     Initialization,
@@ -178,7 +184,7 @@ struct EvolutionMetavars {
               GeneralizedHarmonic::CharacteristicSpeedsCompute<dim, Inertial>>>,
       Initialization::Actions::Evolution<system>,
       GeneralizedHarmonic::Actions::InitializeConstraintsTags<dim>,
-      Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavars>,
+      Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavars, false>,
       Initialization::Actions::Minmod<dim>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
