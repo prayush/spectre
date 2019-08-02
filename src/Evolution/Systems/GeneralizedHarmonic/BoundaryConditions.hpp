@@ -475,14 +475,14 @@ struct ImposeConstraintPreservingBoundaryConditions {
     // setting BCs on individual characteristic variables
     return apply_impl<Metavariables::system::volume_dim,
                       // BC choice for U_\Psi
-                      UPsiBcMethod::Freezing,
+                      UPsiBcMethod::ConstraintPreservingBjorhus,
                       // BC choice for U_0
-                      UZeroBcMethod::Freezing,
+                      UZeroBcMethod::ConstraintPreservingBjorhus,
                       // BC choice for U_+
                       UPlusBcMethod::Freezing,
                       // BC choice for U_-
-                      UMinusBcMethod::Freezing, DbTags>::function_impl(box,
-                                                                       cache);
+                      UMinusBcMethod::ConstraintPreservingPhysicalBjorhus,
+                      DbTags>::function_impl(box, cache);
   }
 };
 

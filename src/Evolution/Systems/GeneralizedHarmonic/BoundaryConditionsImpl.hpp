@@ -2,7 +2,6 @@
 // See LICENSE.txt for details.
 
 #pragma once
-
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -76,7 +75,6 @@ enum class UMinusBcMethod {
   Freezing,
   ConstraintPreservingBjorhus,
   ConstraintPreservingPhysicalBjorhus,
-  ConstraintPreservingPhysicalBjorhusGaugeSommerfeld,
   Unknown
 };
 
@@ -956,29 +954,24 @@ struct set_dt_u_minus {
         get<::Tags::Tempaa<30, VolumeDim, Frame::Inertial, DataVector>>(buffer);
     switch (Method) {
       case UMinusBcMethod::Freezing:
-        return bc_dt_u_minus;
+        return apply_gauge_sommerfeld(
+            make_not_null(&bc_dt_u_minus), constraint_gamma2, inertial_coords,
+            incoming_null_one_form, outgoing_null_one_form,
+            incoming_null_vector, outgoing_null_vector, projection_Ab,
+            char_projected_rhs_dt_u_psi);
       case UMinusBcMethod::ConstraintPreservingBjorhus:
-        return apply_bjorhus_constraint_preserving(
-            make_not_null(&bc_dt_u_minus), incoming_null_one_form,
-            outgoing_null_one_form, incoming_null_vector, outgoing_null_vector,
-            projection_ab, projection_Ab, projection_AB,
-            constraint_char_zero_plus, constraint_char_zero_minus,
-            char_projected_rhs_dt_u_minus, char_speeds);
-      case UMinusBcMethod::ConstraintPreservingPhysicalBjorhus:
         apply_bjorhus_constraint_preserving(
             make_not_null(&bc_dt_u_minus), incoming_null_one_form,
             outgoing_null_one_form, incoming_null_vector, outgoing_null_vector,
             projection_ab, projection_Ab, projection_AB,
             constraint_char_zero_plus, constraint_char_zero_minus,
             char_projected_rhs_dt_u_minus, char_speeds);
-        return apply_bjorhus_constraint_preserving_physical(
-            make_not_null(&bc_dt_u_minus), constraint_gamma2,
-            unit_interface_normal_one_form, unit_interface_normal_vector,
-            spacetime_unit_normal_vector, projection_ab, projection_Ab,
-            projection_AB, inverse_spatial_metric, extrinsic_curvature,
-            inverse_spacetime_metric, three_index_constraint,
-            char_projected_rhs_dt_u_minus, phi, d_phi, char_speeds);
-      case UMinusBcMethod::ConstraintPreservingPhysicalBjorhusGaugeSommerfeld:
+        return apply_gauge_sommerfeld(
+            make_not_null(&bc_dt_u_minus), constraint_gamma2, inertial_coords,
+            incoming_null_one_form, outgoing_null_one_form,
+            incoming_null_vector, outgoing_null_vector, projection_Ab,
+            char_projected_rhs_dt_u_psi);
+      case UMinusBcMethod::ConstraintPreservingPhysicalBjorhus:
         apply_bjorhus_constraint_preserving(
             make_not_null(&bc_dt_u_minus), incoming_null_one_form,
             outgoing_null_one_form, incoming_null_vector, outgoing_null_vector,
@@ -1394,7 +1387,8 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::apply_gauge_sommerfeld(
   ASSERT(get_size(get<0, 0>(*bc_dt_u_minus)) ==
              get_size(get<0>(incoming_null_one_form)),
          "Size of input variables and temporary memory do not match.");
-  const double GaugeBcCoeff = 1.;
+  // gauge_bc_coeff below is hard-coded here to its default value in SpEC
+  const double gauge_bc_coeff = 1.;
 
   DataVector inertial_radius(get_size(get<0>(inertial_coords)), 0.);
   for (size_t i = 0; i < VolumeDim; ++i) {
@@ -1422,7 +1416,7 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::apply_gauge_sommerfeld(
                0.5 * incoming_null_one_form.get(a) *
                    incoming_null_one_form.get(b) * outgoing_null_vector.get(c) *
                    outgoing_null_vector.get(d)) *
-              (get(gamma2) - GaugeBcCoeff * (1. / inertial_radius)) *
+              (get(gamma2) - gauge_bc_coeff * (1. / inertial_radius)) *
               char_projected_rhs_dt_u_psi.get(c, d);
         }
       }
