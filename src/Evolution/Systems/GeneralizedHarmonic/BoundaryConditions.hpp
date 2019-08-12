@@ -136,17 +136,18 @@ struct ImposeConstraintPreservingBoundaryConditions {
           db::get<::Tags::Mesh<VolumeDim>>(box);
       const size_t volume_grid_points = mesh.extents().product();
       const auto& unit_normal_one_forms = db::get<
-          ::Tags::Interface<::Tags::BoundaryDirectionsInterior<VolumeDim>,
+          ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
                             ::Tags::Normalized<::Tags::UnnormalizedFaceNormal<
                                 VolumeDim, Frame::Inertial>>>>(box);
       const auto& external_bdry_vars = db::get<::Tags::Interface<
-          ::Tags::BoundaryDirectionsInterior<VolumeDim>, variables_tag>>(box);
-      const auto& volume_all_at_vars = db::get<dt_variables_tag>(box);
+          ::Tags::BoundaryDirectionsExterior<VolumeDim>, variables_tag>>(box);
+      const auto& volume_all_vars = db::get<variables_tag>(box);
+      const auto& volume_all_dt_vars = db::get<dt_variables_tag>(box);
       const auto& external_bdry_char_speeds = db::get<::Tags::Interface<
-          ::Tags::BoundaryDirectionsInterior<VolumeDim>,
+          ::Tags::BoundaryDirectionsExterior<VolumeDim>,
           Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>>>(box);
       const auto& external_bdry_inertial_coords = db::get<
-          ::Tags::Interface<::Tags::BoundaryDirectionsInterior<VolumeDim>,
+          ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
                             ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(
           box);
 
@@ -157,9 +158,12 @@ struct ImposeConstraintPreservingBoundaryConditions {
         const auto& direction = external_direction_and_vars.first;
         const size_t dimension = direction.dimension();
         const auto& unit_normal_one_form = unit_normal_one_forms.at(direction);
-        const auto& vars = external_direction_and_vars.second;
         const size_t slice_grid_points =
             mesh.extents().slice_away(dimension).product();
+        // Get U on this slice
+        const auto vars =
+            data_on_slice(volume_all_vars, mesh.extents(), dimension,
+                          index_to_slice_at(mesh.extents(), direction));
         ASSERT(vars.number_of_grid_points() == slice_grid_points,
                "vars_on_slice has wrong number of grid points.  "
                "Expected "
@@ -167,7 +171,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
                    << vars.number_of_grid_points());
         // Get dt<U> on this slice
         const auto dt_vars =
-            data_on_slice(volume_all_at_vars, mesh.extents(), dimension,
+            data_on_slice(volume_all_dt_vars, mesh.extents(), dimension,
                           index_to_slice_at(mesh.extents(), direction));
         // Get characteristic speeds
         const auto& char_speeds = external_bdry_char_speeds.at(direction);
@@ -191,7 +195,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
         // (B) 4metric, inv4metric, lapse, shift on this slice
         // (C) dampign parameter ConstraintGamma2 on this slice
         // (D) Compute projection operator on this slice
-        // (E) dt<U> on this slice from `volume_all_at_vars`
+        // (E) dt<U> on this slice from `volume_all_dt_vars`
         BoundaryConditions_detail::local_variables(
             make_not_null(&buffer), box, direction, dimension, mesh, vars,
             dt_vars, unit_normal_one_form, char_speeds);
