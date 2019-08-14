@@ -139,8 +139,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
           ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
                             ::Tags::Normalized<::Tags::UnnormalizedFaceNormal<
                                 VolumeDim, Frame::Inertial>>>>(box);
-      const auto& external_bdry_vars = db::get<::Tags::Interface<
-          ::Tags::BoundaryDirectionsExterior<VolumeDim>, variables_tag>>(box);
+      // const auto& external_bdry_vars = db::get<::Tags::Interface<
+      //::Tags::BoundaryDirectionsExterior<VolumeDim>, variables_tag>>(box);
       const auto& volume_all_vars = db::get<variables_tag>(box);
       const auto& volume_all_dt_vars = db::get<dt_variables_tag>(box);
       const auto& external_bdry_char_speeds = db::get<::Tags::Interface<
@@ -154,10 +154,11 @@ struct ImposeConstraintPreservingBoundaryConditions {
       // ------------------------------- (2)
       // Apply the boundary condition
       // Loop over external boundaries and set dt_volume_vars on them
-      for (auto& external_direction_and_vars : external_bdry_vars) {
-        const auto& direction = external_direction_and_vars.first;
+      for (auto& external_direction_and_normals : unit_normal_one_forms) {
+        const auto& direction = external_direction_and_normals.first;
         const size_t dimension = direction.dimension();
-        const auto& unit_normal_one_form = unit_normal_one_forms.at(direction);
+        const auto& unit_normal_one_form =
+            external_direction_and_normals.second;
         const size_t slice_grid_points =
             mesh.extents().slice_away(dimension).product();
         // Get U on this slice
@@ -479,14 +480,14 @@ struct ImposeConstraintPreservingBoundaryConditions {
     // setting BCs on individual characteristic variables
     return apply_impl<Metavariables::system::volume_dim,
                       // BC choice for U_\Psi
-                      UPsiBcMethod::ConstraintPreservingBjorhus,
+                      UPsiBcMethod::Freezing,
                       // BC choice for U_0
-                      UZeroBcMethod::ConstraintPreservingBjorhus,
+                      UZeroBcMethod::Freezing,
                       // BC choice for U_+
                       UPlusBcMethod::Freezing,
                       // BC choice for U_-
-                      UMinusBcMethod::ConstraintPreservingPhysicalBjorhus,
-                      DbTags>::function_impl(box, cache);
+                      UMinusBcMethod::Freezing, DbTags>::function_impl(box,
+                                                                       cache);
   }
 };
 
