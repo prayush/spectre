@@ -136,20 +136,44 @@ struct ImposeConstraintPreservingBoundaryConditions {
           db::get<::Tags::Mesh<VolumeDim>>(box);
       const size_t volume_grid_points = mesh.extents().product();
       const auto& unit_normal_one_forms = db::get<
-          ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
+          ::Tags::Interface<::Tags::BoundaryDirectionsInterior<VolumeDim>,
                             ::Tags::Normalized<::Tags::UnnormalizedFaceNormal<
                                 VolumeDim, Frame::Inertial>>>>(box);
       // const auto& external_bdry_vars = db::get<::Tags::Interface<
-      //::Tags::BoundaryDirectionsExterior<VolumeDim>, variables_tag>>(box);
+      //::Tags::BoundaryDirectionsInterior<VolumeDim>, variables_tag>>(box);
       const auto& volume_all_vars = db::get<variables_tag>(box);
       const auto& volume_all_dt_vars = db::get<dt_variables_tag>(box);
       const auto& external_bdry_char_speeds = db::get<::Tags::Interface<
-          ::Tags::BoundaryDirectionsExterior<VolumeDim>,
+          ::Tags::BoundaryDirectionsInterior<VolumeDim>,
           Tags::CharacteristicSpeeds<VolumeDim, Frame::Inertial>>>(box);
       const auto& external_bdry_inertial_coords = db::get<
-          ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
+          ::Tags::Interface<::Tags::BoundaryDirectionsInterior<VolumeDim>,
                             ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(
           box);
+
+      // Update variables_tag<BoundaryDirectionsExterior>
+      db::mutate_apply<tmpl::list<::Tags::Interface<
+                           ::Tags::BoundaryDirectionsExterior<VolumeDim>,
+                           typename system::variables_tag>>,
+                       tmpl::list<>>(
+          [
+            &volume_all_vars, &mesh
+          ](const gsl::not_null<db::item_type<
+                ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
+                                  typename system::variables_tag>>*>
+                external_bdry_vars) noexcept {
+            // Loop over external boundaries
+            for (auto& external_direction_and_vars : *external_bdry_vars) {
+              auto& direction = external_direction_and_vars.first;
+              auto& vars = external_direction_and_vars.second;
+              // Get evolved variables on current boundary from volume
+              // and assign them to `vars`
+              vars.assign_subset(data_on_slice(
+                  volume_all_vars, mesh.extents(), direction.dimension(),
+                  index_to_slice_at(mesh.extents(), direction)));
+            }
+          },
+          make_not_null(&box));
 
       // ------------------------------- (2)
       // Apply the boundary condition
@@ -480,14 +504,14 @@ struct ImposeConstraintPreservingBoundaryConditions {
     // setting BCs on individual characteristic variables
     return apply_impl<Metavariables::system::volume_dim,
                       // BC choice for U_\Psi
-                      UPsiBcMethod::Freezing,
+                      UPsiBcMethod::ConstraintPreservingBjorhus,
                       // BC choice for U_0
-                      UZeroBcMethod::Freezing,
+                      UZeroBcMethod::ConstraintPreservingBjorhus,
                       // BC choice for U_+
                       UPlusBcMethod::Freezing,
                       // BC choice for U_-
-                      UMinusBcMethod::Freezing, DbTags>::function_impl(box,
-                                                                       cache);
+                      UMinusBcMethod::ConstraintPreservingPhysicalBjorhus,
+                      DbTags>::function_impl(box, cache);
   }
 };
 

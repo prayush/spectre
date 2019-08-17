@@ -325,19 +325,6 @@ void local_variables(
   // Constraint damping parameters
   get<::Tags::TempScalar<26, DataVector>>(*buffer) =
       get<Tags::ConstraintGamma2>(vars_on_this_slice);
-  // Preallocated memory for output, fill with zeros
-  auto& _bc_upsi =
-      get<::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
-  std::fill(_bc_upsi.begin(), _bc_upsi.end(), 0.);
-  auto& _bc_uzero =
-      get<::Tags::Tempiaa<28, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
-  std::fill(_bc_uzero.begin(), _bc_uzero.end(), 0.);
-  auto& _bc_uplus =
-      get<::Tags::Tempaa<29, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
-  std::fill(_bc_uplus.begin(), _bc_uplus.end(), 0.);
-  auto& _bc_uminus =
-      get<::Tags::Tempaa<30, VolumeDim, Frame::Inertial, DataVector>>(*buffer);
-  std::fill(_bc_uminus.begin(), _bc_uminus.end(), 0.);
 
   // Coordinates
   get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(*buffer) =
@@ -451,7 +438,7 @@ struct set_dt_u_psi {
     // Memory allocated for return type
     ReturnType& bc_dt_u_psi =
         get<::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-
+    std::fill(bc_dt_u_psi.begin(), bc_dt_u_psi.end(), 0.);
     // Switch on prescribed boundary condition method
     switch (Method) {
       case UPsiBcMethod::Freezing:
@@ -595,6 +582,8 @@ struct set_dt_u_zero {
     ReturnType& bc_dt_u_zero =
         get<::Tags::Tempiaa<28, VolumeDim, Frame::Inertial, DataVector>>(
             buffer);
+    std::fill(bc_dt_u_zero.begin(), bc_dt_u_zero.end(), 0.);
+    // Switch on prescribed boundary condition method
     switch (Method) {
       case UZeroBcMethod::Freezing:
         return bc_dt_u_zero;
@@ -851,8 +840,11 @@ struct set_dt_u_plus {
                           const Variables<DtVarsTagsList>& /* dt_vars */,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
                           /* unit_normal_one_form */) noexcept {
+    // Memory allocated for return type
     ReturnType& bc_dt_u_plus =
         get<::Tags::Tempaa<29, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    std::fill(bc_dt_u_plus.begin(), bc_dt_u_plus.end(), 0.);
+    // Switch on prescribed boundary condition method
     switch (Method) {
       case UPlusBcMethod::Freezing:
         return bc_dt_u_plus;
@@ -952,6 +944,8 @@ struct set_dt_u_minus {
     // Memory allocated for return type
     ReturnType& bc_dt_u_minus =
         get<::Tags::Tempaa<30, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    std::fill(bc_dt_u_minus.begin(), bc_dt_u_minus.end(), 0.);
+    // Switch on prescribed boundary condition method
     switch (Method) {
       case UMinusBcMethod::Freezing:
         return apply_gauge_sommerfeld(
