@@ -12,6 +12,8 @@
 #include "ErrorHandling/FloatingPointExceptions.hpp"
 #include "Evolution/Actions/ComputeTimeDerivative.hpp"  // IWYU pragma: keep
 #include "Evolution/DiscontinuousGalerkin/DgElementArray.hpp"  // IWYU pragma: keep
+#include "Evolution/DiscontinuousGalerkin/ObserveErrorNorms.hpp"
+#include "Evolution/DiscontinuousGalerkin/ObserveFields.hpp"
 #include "Evolution/EventsAndTriggers/Actions/RunEventsAndTriggers.hpp"  // IWYU pragma: keep
 #include "Evolution/EventsAndTriggers/Event.hpp"
 #include "Evolution/EventsAndTriggers/EventsAndTriggers.hpp"  // IWYU pragma: keep
@@ -21,7 +23,6 @@
 #include "Evolution/Initialization/NonconservativeSystem.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Equations.hpp"  // IWYU pragma: keep // for UpwindFlux
 #include "Evolution/Systems/GeneralizedHarmonic/Initialize.hpp"
-#include "Evolution/Systems/GeneralizedHarmonic/Observe.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/System.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "IO/Observer/Actions.hpp"  // IWYU pragma: keep
@@ -97,7 +98,31 @@ struct EvolutionMetavars {
   using normal_dot_numerical_flux = OptionTags::NumericalFlux<
       // dg::NumericalFluxes::LocalLaxFriedrichs<system>>;
       GeneralizedHarmonic::UpwindFlux<dim>>;
-  using events = tmpl::list<>;
+  using events = tmpl::list<
+      dg::Events::Registrars::ObserveErrorNorms<
+          dim, typename system::variables_tag::tags_list>,
+      dg::Events::Registrars::ObserveFields<
+          dim,
+          tmpl::append<
+              typename system::variables_tag::tags_list,
+              tmpl::list<
+                  ::Tags::PointwiseL2Norm<GeneralizedHarmonic::Tags::
+                                              GaugeConstraint<dim, Inertial>>,
+                  ::Tags::PointwiseL2Norm<
+                      GeneralizedHarmonic::Tags::FConstraint<dim, Inertial>>,
+                  ::Tags::PointwiseL2Norm<
+                      GeneralizedHarmonic::Tags::TwoIndexConstraint<dim,
+                                                                    Inertial>>,
+                  ::Tags::PointwiseL2Norm<
+                      GeneralizedHarmonic::Tags::ThreeIndexConstraint<
+                          dim, Inertial>>,
+                  ::Tags::PointwiseL2Norm<
+                      GeneralizedHarmonic::Tags::FourIndexConstraint<dim,
+                                                                     Inertial>>,
+                  ::Tags::PointwiseL2Norm<
+                      GeneralizedHarmonic::Tags::ConstraintEnergy<dim,
+                                                                  Inertial>>>>,
+          typename system::variables_tag::tags_list>>;
   using triggers = Triggers::time_triggers;
 
   // A tmpl::list of tags to be added to the ConstGlobalCache by the
@@ -116,8 +141,8 @@ struct EvolutionMetavars {
   struct ObservationType {};
   using element_observation_type = ObservationType;
 
-  using observed_reduction_data_tags = observers::collect_reduction_data_tags<
-      tmpl::list<GeneralizedHarmonic::Actions::Observe>>;
+  using observed_reduction_data_tags =
+      observers::collect_reduction_data_tags<Event<events>::creatable_classes>;
 
   using compute_rhs = tmpl::flatten<tmpl::list<
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
@@ -208,7 +233,6 @@ struct EvolutionMetavars {
               Parallel::PhaseActions<
                   Phase, Phase::Evolve,
                   tmpl::flatten<tmpl::list<
-                      GeneralizedHarmonic::Actions::Observe,
                       Actions::RunEventsAndTriggers,
                       tmpl::conditional_t<
                           local_time_stepping,

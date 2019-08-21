@@ -13,6 +13,7 @@
 #include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "DataStructures/DataBox/Prefixes.hpp"
 #include "DataStructures/Tensor/EagerMath/DotProduct.hpp"
+#include "DataStructures/Tensor/EagerMath/Norms.hpp"
 #include "DataStructures/Variables.hpp"
 #include "Domain/Mesh.hpp"
 #include "Domain/Tags.hpp"
@@ -53,7 +54,20 @@ struct InitializeConstraintsTags {
       GeneralizedHarmonic::Tags::FConstraintCompute<Dim, Inertial>,
       GeneralizedHarmonic::Tags::TwoIndexConstraintCompute<Dim, Inertial>,
       GeneralizedHarmonic::Tags::FourIndexConstraintCompute<Dim, Inertial>,
-      GeneralizedHarmonic::Tags::ConstraintEnergyCompute<Dim, Inertial>>;
+      GeneralizedHarmonic::Tags::ConstraintEnergyCompute<Dim, Inertial>,
+      // following tags added to observe constraints
+      ::Tags::PointwiseL2NormCompute<
+          GeneralizedHarmonic::Tags::GaugeConstraint<Dim, Inertial>>,
+      ::Tags::PointwiseL2NormCompute<
+          GeneralizedHarmonic::Tags::FConstraint<Dim, Inertial>>,
+      ::Tags::PointwiseL2NormCompute<
+          GeneralizedHarmonic::Tags::TwoIndexConstraint<Dim, Inertial>>,
+      ::Tags::PointwiseL2NormCompute<
+          GeneralizedHarmonic::Tags::ThreeIndexConstraint<Dim, Inertial>>,
+      ::Tags::PointwiseL2NormCompute<
+          GeneralizedHarmonic::Tags::FourIndexConstraint<Dim, Inertial>>,
+      ::Tags::PointwiseL2NormCompute<
+          GeneralizedHarmonic::Tags::ConstraintEnergy<Dim, Inertial>>>;
 
   template <typename DbTagsList, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,

@@ -23,16 +23,21 @@ AnalyticSolution:
     Spin: [0.0, 0.0, 0.4]
     Center: [0.0, 0.0, 0.0]
 
-
 NumericalFlux:
   UpwindFlux:
 
 EventsAndTriggers:
+  ? EveryNSlabs:
+      N: 2
+      Offset: 0
+  : - ObserveErrorNorms
+  ? EveryNSlabs:
+      N: 5
+      Offset: 0
+  : - ObserveFields
   ? PastTime: 1.0
   : - Completion
 
-ObserveNSlabs: 2
-ObserveAtT0: true
 Observers:
-  ReductionFileName: ReductionData
-  VolumeFileName: VolumeData
+  VolumeFileName: "VolumeData"
+  ReductionFileName: "ReductionData"
