@@ -18,7 +18,7 @@ DomainCreator:
       IsPeriodicIn: [false, false, false]
 
 AnalyticSolution:
-  WrappedGr:
+  KerrSchild:
     Mass: 1.0
     Spin: [0.0, 0.0, 0.4]
     Center: [0.0, 0.0, 0.0]

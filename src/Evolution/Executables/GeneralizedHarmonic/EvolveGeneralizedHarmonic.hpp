@@ -17,7 +17,6 @@
 #include "Evolution/EventsAndTriggers/EventsAndTriggers.hpp"  // IWYU pragma: keep
 #include "Evolution/Initialization/DiscontinuousGalerkin.hpp"
 #include "Evolution/Initialization/Evolution.hpp"
-#include "Evolution/Initialization/Interface.hpp"
 #include "Evolution/Initialization/Limiter.hpp"
 #include "Evolution/Initialization/NonconservativeSystem.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Equations.hpp"  // IWYU pragma: keep // for UpwindFlux
@@ -44,6 +43,8 @@
 #include "Parallel/Reduction.hpp"
 #include "Parallel/RegisterDerivedClassesWithCharm.hpp"
 #include "ParallelAlgorithms/DiscontinuousGalerkin/InitializeDomain.hpp"
+#include "ParallelAlgorithms/DiscontinuousGalerkin/InitializeInterfaces.hpp"
+#include "ParallelAlgorithms/DiscontinuousGalerkin/InitializeMortars.hpp"
 #include "ParallelAlgorithms/Initialization/Actions/RemoveOptionsAndTerminatePhase.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/KerrSchild.hpp"  // IWYU pragma: keep
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/WrappedGr.hpp"  // IWYU pragma: keep
@@ -148,29 +149,29 @@ struct EvolutionMetavars {
       dg::Actions::InitializeDomain<dim>,
       Initialization::Actions::NonconservativeSystem,
       GeneralizedHarmonic::Actions::InitializeGHAnd3Plus1VariablesTags<dim>,
-      Initialization::Actions::Interface<
+      dg::Actions::InitializeInterfaces<
           system,
-          Initialization::slice_tags_to_face<
+          dg::Initialization::slice_tags_to_face<
               typename system::variables_tag,
               gr::Tags::SpatialMetricCompute<dim, Inertial, DataVector>,
               gr::Tags::DetAndInverseSpatialMetricCompute<dim, Inertial,
                                                           DataVector>,
               gr::Tags::ShiftCompute<dim, Inertial, DataVector>,
               gr::Tags::LapseCompute<dim, Inertial, DataVector>>,
-          Initialization::slice_tags_to_exterior<
+          dg::Initialization::slice_tags_to_exterior<
               gr::Tags::SpatialMetricCompute<dim, Inertial, DataVector>,
               gr::Tags::DetAndInverseSpatialMetricCompute<dim, Inertial,
                                                           DataVector>,
               gr::Tags::ShiftCompute<dim, Inertial, DataVector>,
               gr::Tags::LapseCompute<dim, Inertial, DataVector>>,
-          Initialization::face_compute_tags<
+          dg::Initialization::face_compute_tags<
               ::Tags::BoundaryCoordinates<dim, Inertial>,
               GeneralizedHarmonic::Tags::ConstraintGamma0Compute<dim, Inertial>,
               GeneralizedHarmonic::Tags::ConstraintGamma1Compute<dim, Inertial>,
               GeneralizedHarmonic::Tags::ConstraintGamma2Compute<dim, Inertial>,
               GeneralizedHarmonic::CharacteristicFieldsCompute<dim, Inertial>,
               GeneralizedHarmonic::CharacteristicSpeedsCompute<dim, Inertial>>,
-          Initialization::exterior_compute_tags<
+          dg::Initialization::exterior_compute_tags<
               GeneralizedHarmonic::Tags::ConstraintGamma0Compute<dim, Inertial>,
               GeneralizedHarmonic::Tags::ConstraintGamma1Compute<dim, Inertial>,
               GeneralizedHarmonic::Tags::ConstraintGamma2Compute<dim, Inertial>,
@@ -178,6 +179,7 @@ struct EvolutionMetavars {
               GeneralizedHarmonic::CharacteristicSpeedsCompute<dim, Inertial>>>,
       Initialization::Actions::Evolution<system>,
       GeneralizedHarmonic::Actions::InitializeConstraintsTags<dim>,
+      dg::Actions::InitializeMortars<EvolutionMetavars, true>,
       Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavars>,
       Initialization::Actions::Minmod<dim>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
