@@ -226,28 +226,23 @@ struct ImposeConstraintPreservingBoundaryConditions {
             dt_vars, unit_normal_one_form, char_speeds);
 
         // FIXME: Are there incoming char speeds on the inner boundary?
-        if (false) {  // {{{
+        if (true) {  // {{{
           const auto& x =
               get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(
                   buffer);
           // If radius of surface is less than 10, then assume we are on an
-          // inner boundary. FIX ME
+          // inner boundary. FIXME
           const auto& min_r_squared =
               min(square(get<0>(x)) + square(get<1>(x)) + square(get<2>(x)));
           const auto min_inertial_r_squared =
               min(square(get<0>(inertial_coords)) +
                   square(get<1>(inertial_coords)) +
                   square(get<2>(inertial_coords)));
-          if (min_r_squared < 25.0) {
+          if (min_r_squared < 25.0 or min_inertial_r_squared < 25.0) {
             const auto& min_speed =
                 BoundaryConditions_detail::min_characteristic_speed<VolumeDim>(
                     char_speeds);
-            if (min_speed >= 0.0) {
-              Parallel::printf(
-                  "Min(CharSpeeds<U>) > 0 at t=%f: WHY are still here?...",
-                  db::get<::Tags::Time>(box).value());
-              Parallel::abort("Aborting for above reason...");
-            } else if (min_speed < 0.0) {
+            if (min_speed <= 0.0) {
               Parallel::printf(
                   "\nWARNING: Incoming char speeds on INNER boundary at t=%f\n",
                   db::get<::Tags::Time>(box).value());
