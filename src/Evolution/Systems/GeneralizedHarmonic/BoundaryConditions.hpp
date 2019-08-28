@@ -151,30 +151,6 @@ struct ImposeConstraintPreservingBoundaryConditions {
                             ::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(
           box);
 
-      // Update variables_tag<BoundaryDirectionsExterior>
-      db::mutate_apply<tmpl::list<::Tags::Interface<
-                           ::Tags::BoundaryDirectionsExterior<VolumeDim>,
-                           typename system::variables_tag>>,
-                       tmpl::list<>>(
-          [
-            &volume_all_vars, &mesh
-          ](const gsl::not_null<db::item_type<
-                ::Tags::Interface<::Tags::BoundaryDirectionsExterior<VolumeDim>,
-                                  typename system::variables_tag>>*>
-                external_bdry_vars) noexcept {
-            // Loop over external boundaries
-            for (auto& external_direction_and_vars : *external_bdry_vars) {
-              auto& direction = external_direction_and_vars.first;
-              auto& vars = external_direction_and_vars.second;
-              // Get evolved variables on current boundary from volume
-              // and assign them to `vars`
-              vars.assign_subset(data_on_slice(
-                  volume_all_vars, mesh.extents(), direction.dimension(),
-                  index_to_slice_at(mesh.extents(), direction)));
-            }
-          },
-          make_not_null(&box));
-
       // ------------------------------- (2)
       // Apply the boundary condition
       // Loop over external boundaries and set dt_volume_vars on them

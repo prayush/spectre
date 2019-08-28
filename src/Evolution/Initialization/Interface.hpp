@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 
 #include "DataStructures/DataBox/DataBox.hpp"
@@ -80,12 +81,16 @@ namespace Actions {
 template <typename System, typename SliceTagsToFace,
           typename SliceTagsToExterior,
           typename FaceComputeTags = face_compute_tags<>,
-          typename ExteriorComputeTags = exterior_compute_tags<>>
+          typename ExteriorComputeTags = exterior_compute_tags<>,
+          bool AddFluxBoundaryConditionComputeTags = true>
 struct Interface {
   static constexpr size_t dim = System::volume_dim;
-  using simple_tags = db::AddSimpleTags<
-        ::Tags::Interface<::Tags::BoundaryDirectionsExterior<dim>,
-                          typename System::variables_tag>>;
+  using simple_tags =
+      tmpl::conditional_t<AddFluxBoundaryConditionComputeTags,
+                          db::AddSimpleTags<::Tags::Interface<
+                              ::Tags::BoundaryDirectionsExterior<dim>,
+                              typename System::variables_tag>>,
+                          db::AddSimpleTags<>>;
 
   template <typename TagToSlice, typename Directions>
   struct make_slice_tag {
@@ -153,6 +158,16 @@ struct Interface {
                     const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/, ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
+    return apply_impl(
+        box,
+        std::integral_constant<bool, AddFluxBoundaryConditionComputeTags>{});
+  }
+
+ private:
+  template <typename DbTagsList>
+  static auto apply_impl(
+      db::DataBox<DbTagsList>& box,
+      std::integral_constant<bool, true> /* meta */) noexcept {
     const auto& mesh = db::get<::Tags::Mesh<dim>>(box);
     std::unordered_map<Direction<dim>,
                        db::item_type<typename System::variables_tag>>
@@ -168,6 +183,15 @@ struct Interface {
     return std::make_tuple(
         merge_into_databox<Interface, simple_tags, compute_tags>(
             std::move(box), std::move(external_boundary_vars)));
+  }
+
+  template <typename DbTagsList>
+  static auto apply_impl(
+      db::DataBox<DbTagsList>& box,
+      std::integral_constant<bool, false> /* meta */) noexcept {
+    return std::make_tuple(
+        merge_into_databox<Interface, simple_tags, compute_tags>(
+            std::move(box)));
   }
 };
 }  // namespace Actions
