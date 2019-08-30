@@ -8,6 +8,11 @@
 #include <tuple>
 #include <utility>
 
+// debugPK
+#include <iomanip>
+#include <iostream>
+#include <string>
+
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "DataStructures/DataBox/DataOnSlice.hpp"
@@ -40,6 +45,55 @@
 #include "Utilities/TaggedTuple.hpp"
 #include "Utilities/TypeTraits.hpp"
 
+const bool debugPKon = true, debugPKoff = false;
+
+template <typename T1, typename T2, size_t VolumeDim = 3>
+void print_rank1_tensor_at_point(const std::string& name, const T1& tensor,
+                                 const T2& coord_x, const T2& coord_y,
+                                 const T2& coord_z, const size_t idx) noexcept {
+  std::cout << "--- OUTPUT for " << name << "[" << coord_x[idx] << ", "
+            << coord_y[idx] << ", " << coord_z[idx] << "] ---" << std::endl
+            << std::flush;
+  for (size_t a = 0; a <= VolumeDim; ++a) {
+    std::cout << "  " << tensor.get(a)[idx] << "  " << std::flush;
+  }
+  std::cout << std::endl << std::flush;
+}
+
+template <typename T1, typename T2, size_t VolumeDim = 3>
+void print_rank2_tensor_at_point(const std::string& name, const T1& tensor,
+                                 const T2& coord_x, const T2& coord_y,
+                                 const T2& coord_z, const size_t idx) noexcept {
+  std::cout << "--- OUTPUT for " << name << "[" << coord_x[idx] << ", "
+            << coord_y[idx] << ", " << coord_z[idx] << "] ---" << std::endl
+            << std::flush;
+  for (size_t a = 0; a <= VolumeDim; ++a) {
+    for (size_t b = 0; b <= VolumeDim; ++b) {
+      std::cout << "  " << tensor.get(a, b)[idx] << "  " << std::flush;
+    }
+    std::cout << std::endl << std::flush;
+  }
+  std::cout << std::endl << std::flush;
+}
+
+template <typename T1, typename T2, size_t VolumeDim = 3>
+void print_rank3_tensor_at_point(const std::string& name, const T1& tensor,
+                                 const T2& coord_x, const T2& coord_y,
+                                 const T2& coord_z, const size_t idx) noexcept {
+  std::cout << "--- OUTPUT for " << name << "[" << coord_x[idx] << ", "
+            << coord_y[idx] << ", " << coord_z[idx] << "] ---" << std::endl
+            << std::flush;
+  for (size_t j = 0; j < VolumeDim; ++j) {
+    for (size_t a = 0; a <= VolumeDim; ++a) {
+      for (size_t b = 0; b <= VolumeDim; ++b) {
+        std::cout << "  " << tensor.get(j, a, b)[idx] << "  " << std::flush;
+      }
+      std::cout << std::endl << std::flush;
+    }
+    std::cout << std::endl << std::flush;
+  }
+  std::cout << std::endl << std::flush;
+}
 /// \cond
 namespace Tags {
 template <typename Tag>
@@ -435,9 +489,91 @@ struct set_dt_u_psi {
                      get(get<::Tags::TempScalar<13, DataVector>>(buffer)),
                      get(get<::Tags::TempScalar<14, DataVector>>(buffer)),
                      get(get<::Tags::TempScalar<15, DataVector>>(buffer))}};
+
+    // --------------------------------------- TESTS
+    // POPULATE various tensors needed to compute BcDtUpsi
+    // EXACTLY as done in SpEC
+    auto local_inertial_coords =
+        get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto local_three_index_constraint = three_index_constraint;
+    auto local_unit_interface_normal_vector = unit_interface_normal_vector;
+    auto local_lapse = lapse;
+    auto local_shift = shift;
+    auto local_pi = pi;
+    auto local_phi = phi;
+    auto local_char_projected_rhs_dt_u_psi = char_projected_rhs_dt_u_psi;
+    auto local_char_speeds = char_speeds;
+    // Setting 3idxConstraint
+    for (size_t i = 0; i < lapse.size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = 0; b <= VolumeDim; ++b) {
+          local_three_index_constraint.get(0, a, b)[i] = 11. - 3.;
+          local_three_index_constraint.get(1, a, b)[i] = 13. - 5.;
+          local_three_index_constraint.get(2, a, b)[i] = 17. - 7.;
+        }
+      }
+    }
+    // Setting unit_interface_normal_Vector
+    for (size_t i = 0; i < lapse.size(); ++i) {
+      local_unit_interface_normal_vector.get(0)[i] = 1.e300;
+      local_unit_interface_normal_vector.get(1)[i] = -1.;
+      local_unit_interface_normal_vector.get(2)[i] = 0.;
+      local_unit_interface_normal_vector.get(3)[i] = 0.;
+    }
+    // Setting lapse
+    for (size_t i = 0; i < lapse.size(); ++i) {
+      get(local_lapse)[i] = 2.;
+    }
+    // Setting shift
+    for (size_t i = 0; i < lapse.size(); ++i) {
+      local_shift.get(0)[i] = 1.;
+      local_shift.get(1)[i] = 2.;
+      local_shift.get(2)[i] = 3.;
+    }
+    // Setting pi AND phi
+    for (size_t i = 0; i < lapse.size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = 0; b <= VolumeDim; ++b) {
+          local_pi.get(a, b)[i] = 1.;
+          local_phi.get(0, a, b)[i] = 3.;
+          local_phi.get(1, a, b)[i] = 5.;
+          local_phi.get(2, a, b)[i] = 7.;
+        }
+      }
+    }
+    // Setting local_RhsUPsi
+    for (size_t i = 0; i < lapse.size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        local_char_projected_rhs_dt_u_psi.get(0, a)[i] = 23.;
+        local_char_projected_rhs_dt_u_psi.get(1, a)[i] = 29.;
+        local_char_projected_rhs_dt_u_psi.get(2, a)[i] = 31.;
+        local_char_projected_rhs_dt_u_psi.get(3, a)[i] = 37.;
+      }
+    }
+    // Setting char speeds
+    for (size_t i = 0; i < lapse.size(); ++i) {
+      local_char_speeds.at(0)[i] = -0.3;
+      local_char_speeds.at(1)[i] = -0.1;
+    }
+
     // Memory allocated for return type
     ReturnType& bc_dt_u_psi =
         get<::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    std::fill(bc_dt_u_psi.begin(), bc_dt_u_psi.end(), 0.);
+    // debugPK
+    auto _ = apply_bjorhus_constraint_preserving(
+        make_not_null(&bc_dt_u_psi), local_unit_interface_normal_vector,
+        local_three_index_constraint, local_char_projected_rhs_dt_u_psi,
+        local_char_speeds);
+    // DISPLAY results of the TEST
+    if (debugPKon) {
+      for (size_t i = 0; i < lapse.size(); ++i) {
+        print_rank2_tensor_at_point(
+            "BcDtUpsi", bc_dt_u_psi, local_inertial_coords.get(0),
+            local_inertial_coords.get(1), local_inertial_coords.get(2), i);
+      }
+    }
+    // --------------------------------------- TESTS
     std::fill(bc_dt_u_psi.begin(), bc_dt_u_psi.end(), 0.);
     // Switch on prescribed boundary condition method
     switch (Method) {
@@ -578,10 +714,86 @@ struct set_dt_u_zero {
         get<::Tags::Tempijaa<33, VolumeDim, Frame::Inertial, DataVector>>(
             buffer);
 
+    // --------------------------------------- TESTS
+    // POPULATE various tensors needed to compute BcDtU0
+    // EXACTLY as done in SpEC
+    auto local_inertial_coords =
+        get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto local_four_index_constraint = four_index_constraint;
+    auto local_unit_interface_normal_vector = unit_interface_normal_vector;
+    auto local_lapse = lapse;
+    auto local_shift = shift;
+    auto local_pi = pi;
+    auto local_phi = phi;
+    auto local_char_projected_rhs_dt_u_zero = char_projected_rhs_dt_u_zero;
+    auto local_char_speeds = char_speeds;
+    // Setting 4idxConstraint: FIXME -- DOES NOT MATCH WITH SPEC YET!!
+    for (size_t i = 0; i < lapse.size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = 0; b <= VolumeDim; ++b) {
+          local_four_index_constraint.get(0, a, b)[i] = 11. - 3.;
+          local_four_index_constraint.get(1, a, b)[i] = 13. - 5.;
+          local_four_index_constraint.get(2, a, b)[i] = 17. - 7.;
+        }
+      }
+    }
+    // Setting unit_interface_normal_Vector
+    for (size_t i = 0; i < lapse.size(); ++i) {
+      local_unit_interface_normal_vector.get(0)[i] = 1.e300;
+      local_unit_interface_normal_vector.get(1)[i] = -1.;
+      local_unit_interface_normal_vector.get(2)[i] = 0.;
+      local_unit_interface_normal_vector.get(3)[i] = 0.;
+    }
+    // Setting lapse
+    for (size_t i = 0; i < lapse.size(); ++i) {
+      get(local_lapse)[i] = 2.;
+    }
+    // Setting shift
+    for (size_t i = 0; i < lapse.size(); ++i) {
+      local_shift.get(0)[i] = 1.;
+      local_shift.get(1)[i] = 2.;
+      local_shift.get(2)[i] = 3.;
+    }
+    // Setting pi AND phi
+    for (size_t i = 0; i < lapse.size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = 0; b <= VolumeDim; ++b) {
+          local_pi.get(a, b)[i] = 1.;
+          local_phi.get(0, a, b)[i] = 3.;
+          local_phi.get(1, a, b)[i] = 5.;
+          local_phi.get(2, a, b)[i] = 7.;
+        }
+      }
+    }
+    // Setting local_RhsUPsi
+    // for (size_t i = 0; i < lapse.size(); ++i) {
+    // for (size_t a = 0; a <= VolumeDim; ++a) {
+    // local_char_projected_rhs_dt_u_psi.get(0, a)[i] = 23.;
+    // local_char_projected_rhs_dt_u_psi.get(1, a)[i] = 29.;
+    // local_char_projected_rhs_dt_u_psi.get(2, a)[i] = 31.;
+    // local_char_projected_rhs_dt_u_psi.get(3, a)[i] = 37.;
+    //}
+    //}
+    // Setting local_RhsU0
+    // Setting char speeds
+    for (size_t i = 0; i < lapse.size(); ++i) {
+      local_char_speeds.at(0)[i] = -0.3;
+      local_char_speeds.at(1)[i] = -0.1;
+    }
+
     // Memory allocated for return type
     ReturnType& bc_dt_u_zero =
         get<::Tags::Tempiaa<28, VolumeDim, Frame::Inertial, DataVector>>(
             buffer);
+    std::fill(bc_dt_u_zero.begin(), bc_dt_u_zero.end(), 0.);
+    // debugPK
+    auto _ = apply_bjorhus_constraint_preserving(
+        make_not_null(&bc_dt_u_zero), local_unit_interface_normal_vector,
+        local_four_index_constraint, local_char_projected_rhs_dt_u_zero,
+        local_char_speeds);
+    // DISPLAY results of the TEST
+
+    // --------------------------------------- TESTS
     std::fill(bc_dt_u_zero.begin(), bc_dt_u_zero.end(), 0.);
     // Switch on prescribed boundary condition method
     switch (Method) {

@@ -181,6 +181,9 @@ struct EvolutionMetavars {
       Initialization::Actions::NonconservativeSystem,
       GeneralizedHarmonic::Actions::InitializeGHAnd3Plus1VariablesTags<
           volume_dim>,
+      Initialization::Actions::Evolution<EvolutionMetavars>,
+      GeneralizedHarmonic::Actions::InitializeGaugeTags<volume_dim>,
+      GeneralizedHarmonic::Actions::InitializeConstraintsTags<volume_dim>,
       dg::Actions::InitializeInterfaces<
           system,
           dg::Initialization::slice_tags_to_face<
@@ -189,7 +192,13 @@ struct EvolutionMetavars {
               gr::Tags::DetAndInverseSpatialMetricCompute<volume_dim, frame,
                                                           DataVector>,
               gr::Tags::ShiftCompute<volume_dim, frame, DataVector>,
-              gr::Tags::LapseCompute<volume_dim, frame, DataVector>>,
+              gr::Tags::LapseCompute<volume_dim, frame, DataVector>,
+              // debugPK
+              GeneralizedHarmonic::Tags::ThreeIndexConstraint<volume_dim,
+                                                              frame>,
+              GeneralizedHarmonic::Tags::GaugeH<volume_dim, frame>,
+              GeneralizedHarmonic::Tags::SpacetimeDerivGaugeH<volume_dim,
+                                                              frame>>,
           dg::Initialization::slice_tags_to_exterior<
               typename system::variables_tag,
               gr::Tags::SpatialMetricCompute<volume_dim, frame, DataVector>,
@@ -221,9 +230,6 @@ struct EvolutionMetavars {
               GeneralizedHarmonic::CharacteristicSpeedsCompute<volume_dim,
                                                                frame>>,
           false>,
-      Initialization::Actions::Evolution<EvolutionMetavars>,
-      GeneralizedHarmonic::Actions::InitializeGaugeTags<volume_dim>,
-      GeneralizedHarmonic::Actions::InitializeConstraintsTags<volume_dim>,
       dg::Actions::InitializeMortars<EvolutionMetavars, false>,
       Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavars>,
       Initialization::Actions::Minmod<volume_dim>,
