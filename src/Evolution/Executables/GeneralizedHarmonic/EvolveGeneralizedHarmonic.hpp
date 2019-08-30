@@ -162,7 +162,11 @@ struct EvolutionMetavars {
               gr::Tags::DetAndInverseSpatialMetricCompute<dim, Inertial,
                                                           DataVector>,
               gr::Tags::ShiftCompute<dim, Inertial, DataVector>,
-              gr::Tags::LapseCompute<dim, Inertial, DataVector>>,
+              gr::Tags::LapseCompute<dim, Inertial, DataVector>,
+              // debugPK
+              GeneralizedHarmonic::Tags::ThreeIndexConstraint<dim, Inertial>,
+              GeneralizedHarmonic::Tags::GaugeH<dim, Inertial>,
+              GeneralizedHarmonic::Tags::SpacetimeDerivGaugeH<dim, Inertial>>,
           Initialization::slice_tags_to_exterior<
               typename system::variables_tag,
               gr::Tags::SpatialMetricCompute<dim, Inertial, DataVector>,
