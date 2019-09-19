@@ -490,6 +490,10 @@ struct set_dt_u_psi {
                      get(get<::Tags::TempScalar<14, DataVector>>(buffer)),
                      get(get<::Tags::TempScalar<15, DataVector>>(buffer))}};
 
+    // Memory allocated for return type
+    ReturnType& bc_dt_u_psi =
+        get<::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+#if 0
     // --------------------------------------- TESTS
     // POPULATE various tensors needed to compute BcDtUpsi
     // EXACTLY as done in SpEC
@@ -556,11 +560,8 @@ struct set_dt_u_psi {
       local_char_speeds.at(1)[i] = -0.1;
     }
 
-    // Memory allocated for return type
-    ReturnType& bc_dt_u_psi =
-        get<::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    std::fill(bc_dt_u_psi.begin(), bc_dt_u_psi.end(), 0.);
     // debugPK
+    std::fill(bc_dt_u_psi.begin(), bc_dt_u_psi.end(), 0.);
     auto _ = apply_bjorhus_constraint_preserving(
         make_not_null(&bc_dt_u_psi), local_unit_interface_normal_vector,
         local_three_index_constraint, local_char_projected_rhs_dt_u_psi,
@@ -574,6 +575,7 @@ struct set_dt_u_psi {
       }
     }
     // --------------------------------------- TESTS
+#endif
     std::fill(bc_dt_u_psi.begin(), bc_dt_u_psi.end(), 0.);
     // Switch on prescribed boundary condition method
     switch (Method) {
@@ -628,6 +630,9 @@ set_dt_u_psi<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
          "Size of input variables and temporary memory do not match.");
   for (size_t a = 0; a <= VolumeDim; ++a) {
     for (size_t b = a; b <= VolumeDim; ++b) {
+      std::cout << "In apply_bjorhus: a = " << b << ", b = " << b << std::endl;
+      std::cout << bc_dt_u_psi->get(a, b) << std::endl;
+      std::cout << char_projected_rhs_dt_u_psi.get(a, b) << std::endl;
       bc_dt_u_psi->get(a, b) += char_projected_rhs_dt_u_psi.get(a, b);
       for (size_t i = 0; i < VolumeDim; ++i) {
         bc_dt_u_psi->get(a, b) += char_speeds.at(0) *
