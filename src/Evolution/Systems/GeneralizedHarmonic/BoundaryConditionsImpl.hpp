@@ -28,6 +28,7 @@
 #include "ErrorHandling/Assert.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditionsHelpers.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/Constraints.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/InterfaceActionHelpers.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/FluxCommunicationTypes.hpp"
@@ -493,8 +494,8 @@ struct set_dt_u_psi {
     // Memory allocated for return type
     ReturnType& bc_dt_u_psi =
         get<::Tags::Tempaa<27, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-#if 0
     // --------------------------------------- TESTS
+#if 0
     // POPULATE various tensors needed to compute BcDtUpsi
     // EXACTLY as done in SpEC
     auto local_inertial_coords =
@@ -508,7 +509,7 @@ struct set_dt_u_psi {
     auto local_char_projected_rhs_dt_u_psi = char_projected_rhs_dt_u_psi;
     auto local_char_speeds = char_speeds;
     // Setting 3idxConstraint
-    for (size_t i = 0; i < lapse.size(); ++i) {
+    for (size_t i = 0; i < get(lapse).size(); ++i) {
       for (size_t a = 0; a <= VolumeDim; ++a) {
         for (size_t b = 0; b <= VolumeDim; ++b) {
           local_three_index_constraint.get(0, a, b)[i] = 11. - 3.;
@@ -518,24 +519,24 @@ struct set_dt_u_psi {
       }
     }
     // Setting unit_interface_normal_Vector
-    for (size_t i = 0; i < lapse.size(); ++i) {
+    for (size_t i = 0; i < get(lapse).size(); ++i) {
       local_unit_interface_normal_vector.get(0)[i] = 1.e300;
       local_unit_interface_normal_vector.get(1)[i] = -1.;
-      local_unit_interface_normal_vector.get(2)[i] = 0.;
-      local_unit_interface_normal_vector.get(3)[i] = 0.;
+      local_unit_interface_normal_vector.get(2)[i] = 1.;
+      local_unit_interface_normal_vector.get(3)[i] = 1.;
     }
     // Setting lapse
-    for (size_t i = 0; i < lapse.size(); ++i) {
+    for (size_t i = 0; i < get(lapse).size(); ++i) {
       get(local_lapse)[i] = 2.;
     }
     // Setting shift
-    for (size_t i = 0; i < lapse.size(); ++i) {
+    for (size_t i = 0; i < get(lapse).size(); ++i) {
       local_shift.get(0)[i] = 1.;
       local_shift.get(1)[i] = 2.;
       local_shift.get(2)[i] = 3.;
     }
     // Setting pi AND phi
-    for (size_t i = 0; i < lapse.size(); ++i) {
+    for (size_t i = 0; i < get(lapse).size(); ++i) {
       for (size_t a = 0; a <= VolumeDim; ++a) {
         for (size_t b = 0; b <= VolumeDim; ++b) {
           local_pi.get(a, b)[i] = 1.;
@@ -546,7 +547,7 @@ struct set_dt_u_psi {
       }
     }
     // Setting local_RhsUPsi
-    for (size_t i = 0; i < lapse.size(); ++i) {
+    for (size_t i = 0; i < get(lapse).size(); ++i) {
       for (size_t a = 0; a <= VolumeDim; ++a) {
         local_char_projected_rhs_dt_u_psi.get(0, a)[i] = 23.;
         local_char_projected_rhs_dt_u_psi.get(1, a)[i] = 29.;
@@ -555,7 +556,7 @@ struct set_dt_u_psi {
       }
     }
     // Setting char speeds
-    for (size_t i = 0; i < lapse.size(); ++i) {
+    for (size_t i = 0; i < get(lapse).size(); ++i) {
       local_char_speeds.at(0)[i] = -0.3;
       local_char_speeds.at(1)[i] = -0.1;
     }
@@ -568,14 +569,14 @@ struct set_dt_u_psi {
         local_char_speeds);
     // DISPLAY results of the TEST
     if (debugPKon) {
-      for (size_t i = 0; i < lapse.size(); ++i) {
+      for (size_t i = 0; i < get(lapse).size(); ++i) {
         print_rank2_tensor_at_point(
             "BcDtUpsi", bc_dt_u_psi, local_inertial_coords.get(0),
             local_inertial_coords.get(1), local_inertial_coords.get(2), i);
       }
     }
-    // --------------------------------------- TESTS
 #endif
+    // --------------------------------------- TESTS
     std::fill(bc_dt_u_psi.begin(), bc_dt_u_psi.end(), 0.);
     // Switch on prescribed boundary condition method
     switch (Method) {
@@ -630,9 +631,6 @@ set_dt_u_psi<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
          "Size of input variables and temporary memory do not match.");
   for (size_t a = 0; a <= VolumeDim; ++a) {
     for (size_t b = a; b <= VolumeDim; ++b) {
-      std::cout << "In apply_bjorhus: a = " << b << ", b = " << b << std::endl;
-      std::cout << bc_dt_u_psi->get(a, b) << std::endl;
-      std::cout << char_projected_rhs_dt_u_psi.get(a, b) << std::endl;
       bc_dt_u_psi->get(a, b) += char_projected_rhs_dt_u_psi.get(a, b);
       for (size_t i = 0; i < VolumeDim; ++i) {
         bc_dt_u_psi->get(a, b) += char_speeds.at(0) *
@@ -719,12 +717,18 @@ struct set_dt_u_zero {
         get<::Tags::Tempijaa<33, VolumeDim, Frame::Inertial, DataVector>>(
             buffer);
 
-    // --------------------------------------- TESTS
+    // Memory allocated for return type
+    ReturnType& bc_dt_u_zero =
+        get<::Tags::Tempiaa<28, VolumeDim, Frame::Inertial, DataVector>>(
+            buffer);
+// --------------------------------------- TESTS
+#if 0
+    std::fill(bc_dt_u_zero.begin(), bc_dt_u_zero.end(), 0.);
+    std::cout << "1. INSIDE set_dt_u_zero --- " << std::endl;
     // POPULATE various tensors needed to compute BcDtU0
     // EXACTLY as done in SpEC
     auto local_inertial_coords =
         get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    auto local_four_index_constraint = four_index_constraint;
     auto local_unit_interface_normal_vector = unit_interface_normal_vector;
     auto local_lapse = lapse;
     auto local_shift = shift;
@@ -733,34 +737,78 @@ struct set_dt_u_zero {
     auto local_char_projected_rhs_dt_u_zero = char_projected_rhs_dt_u_zero;
     auto local_char_speeds = char_speeds;
     // Setting 4idxConstraint: FIXME -- DOES NOT MATCH WITH SPEC YET!!
-    for (size_t i = 0; i < lapse.size(); ++i) {
+    // initialize dPhi (with same values as for SpEC) and compute C4 from it
+    auto local_dphi =
+        make_with_value<tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>>(
+            local_lapse, 0.);
+    for (size_t a = 0; a <= VolumeDim; ++a) {
+      for (size_t b = 0; b <= VolumeDim; ++b) {
+        for (size_t i = 0; i < get(lapse).size(); ++i) {
+          local_dphi.get(0, 0, a, b)[i] = 3.;
+          local_dphi.get(0, 1, a, b)[i] = 5.;
+          local_dphi.get(0, 2, a, b)[i] = 7.;
+          local_dphi.get(1, 0, a, b)[i] = 59.;
+          local_dphi.get(1, 1, a, b)[i] = 61.;
+          local_dphi.get(1, 2, a, b)[i] = 67.;
+          local_dphi.get(2, 0, a, b)[i] = 73.;
+          local_dphi.get(2, 1, a, b)[i] = 79.;
+          local_dphi.get(2, 2, a, b)[i] = 83.;
+        }
+      }
+    }
+    // But we store C4_{iab} = LeviCivita^{ijk} dphi_{jkab}
+    auto local_four_index_constraint =
+        GeneralizedHarmonic::four_index_constraint<VolumeDim, Frame::Inertial,
+                                                   DataVector>(local_dphi);
+
+    if (debugPKon) {
+      for (size_t i = 0; i < get(lapse).size(); ++i) {
+        print_rank3_tensor_at_point("local_4idxC", local_four_index_constraint,
+                                    local_inertial_coords.get(0),
+                                    local_inertial_coords.get(1),
+                                    local_inertial_coords.get(2), i);
+      }
+    }
+    std::cout << "2. INSIDE set_dt_u_zero --- " << std::endl;
+
+    if (debugPKoff) {
       for (size_t a = 0; a <= VolumeDim; ++a) {
         for (size_t b = 0; b <= VolumeDim; ++b) {
-          local_four_index_constraint.get(0, a, b)[i] = 11. - 3.;
-          local_four_index_constraint.get(1, a, b)[i] = 13. - 5.;
-          local_four_index_constraint.get(2, a, b)[i] = 17. - 7.;
+          std::cout << "a = " << a << ", b = " << b << std::endl
+                    << "\t No of grid points: " << get(lapse).size() << ", "
+                    << get(lapse).size() << ", " << shift.size() << ", "
+                    << shift.get(0).size() << std::endl
+                    << "\t local_lapse: " << local_lapse.get() << std::endl
+                    << "\t local_shift: " << local_shift.get(0) << std::endl
+                    << "\t local_unit_int_normal: "
+                    << local_unit_interface_normal_vector.get(0) << std::endl
+                    << "\t local_dphi: " << local_dphi.get(0, 0, a, b)
+                    << std::endl
+                    << "\t local_4idxC: "
+                    << local_four_index_constraint.get(0, a, b) << std::endl
+                    << std::flush;
         }
       }
     }
     // Setting unit_interface_normal_Vector
-    for (size_t i = 0; i < lapse.size(); ++i) {
+    for (size_t i = 0; i < get(lapse).size(); ++i) {
       local_unit_interface_normal_vector.get(0)[i] = 1.e300;
       local_unit_interface_normal_vector.get(1)[i] = -1.;
-      local_unit_interface_normal_vector.get(2)[i] = 0.;
-      local_unit_interface_normal_vector.get(3)[i] = 0.;
+      local_unit_interface_normal_vector.get(2)[i] = 1.;
+      local_unit_interface_normal_vector.get(3)[i] = 1.;
     }
     // Setting lapse
-    for (size_t i = 0; i < lapse.size(); ++i) {
+    for (size_t i = 0; i < get(lapse).size(); ++i) {
       get(local_lapse)[i] = 2.;
     }
     // Setting shift
-    for (size_t i = 0; i < lapse.size(); ++i) {
+    for (size_t i = 0; i < get(lapse).size(); ++i) {
       local_shift.get(0)[i] = 1.;
       local_shift.get(1)[i] = 2.;
       local_shift.get(2)[i] = 3.;
     }
     // Setting pi AND phi
-    for (size_t i = 0; i < lapse.size(); ++i) {
+    for (size_t i = 0; i < get(lapse).size(); ++i) {
       for (size_t a = 0; a <= VolumeDim; ++a) {
         for (size_t b = 0; b <= VolumeDim; ++b) {
           local_pi.get(a, b)[i] = 1.;
@@ -770,34 +818,38 @@ struct set_dt_u_zero {
         }
       }
     }
-    // Setting local_RhsUPsi
-    // for (size_t i = 0; i < lapse.size(); ++i) {
-    // for (size_t a = 0; a <= VolumeDim; ++a) {
-    // local_char_projected_rhs_dt_u_psi.get(0, a)[i] = 23.;
-    // local_char_projected_rhs_dt_u_psi.get(1, a)[i] = 29.;
-    // local_char_projected_rhs_dt_u_psi.get(2, a)[i] = 31.;
-    // local_char_projected_rhs_dt_u_psi.get(3, a)[i] = 37.;
-    //}
-    //}
     // Setting local_RhsU0
+    for (size_t i = 0; i < get(lapse).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = a; b <= VolumeDim; ++b) {
+          local_char_projected_rhs_dt_u_zero.get(0, a, b)[i] = 91.;
+          local_char_projected_rhs_dt_u_zero.get(1, a, b)[i] = 97.;
+          local_char_projected_rhs_dt_u_zero.get(2, a, b)[i] = 101.;
+        }
+      }
+    }
     // Setting char speeds
-    for (size_t i = 0; i < lapse.size(); ++i) {
+    for (size_t i = 0; i < get(lapse).size(); ++i) {
       local_char_speeds.at(0)[i] = -0.3;
       local_char_speeds.at(1)[i] = -0.1;
     }
+    std::cout << "3. INSIDE set_dt_u_zero --- " << std::endl;
 
-    // Memory allocated for return type
-    ReturnType& bc_dt_u_zero =
-        get<::Tags::Tempiaa<28, VolumeDim, Frame::Inertial, DataVector>>(
-            buffer);
-    std::fill(bc_dt_u_zero.begin(), bc_dt_u_zero.end(), 0.);
     // debugPK
     auto _ = apply_bjorhus_constraint_preserving(
         make_not_null(&bc_dt_u_zero), local_unit_interface_normal_vector,
         local_four_index_constraint, local_char_projected_rhs_dt_u_zero,
         local_char_speeds);
+    std::cout << "4. INSIDE set_dt_u_zero --- " << std::endl;
     // DISPLAY results of the TEST
-
+    if (debugPKon) {
+      for (size_t i = 0; i < get(lapse).size(); ++i) {
+        print_rank3_tensor_at_point(
+            "BcDtUZero", bc_dt_u_zero, local_inertial_coords.get(0),
+            local_inertial_coords.get(1), local_inertial_coords.get(2), i);
+      }
+    }
+#endif
     // --------------------------------------- TESTS
     std::fill(bc_dt_u_zero.begin(), bc_dt_u_zero.end(), 0.);
     // Switch on prescribed boundary condition method
@@ -885,6 +937,7 @@ set_dt_u_zero<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
   ASSERT(get_size(get<0, 0, 0>(*bc_dt_u_zero)) ==
              get_size(get<0>(unit_interface_normal_vector)),
          "Size of input variables and temporary memory do not match.");
+
   for (size_t a = 0; a <= VolumeDim; ++a) {
     for (size_t b = a; b <= VolumeDim; ++b) {
       for (size_t i = 0; i < VolumeDim; ++i) {
@@ -894,19 +947,19 @@ set_dt_u_zero<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
       // But we store C4_{iab} = LeviCivita^{ijk} dphi_{jkab},
       // which means  C_{jkab} = LeviCivita^{ijk} C4_{iab}
       // where C4 is `four_index_constraint`.
-      // therefore, T2_{kab} =  char_speed<UZero> n^j C_{jkab}
+      // therefore, T2_{iab} =  char_speed<UZero> n^j C_{jiab}
       // (since char_speed<UZero> = - n_l N^l), and therefore:
-      // T2_{kab} = char_speed<UZero> n^j LeviCivita^{ijk} C4_{iab}.
+      // T2_{iab} = char_speed<UZero> n^k LeviCivita^{ijk} C4_{jab}.
       // Let LeviCivitaIterator be indexed by
       // it[0] <--> i,
       // it[1] <--> j,
       // it[2] <--> k, then
-      // T2_{it[2], ab} += char_speed<UZero> n^it[1] it.sign() C4_{it[0], ab};
+      // T2_{it[0], ab} += char_speed<UZero> n^it[2] it.sign() C4_{it[1], ab};
       for (LeviCivitaIterator<VolumeDim> it; it; ++it) {
-        bc_dt_u_zero->get(it[2], a, b) +=
+        bc_dt_u_zero->get(it[0], a, b) +=
             it.sign() * char_speeds.at(1) *
-            unit_interface_normal_vector.get(it[1] + 1) *
-            four_index_constraint.get(it[0], a, b);
+            unit_interface_normal_vector.get(it[2] + 1) *
+            four_index_constraint.get(it[1], a, b);
       }
     }
   }
