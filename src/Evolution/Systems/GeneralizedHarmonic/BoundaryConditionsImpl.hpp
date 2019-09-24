@@ -1214,7 +1214,156 @@ struct set_dt_u_minus {
     // Memory allocated for return type
     ReturnType& bc_dt_u_minus =
         get<::Tags::Tempaa<30, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    // --------------------------------------- TESTS
+#if 0
+    // POPULATE various tensors needed to compute BcDtUMinus
+    // EXACTLY as done in SpEC
+    const auto& local_inertial_coords =
+        get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto local_three_index_constraint = three_index_constraint;
+    auto local_unit_interface_normal_vector = unit_interface_normal_vector;
+    // auto local_lapse = lapse;
+    // auto local_shift = shift;
+    // auto local_pi = pi;
+    auto local_phi = phi;
+    auto local_char_projected_rhs_dt_u_psi = char_projected_rhs_dt_u_psi;
+    auto local_char_speeds = char_speeds;
+    //
+    auto local_constraint_gamma2 = constraint_gamma2;
+    auto local_incoming_null_one_form = incoming_null_one_form;
+    auto local_incoming_null_vector = incoming_null_vector;
+    auto local_outgoing_null_one_form = outgoing_null_one_form;
+    auto local_outgoing_null_vector = outgoing_null_vector;
+    auto local_projection_Ab = projection_Ab;
+    // auto local_spacetime_metric = spacetime_metric;
+    // auto local_inverse_spacetime_metric = inverse_spacetime_metric;
+    // auto local_gauge_source = gauge_source;
+    auto local_char_projected_rhs_dt_u_minus = char_projected_rhs_dt_u_minus;
+
+    // Setting 3idxConstraint
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = 0; b <= VolumeDim; ++b) {
+          local_three_index_constraint.get(0, a, b)[i] = 11. - 3.;
+          local_three_index_constraint.get(1, a, b)[i] = 13. - 5.;
+          local_three_index_constraint.get(2, a, b)[i] = 17. - 7.;
+        }
+      }
+    }
+    // Setting unit_interface_normal_Vector
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      local_unit_interface_normal_vector.get(0)[i] = 1.e300;
+      local_unit_interface_normal_vector.get(1)[i] = -1.;
+      local_unit_interface_normal_vector.get(2)[i] = 1.;
+      local_unit_interface_normal_vector.get(3)[i] = 1.;
+    }
+    // Setting lapse
+    // for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+    // get(local_lapse)[i] = 2.;
+    //}
+    // Setting shift
+    // for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+    // local_shift.get(0)[i] = 1.;
+    // local_shift.get(1)[i] = 2.;
+    // local_shift.get(2)[i] = 3.;
+    //}
+    // Setting pi AND phi
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = 0; b <= VolumeDim; ++b) {
+          // local_pi.get(a, b)[i] = 1.;
+          local_phi.get(0, a, b)[i] = 3.;
+          local_phi.get(1, a, b)[i] = 5.;
+          local_phi.get(2, a, b)[i] = 7.;
+        }
+      }
+    }
+    // Setting local_RhsUPsi
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        local_char_projected_rhs_dt_u_psi.get(0, a)[i] = 23.;
+        local_char_projected_rhs_dt_u_psi.get(1, a)[i] = 29.;
+        local_char_projected_rhs_dt_u_psi.get(2, a)[i] = 31.;
+        local_char_projected_rhs_dt_u_psi.get(3, a)[i] = 37.;
+      }
+    }
+    // Setting char speeds
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      local_char_speeds.at(0)[i] = -0.3;
+      local_char_speeds.at(1)[i] = -0.1;
+      local_char_speeds.at(3)[i] = -0.2;
+    }
+    // Setting constraint_gamma2
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      get(local_constraint_gamma2)[i] = 113.;
+    }
+    // Setting incoming null one_form: ui
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      local_incoming_null_one_form.get(0)[i] = -2.;
+      local_incoming_null_one_form.get(1)[i] = 5.;
+      local_incoming_null_one_form.get(2)[i] = 3.;
+      local_incoming_null_one_form.get(3)[i] = 7.;
+    }
+    // Setting incoming null vector: uI
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      local_incoming_null_vector.get(0)[i] = -1.;
+      local_incoming_null_vector.get(1)[i] = 13.;
+      local_incoming_null_vector.get(2)[i] = 17.;
+      local_incoming_null_vector.get(3)[i] = 19.;
+    }
+    // Setting outgoing null one_form: vi
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      local_outgoing_null_one_form.get(0)[i] = -1.;
+      local_outgoing_null_one_form.get(1)[i] = 3.;
+      local_outgoing_null_one_form.get(2)[i] = 2.;
+      local_outgoing_null_one_form.get(3)[i] = 5.;
+    }
+    // Setting outgoing null vector: vI
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      local_outgoing_null_vector.get(0)[i] = -1.;
+      local_outgoing_null_vector.get(1)[i] = 2.;
+      local_outgoing_null_vector.get(2)[i] = 3.;
+      local_outgoing_null_vector.get(3)[i] = 5.;
+    }
+    // Setting projection Ab
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        local_projection_Ab.get(0, a)[i] = 233.;
+        local_projection_Ab.get(1, a)[i] = 239.;
+        local_projection_Ab.get(2, a)[i] = 241.;
+        local_projection_Ab.get(3, a)[i] = 251.;
+      }
+    }
+    // Setting RhsUMinus
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        local_char_projected_rhs_dt_u_minus.get(0, a)[i] = 331.;
+        local_char_projected_rhs_dt_u_minus.get(1, a)[i] = 337.;
+        local_char_projected_rhs_dt_u_minus.get(2, a)[i] = 347.;
+        local_char_projected_rhs_dt_u_minus.get(3, a)[i] = 349.;
+      }
+    }
+
+    // debugPK
     std::fill(bc_dt_u_minus.begin(), bc_dt_u_minus.end(), 0.);
+    auto _ = apply_gauge_sommerfeld(
+        make_not_null(&bc_dt_u_minus), local_constraint_gamma2,
+        local_inertial_coords, local_incoming_null_one_form,
+        local_outgoing_null_one_form, local_incoming_null_vector,
+        local_outgoing_null_vector, local_projection_Ab,
+        local_char_projected_rhs_dt_u_psi);
+    // DISPLAY results of the TEST
+    if (debugPKon) {
+      for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+        print_rank2_tensor_at_point("BcDtUMinus<gauge_sommerfeld>",
+                                    bc_dt_u_minus, local_inertial_coords.get(0),
+                                    local_inertial_coords.get(1),
+                                    local_inertial_coords.get(2), i);
+      }
+    }
+#endif
+    std::fill(bc_dt_u_minus.begin(), bc_dt_u_minus.end(), 0.);
+    // --------------------------------------- TESTS
     // Switch on prescribed boundary condition method
     switch (Method) {
       case UMinusBcMethod::Freezing:
@@ -1652,7 +1801,7 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::apply_gauge_sommerfeld(
              get_size(get<0>(incoming_null_one_form)),
          "Size of input variables and temporary memory do not match.");
   // gauge_bc_coeff below is hard-coded here to its default value in SpEC
-  const double gauge_bc_coeff = 1.;
+  constexpr double gauge_bc_coeff = 1.;
 
   DataVector inertial_radius(get_size(get<0>(inertial_coords)), 0.);
   for (size_t i = 0; i < VolumeDim; ++i) {
