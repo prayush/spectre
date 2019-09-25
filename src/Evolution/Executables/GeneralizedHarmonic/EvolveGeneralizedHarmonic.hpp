@@ -146,23 +146,23 @@ struct EvolutionMetavars {
   using observed_reduction_data_tags =
       observers::collect_reduction_data_tags<Event<events>::creatable_classes>;
 
-  using compute_rhs = tmpl::flatten<
-      tmpl::list<dg::Actions::ComputeNonconservativeBoundaryFluxes<
-                     Tags::InternalDirections<volume_dim>>,
-                 dg::Actions::SendDataForFluxes<EvolutionMetavars>,
-                 Actions::ComputeTimeDerivative,
-                 dg::Actions::ComputeNonconservativeBoundaryFluxes<
-                     Tags::BoundaryDirectionsInterior<volume_dim>>,
-                 dg::Actions::ReceiveDataForFluxes<EvolutionMetavars>,
-                 tmpl::conditional_t<local_time_stepping, tmpl::list<>,
-                                     dg::Actions::ApplyFluxes>,
-                 Actions::RecordTimeStepperData>>;
+  using compute_rhs = tmpl::flatten<tmpl::list<
+      dg::Actions::ComputeNonconservativeBoundaryFluxes<
+          Tags::InternalDirections<volume_dim>>,
+      dg::Actions::SendDataForFluxes<EvolutionMetavars>,
+      Actions::ComputeTimeDerivative,
+      dg::Actions::ComputeNonconservativeBoundaryFluxes<
+          Tags::BoundaryDirectionsInterior<volume_dim>>,
+      dg::Actions::ReceiveDataForFluxes<EvolutionMetavars>,
+      tmpl::conditional_t<local_time_stepping, tmpl::list<>,
+                          dg::Actions::ApplyFluxes>,
+      GeneralizedHarmonic::Actions::
+          ImposeConstraintPreservingBoundaryConditions<EvolutionMetavars>,
+      Actions::RecordTimeStepperData>>;
   using update_variables = tmpl::flatten<tmpl::list<
       tmpl::conditional_t<local_time_stepping,
                           dg::Actions::ApplyBoundaryFluxesLocalTimeStepping,
                           tmpl::list<>>,
-      GeneralizedHarmonic::Actions::
-          ImposeConstraintPreservingBoundaryConditions<EvolutionMetavars>,
       Actions::UpdateU  //,
                         // dg::Actions::ExponentialFilter<
       // 0, typename system::variables_tag::type::tags_list>
