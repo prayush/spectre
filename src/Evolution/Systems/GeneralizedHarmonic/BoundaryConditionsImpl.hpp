@@ -1216,9 +1216,10 @@ struct set_dt_u_minus {
         get<::Tags::Tempaa<30, VolumeDim, Frame::Inertial, DataVector>>(buffer);
     // --------------------------------------- TESTS
 #if 0
+    std::cout << std::setprecision(16);
     // POPULATE various tensors needed to compute BcDtUMinus
     // EXACTLY as done in SpEC
-    const auto& local_inertial_coords =
+    auto& local_inertial_coords =
         get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(buffer);
     auto local_three_index_constraint = three_index_constraint;
     auto local_unit_interface_normal_vector = unit_interface_normal_vector;
@@ -1235,10 +1236,15 @@ struct set_dt_u_minus {
     auto local_outgoing_null_one_form = outgoing_null_one_form;
     auto local_outgoing_null_vector = outgoing_null_vector;
     auto local_projection_Ab = projection_Ab;
+    auto local_projection_ab = projection_ab;
+    auto local_projection_AB = projection_AB;
     // auto local_spacetime_metric = spacetime_metric;
     // auto local_inverse_spacetime_metric = inverse_spacetime_metric;
     // auto local_gauge_source = gauge_source;
     auto local_char_projected_rhs_dt_u_minus = char_projected_rhs_dt_u_minus;
+    //
+    auto local_constraint_char_zero_minus = constraint_char_zero_minus;
+    auto local_constraint_char_zero_plus = constraint_char_zero_plus;
 
     // Setting 3idxConstraint
     for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
@@ -1334,6 +1340,24 @@ struct set_dt_u_minus {
         local_projection_Ab.get(3, a)[i] = 251.;
       }
     }
+    // Setting projection ab
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        local_projection_ab.get(0, a)[i] = 379.;
+        local_projection_ab.get(1, a)[i] = 383.;
+        local_projection_ab.get(2, a)[i] = 389.;
+        local_projection_ab.get(3, a)[i] = 397.;
+      }
+    }
+    // Setting projection AB
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        local_projection_AB.get(0, a)[i] = 353.;
+        local_projection_AB.get(1, a)[i] = 359.;
+        local_projection_AB.get(2, a)[i] = 367.;
+        local_projection_AB.get(3, a)[i] = 373.;
+      }
+    }
     // Setting RhsUMinus
     for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
       for (size_t a = 0; a <= VolumeDim; ++a) {
@@ -1343,22 +1367,169 @@ struct set_dt_u_minus {
         local_char_projected_rhs_dt_u_minus.get(3, a)[i] = 349.;
       }
     }
+    // Setting constraint_char_zero_plus AND constraint_char_zero_minus
+    // ONLY ON THE +Y AXIS (Y = +0.5) -- FIXME
+    //
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      if (get<0>(inertial_coords)[i] == 299. and
+          get<1>(inertial_coords)[i] == 0.5 and
+          get<2>(inertial_coords)[i] == -0.5) {
+        std::array<double, 4> spec_vals = {
+            {116825669851.0523, -61312353.06244799, -27701645.812406,
+             5420092.437635988}};
+        std::array<double, 4> spec_vals2 = {
+            {114778477915.6773, -238132756.937448, -325016009.687406,
+             -412576643.437364}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 299.5 and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == -0.5) {
+        std::array<double, 4> spec_vals = {
+            {57912013103.59233, -210146467.5227862, -203382066.4200172,
+             -197106629.2839151}};
+        std::array<double, 4> spec_vals2 = {
+            {55800195748.29776, -387039486.9857526, -500769045.8829836,
+             -615175980.7468815}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 300. and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == -0.5) {
+        std::array<double, 4> spec_vals = {
+            {57912339733.04692, -210144827.9955755, -203380131.5377951,
+             -197104399.0467367}};
+        std::array<double, 4> spec_vals2 = {
+            {55800522732.56735, -387037846.6557527, -500767110.1979722,
+             -615173749.7069137}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 299. and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == 0.) {
+        std::array<double, 4> spec_vals = {
+            {57911685113.52791, -210148113.8975043, -203384009.3832927,
+             -197108868.8356919}};
+        std::array<double, 4> spec_vals2 = {
+            {55799867401.9404, -387041134.166613, -500770989.6524013,
+             -615178221.1048005}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 299.5 and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == 0.) {
+        std::array<double, 4> spec_vals = {
+            {57912012831.36965, -210146468.8892238, -203382068.0326135,
+             -197106631.1426699}};
+        std::array<double, 4> spec_vals2 = {
+            {55800195475.77937, -387039488.3528592, -500769047.496249,
+             -615175982.6063054}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 300. and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == 0.) {
+        std::array<double, 4> spec_vals = {
+            {57912339462.17721, -210144829.3552071, -203380133.1423593,
+             -197104400.8962334}};
+        std::array<double, 4> spec_vals2 = {
+            {55800522461.40339, -387037848.01605, -500767111.8032022,
+             -615173751.5570762}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 299. and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == 0.5) {
+        std::array<double, 4> spec_vals = {
+            {57911685388.87936, -210148112.5153456, -203384007.7521427,
+             -197108866.9555508}};
+        std::array<double, 4> spec_vals2 = {
+            {55799867677.59096, -387041132.7837775, -500770988.0205746,
+             -615178219.2239828}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 299.5 and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == 0.5) {
+        std::array<double, 4> spec_vals = {
+            {57912013105.34742, -210146467.5139756, -203382066.409619,
+             -197106629.2719292}};
+        std::array<double, 4> spec_vals2 = {
+            {55800195750.05476, -387039486.9769377, -500769045.8725812,
+             -615175980.7348914}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 300. and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == 0.5) {
+        std::array<double, 4> spec_vals = {
+            {57912339734.79037, -210144827.9868235, -203380131.527466,
+             -197104399.0348305}};
+        std::array<double, 4> spec_vals2 = {
+            {55800522734.31269, -387037846.6469963, -500767110.1876388,
+             -615173749.6950033}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else {
+        // disabled error checking
+        // When applying BCs to various faces, only one (i.e. the +y side)
+        // will be set here, others can be set however...
+        ASSERT(true,
+               "Not checking the correct face, coordinates not recognized");
+      }
+    }
 
     // debugPK
     std::fill(bc_dt_u_minus.begin(), bc_dt_u_minus.end(), 0.);
-    auto _ = apply_gauge_sommerfeld(
-        make_not_null(&bc_dt_u_minus), local_constraint_gamma2,
-        local_inertial_coords, local_incoming_null_one_form,
-        local_outgoing_null_one_form, local_incoming_null_vector,
-        local_outgoing_null_vector, local_projection_Ab,
-        local_char_projected_rhs_dt_u_psi);
-    // DISPLAY results of the TEST
     if (debugPKon) {
-      for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
-        print_rank2_tensor_at_point("BcDtUMinus<gauge_sommerfeld>",
-                                    bc_dt_u_minus, local_inertial_coords.get(0),
-                                    local_inertial_coords.get(1),
-                                    local_inertial_coords.get(2), i);
+      auto _ = apply_bjorhus_constraint_preserving(
+          make_not_null(&bc_dt_u_minus), local_incoming_null_one_form,
+          local_outgoing_null_one_form, local_incoming_null_vector,
+          local_outgoing_null_vector, local_projection_ab, local_projection_Ab,
+          local_projection_AB, local_constraint_char_zero_plus,
+          local_constraint_char_zero_minus, local_char_projected_rhs_dt_u_minus,
+          local_char_speeds, inertial_coords);
+      if (debugPKon) {
+        for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+          print_rank2_tensor_at_point(
+              "BcDtUMinus<CP>", bc_dt_u_minus, local_inertial_coords.get(0),
+              local_inertial_coords.get(1), local_inertial_coords.get(2), i);
+        }
+      }
+    }
+    if (debugPKon) {
+      auto __ = apply_gauge_sommerfeld(
+          make_not_null(&bc_dt_u_minus), local_constraint_gamma2,
+          local_inertial_coords, local_incoming_null_one_form,
+          local_outgoing_null_one_form, local_incoming_null_vector,
+          local_outgoing_null_vector, local_projection_Ab,
+          local_char_projected_rhs_dt_u_psi);
+      // DISPLAY results of the TEST
+      if (debugPKon) {
+        for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+          print_rank2_tensor_at_point(
+              "BcDtUMinus<gauge_sommerfeld, CP>", bc_dt_u_minus,
+              local_inertial_coords.get(0), local_inertial_coords.get(1),
+              local_inertial_coords.get(2), i);
+        }
       }
     }
 #endif
@@ -1378,7 +1549,7 @@ struct set_dt_u_minus {
             outgoing_null_one_form, incoming_null_vector, outgoing_null_vector,
             projection_ab, projection_Ab, projection_AB,
             constraint_char_zero_plus, constraint_char_zero_minus,
-            char_projected_rhs_dt_u_minus, char_speeds);
+            char_projected_rhs_dt_u_minus, char_speeds, inertial_coords);
         return apply_gauge_sommerfeld(
             make_not_null(&bc_dt_u_minus), constraint_gamma2, inertial_coords,
             incoming_null_one_form, outgoing_null_one_form,
@@ -1390,7 +1561,7 @@ struct set_dt_u_minus {
             outgoing_null_one_form, incoming_null_vector, outgoing_null_vector,
             projection_ab, projection_Ab, projection_AB,
             constraint_char_zero_plus, constraint_char_zero_minus,
-            char_projected_rhs_dt_u_minus, char_speeds);
+            char_projected_rhs_dt_u_minus, char_speeds, inertial_coords);
         apply_bjorhus_constraint_preserving_physical(
             make_not_null(&bc_dt_u_minus), constraint_gamma2,
             unit_interface_normal_one_form, unit_interface_normal_vector,
@@ -1431,7 +1602,9 @@ struct set_dt_u_minus {
           constraint_char_zero_minus,
       const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
           char_projected_rhs_dt_u_minus,
-      const std::array<DataVector, 4>& char_speeds) noexcept;
+      const std::array<DataVector, 4>& char_speeds,
+      const typename ::Tags::Coordinates<VolumeDim, Frame::Inertial>::type&
+          local_inertial_coords) noexcept;
   static ReturnType apply_bjorhus_constraint_preserving_physical(
       const gsl::not_null<ReturnType*> bc_dt_u_minus,
       const Scalar<DataVector>& gamma2,
@@ -1494,7 +1667,23 @@ set_dt_u_minus<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
         constraint_char_zero_minus,
     const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
         char_projected_rhs_dt_u_minus,
-    const std::array<DataVector, 4>& char_speeds) noexcept {
+    const std::array<DataVector, 4>& char_speeds,
+    const typename ::Tags::Coordinates<VolumeDim, Frame::Inertial>::type&
+        local_inertial_coords) noexcept {
+  // debugPK
+  if (debugPKon) {
+    for (size_t i = 0; i < get_size(get<0>(incoming_null_one_form)); ++i) {
+      print_rank1_tensor_at_point(" C2PLUS<CP>", constraint_char_zero_plus,
+                                  local_inertial_coords.get(0),
+                                  local_inertial_coords.get(1),
+                                  local_inertial_coords.get(2), i);
+      print_rank1_tensor_at_point(" C2MINUS<CP>", constraint_char_zero_minus,
+                                  local_inertial_coords.get(0),
+                                  local_inertial_coords.get(1),
+                                  local_inertial_coords.get(2), i);
+    }
+  }
+
   ASSERT(get_size(get<0, 0>(*bc_dt_u_minus)) ==
              get_size(get<0>(incoming_null_one_form)),
          "Size of input variables and temporary memory do not match.");
