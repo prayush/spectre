@@ -952,9 +952,6 @@ void test_constraint_preserving_bjorhus_u_minus<
     // RhsUPsi and RhsUminus
     auto& local_char_projected_rhs_dt_u_psi =
         get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    auto& local_char_projected_rhs_dt_u_zero =
-        get<::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>>(
-            buffer);
     auto& local_char_projected_rhs_dt_u_minus =
         get<::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>>(buffer);
 
@@ -1074,16 +1071,6 @@ void test_constraint_preserving_bjorhus_u_minus<
           local_phi.get(0, a, b)[i] = 3.;
           local_phi.get(1, a, b)[i] = 5.;
           local_phi.get(2, a, b)[i] = 7.;
-        }
-      }
-    }
-    // Setting local_RhsU0
-    for (size_t i = 0; i < slice_grid_points; ++i) {
-      for (size_t a = 0; a <= VolumeDim; ++a) {
-        for (size_t b = a; b <= VolumeDim; ++b) {
-          local_char_projected_rhs_dt_u_zero.get(0, a, b)[i] = 91.;
-          local_char_projected_rhs_dt_u_zero.get(1, a, b)[i] = 97.;
-          local_char_projected_rhs_dt_u_zero.get(2, a, b)[i] = 101.;
         }
       }
     }
