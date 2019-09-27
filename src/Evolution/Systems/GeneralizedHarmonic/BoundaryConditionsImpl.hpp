@@ -1215,14 +1215,13 @@ struct set_dt_u_minus {
     ReturnType& bc_dt_u_minus =
         get<::Tags::Tempaa<30, VolumeDim, Frame::Inertial, DataVector>>(buffer);
     // --------------------------------------- TESTS
-#if 0
+#if 1
     std::cout << std::setprecision(16);
     // POPULATE various tensors needed to compute BcDtUMinus
     // EXACTLY as done in SpEC
     auto& local_inertial_coords =
         get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(buffer);
     auto local_three_index_constraint = three_index_constraint;
-    auto local_unit_interface_normal_vector = unit_interface_normal_vector;
     // auto local_lapse = lapse;
     // auto local_shift = shift;
     // auto local_pi = pi;
@@ -1245,6 +1244,14 @@ struct set_dt_u_minus {
     //
     auto local_constraint_char_zero_minus = constraint_char_zero_minus;
     auto local_constraint_char_zero_plus = constraint_char_zero_plus;
+    // for CPBPhys
+    auto local_d_phi = d_phi;
+    auto local_unit_interface_normal_one_form = unit_interface_normal_one_form;
+    auto local_unit_interface_normal_vector = unit_interface_normal_vector;
+    auto local_spacetime_unit_normal_vector = spacetime_unit_normal_vector;
+    auto local_inverse_spatial_metric = inverse_spatial_metric;
+    auto local_inverse_spacetime_metric = inverse_spacetime_metric;
+    auto local_extrinsic_curvature = extrinsic_curvature;
 
     // Setting 3idxConstraint
     for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
@@ -1375,11 +1382,11 @@ struct set_dt_u_minus {
           get<1>(inertial_coords)[i] == 0.5 and
           get<2>(inertial_coords)[i] == -0.5) {
         std::array<double, 4> spec_vals = {
-            {116825669851.0523, -61312353.06244799, -27701645.812406,
-             5420092.437635988}};
+            {3722388974.799386, -16680127.68747905, -22991565.68745775,
+             -29394198.68743645}};
         std::array<double, 4> spec_vals2 = {
-            {114778477915.6773, -238132756.937448, -325016009.687406,
-             -412576643.437364}};
+            {3866802572.424386, -19802442.06247905, -19496408.06245775,
+             -19257249.06243645}};
         for (size_t j = 0; j <= VolumeDim; ++j) {
           local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
           local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
@@ -1388,11 +1395,11 @@ struct set_dt_u_minus {
                  get<1>(inertial_coords)[i] == 0.5 and
                  get<2>(inertial_coords)[i] == -0.5) {
         std::array<double, 4> spec_vals = {
-            {57912013103.59233, -210146467.5227862, -203382066.4200172,
-             -197106629.2839151}};
+            {1718287695.133032, -35082292.16184025, -44420849.32723039,
+             -53850596.45928719}};
         std::array<double, 4> spec_vals2 = {
-            {55800195748.29776, -387039486.9857526, -500769045.8829836,
-             -615175980.7468815}};
+            {1866652790.548975, -38170999.90741873, -40892085.07280888,
+             -43680040.20486567}};
         for (size_t j = 0; j <= VolumeDim; ++j) {
           local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
           local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
@@ -1401,11 +1408,11 @@ struct set_dt_u_minus {
                  get<1>(inertial_coords)[i] == 0.5 and
                  get<2>(inertial_coords)[i] == -0.5) {
         std::array<double, 4> spec_vals = {
-            {57912339733.04692, -210144827.9955755, -203380131.5377951,
-             -197104399.0467367}};
+            {1718299060.415949, -35082089.27527188, -44420613.14790046,
+             -53850326.98725116}};
         std::array<double, 4> spec_vals2 = {
-            {55800522732.56735, -387037846.6557527, -500767110.1979722,
-             -615173749.7069137}};
+            {1866664134.129611, -38170797.39904065, -40891849.27166924,
+             -43679771.11101994}};
         for (size_t j = 0; j <= VolumeDim; ++j) {
           local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
           local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
@@ -1414,11 +1421,11 @@ struct set_dt_u_minus {
                  get<1>(inertial_coords)[i] == 0.5 and
                  get<2>(inertial_coords)[i] == 0.) {
         std::array<double, 4> spec_vals = {
-            {57911685113.52791, -210148113.8975043, -203384009.3832927,
-             -197108868.8356919}};
+            {1718276282.501221, -35082495.89577083, -44421086.49296889,
+             -53850867.05677793}};
         std::array<double, 4> spec_vals2 = {
-            {55799867401.9404, -387041134.166613, -500770989.6524013,
-             -615178221.1048005}};
+            {1866641399.709844, -38171203.26157932, -40892321.85877737,
+             -43680310.4225864}};
         for (size_t j = 0; j <= VolumeDim; ++j) {
           local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
           local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
@@ -1427,11 +1434,11 @@ struct set_dt_u_minus {
                  get<1>(inertial_coords)[i] == 0.5 and
                  get<2>(inertial_coords)[i] == 0.) {
         std::array<double, 4> spec_vals = {
-            {57912012831.36965, -210146468.8892238, -203382068.0326135,
-             -197106631.1426699}};
+            {1718287685.660846, -35082292.33093269, -44420849.52407002,
+             -53850596.68387395}};
         std::array<double, 4> spec_vals2 = {
-            {55800195475.77937, -387039488.3528592, -500769047.496249,
-             -615175982.6063054}};
+            {1866652781.094877, -38171000.07619599, -40892085.26933331,
+             -43680040.42913724}};
         for (size_t j = 0; j <= VolumeDim; ++j) {
           local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
           local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
@@ -1440,11 +1447,11 @@ struct set_dt_u_minus {
                  get<1>(inertial_coords)[i] == 0.5 and
                  get<2>(inertial_coords)[i] == 0.) {
         std::array<double, 4> spec_vals = {
-            {57912339462.17721, -210144829.3552071, -203380133.1423593,
-             -197104400.8962334}};
+            {1718299050.990844, -35082089.44352208, -44420613.34375966,
+             -53850327.21071925}};
         std::array<double, 4> spec_vals2 = {
-            {55800522461.40339, -387037848.01605, -500767111.8032022,
-             -615173751.5570762}};
+            {1866664124.722503, -38170797.56697725, -40891849.46721483,
+             -43679771.33417442}};
         for (size_t j = 0; j <= VolumeDim; ++j) {
           local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
           local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
@@ -1453,11 +1460,11 @@ struct set_dt_u_minus {
                  get<1>(inertial_coords)[i] == 0.5 and
                  get<2>(inertial_coords)[i] == 0.5) {
         std::array<double, 4> spec_vals = {
-            {57911685388.87936, -210148112.5153456, -203384007.7521427,
-             -197108866.9555508}};
+            {1718276292.082241, -35082495.72473276, -44421086.29386414,
+             -53850866.82960649}};
         std::array<double, 4> spec_vals2 = {
-            {55799867677.59096, -387041132.7837775, -500770988.0205746,
-             -615178219.2239828}};
+            {1866641409.272568, -38171203.09086005, -40892321.65999144,
+             -43680310.19573379}};
         for (size_t j = 0; j <= VolumeDim; ++j) {
           local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
           local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
@@ -1466,11 +1473,11 @@ struct set_dt_u_minus {
                  get<1>(inertial_coords)[i] == 0.5 and
                  get<2>(inertial_coords)[i] == 0.5) {
         std::array<double, 4> spec_vals = {
-            {57912013105.34742, -210146467.5139756, -203382066.409619,
-             -197106629.2719292}};
+            {1718287695.194063, -35082292.16074976, -44420849.32596073,
+             -53850596.45783833}};
         std::array<double, 4> spec_vals2 = {
-            {55800195750.05476, -387039486.9769377, -500769045.8725812,
-             -615175980.7348914}};
+            {1866652790.609889, -38170999.90633029, -40892085.07154126,
+             -43680040.20341886}};
         for (size_t j = 0; j <= VolumeDim; ++j) {
           local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
           local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
@@ -1479,19 +1486,19 @@ struct set_dt_u_minus {
                  get<1>(inertial_coords)[i] == 0.5 and
                  get<2>(inertial_coords)[i] == 0.5) {
         std::array<double, 4> spec_vals = {
-            {57912339734.79037, -210144827.9868235, -203380131.527466,
-             -197104399.0348305}};
+            {1718299060.476573, -35082089.27418864, -44420613.14663924,
+             -53850326.98581193}};
         std::array<double, 4> spec_vals2 = {
-            {55800522734.31269, -387037846.6469963, -500767110.1876388,
-             -615173749.6950033}};
+            {1866664134.190119, -38170797.39795944, -40891849.27041004,
+             -43679771.10958273}};
         for (size_t j = 0; j <= VolumeDim; ++j) {
           local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
           local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
         }
       } else {
-        // disabled error checking
-        // When applying BCs to various faces, only one (i.e. the +y side)
+        // When applying BCs to various faces, only one face (i.e. the +y side)
         // will be set here, others can be set however...
+        // FIXME: Disabled
         ASSERT(true,
                "Not checking the correct face, coordinates not recognized");
       }
@@ -1499,7 +1506,7 @@ struct set_dt_u_minus {
 
     // debugPK
     std::fill(bc_dt_u_minus.begin(), bc_dt_u_minus.end(), 0.);
-    if (debugPKon) {
+    if (debugPKoff) {
       auto _ = apply_bjorhus_constraint_preserving(
           make_not_null(&bc_dt_u_minus), local_incoming_null_one_form,
           local_outgoing_null_one_form, local_incoming_null_vector,
@@ -1516,6 +1523,28 @@ struct set_dt_u_minus {
       }
     }
     if (debugPKon) {
+      auto __ = apply_bjorhus_constraint_preserving_physical(
+          make_not_null(&bc_dt_u_minus), local_constraint_gamma2,
+          local_unit_interface_normal_one_form,  //
+          local_unit_interface_normal_vector,    //
+          local_spacetime_unit_normal_vector,    //
+          local_projection_ab, local_projection_Ab, local_projection_AB,
+          local_inverse_spatial_metric,  //
+          local_extrinsic_curvature,     //
+          local_inverse_spacetime_metric, local_three_index_constraint,
+          local_char_projected_rhs_dt_u_minus, local_phi, local_d_phi,  //
+          local_char_speeds);
+      // DISPLAY results of the TEST
+      if (debugPKon) {
+        for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+          print_rank2_tensor_at_point(
+              "BcDtUMinus<gauge_sommerfeld, CPBPhys>", bc_dt_u_minus,
+              local_inertial_coords.get(0), local_inertial_coords.get(1),
+              local_inertial_coords.get(2), i);
+        }
+      }
+    }
+    if (debugPKoff) {
       auto __ = apply_gauge_sommerfeld(
           make_not_null(&bc_dt_u_minus), local_constraint_gamma2,
           local_inertial_coords, local_incoming_null_one_form,
@@ -1671,7 +1700,7 @@ set_dt_u_minus<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
     const typename ::Tags::Coordinates<VolumeDim, Frame::Inertial>::type&
         local_inertial_coords) noexcept {
   // debugPK
-  if (debugPKon) {
+  if (debugPKoff) {
     for (size_t i = 0; i < get_size(get<0>(incoming_null_one_form)); ++i) {
       print_rank1_tensor_at_point(" C2PLUS<CP>", constraint_char_zero_plus,
                                   local_inertial_coords.get(0),
