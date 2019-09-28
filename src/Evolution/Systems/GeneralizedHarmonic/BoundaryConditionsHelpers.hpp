@@ -40,6 +40,8 @@
 #include "Utilities/TaggedTuple.hpp"
 #include "Utilities/TypeTraits.hpp"
 
+const bool debugPKoff = false, debugPKon = true;
+
 /// \cond
 namespace Tags {
 template <typename Tag>
@@ -191,7 +193,7 @@ spatial_christoffel_second_kind_from_KST_vars(
   // raise first index
   for (size_t k = 0; k < VolumeDim; ++k) {
     for (size_t i = 0; i < VolumeDim; ++i) {
-      for (size_t j = 0; j < VolumeDim; ++j) {
+      for (size_t j = i; j < VolumeDim; ++j) {
         for (size_t l = 0; l < VolumeDim; ++l) {
           christoffel_second_kind.get(k, i, j) +=
               inverse_spatial_metric.get(k, l) *
@@ -211,9 +213,21 @@ void spatial_projection_tensor(
     const tnsr::A<DataType, VolumeDim, Frame>& normal_vector) noexcept {
   for (size_t i = 0; i < VolumeDim; ++i) {
     for (size_t j = i; j < VolumeDim; ++j) {
+      if (debugPKon) {  // debugPK
+        std::cout << " 5.1.1 Computed projection_tensor(" << i << ", " << j
+                  << "): " << projection_tensor->get(i, j) << std::endl
+                  << std::flush;
+      }  // debugPK
+
       projection_tensor->get(i, j) =
           inverse_spatial_metric.get(i, j) -
           normal_vector.get(i + 1) * normal_vector.get(j + 1);
+
+      if (debugPKon) {  // debugPK
+        std::cout << " 5.1.1 Computed projection_tensor(" << i << ", " << j
+                  << "): " << projection_tensor->get(i, j) << std::endl
+                  << std::flush;
+      }  // debugPK
     }
   }
 }
@@ -224,9 +238,21 @@ void spatial_projection_tensor(
     const tnsr::a<DataType, VolumeDim, Frame>& normal_one_form) noexcept {
   for (size_t i = 0; i < VolumeDim; ++i) {
     for (size_t j = i; j < VolumeDim; ++j) {
+      if (debugPKon) {  // debugPK
+        std::cout << " 5.2.1 Computed projection_tensor(" << i << ", " << j
+                  << "): " << projection_tensor->get(i, j) << std::endl
+                  << std::flush;
+      }  // debugPK
+
       projection_tensor->get(i, j) =
           spatial_metric.get(i, j) -
           normal_one_form.get(i + 1) * normal_one_form.get(j + 1);
+
+      if (debugPKon) {  // debugPK
+        std::cout << " 5.2.1 Computed projection_tensor(" << i << ", " << j
+                  << "): " << projection_tensor->get(i, j) << std::endl
+                  << std::flush;
+      }  // debugPK
     }
   }
 }
@@ -236,11 +262,28 @@ void spatial_projection_tensor(
     const tnsr::A<DataType, VolumeDim, Frame>& normal_vector,
     const tnsr::a<DataType, VolumeDim, Frame>& normal_one_form) noexcept {
   for (size_t i = 0; i < VolumeDim; ++i) {
-    projection_tensor->get(i, i) = 0.;
     for (size_t j = 0; j < VolumeDim; ++j) {
+      if (debugPKon) {  // debugPK
+        std::cout << " 5.3.1 Computed projection_tensor(" << i << ", " << j
+                  << "): " << projection_tensor->get(i, j) << std::endl
+                  << std::flush;
+      }  // debugPK
+
       projection_tensor->get(i, j) =
           -normal_vector.get(i + 1) * normal_one_form.get(j + 1);
+
+      if (debugPKon) {  // debugPK
+        std::cout << " 5.3.1 Computed projection_tensor(" << i << ", " << j
+                  << "): " << projection_tensor->get(i, j) << std::endl
+                  << std::flush;
+      }  // debugPK
     }
+    projection_tensor->get(i, i) += 1.;
+    if (debugPKon) {  // debugPK
+      std::cout << " 5.3.1 Computed projection_tensor(" << i << ", " << i
+                << "): " << projection_tensor->get(i, i) << std::endl
+                << std::flush;
+    }  // debugPK
   }
 }
 
@@ -281,14 +324,55 @@ void weyl_propagating(
     for (size_t b = a; b < VolumeDim; ++b) {  // Symmetry
       temp.get(a, b) = ricci.get(a, b);
       for (size_t c = 0; c < VolumeDim; ++c) {
+        if (debugPKoff) {  // debugPK
+          std::cout << " 6.x.1 WeylProp: a = " << a << ", b = " << b
+                    << ", c = " << c << std::endl
+                    << std::flush;
+          std::cout << " 6.x.1 Ricci(" << a << ", " << b
+                    << "): " << ricci.get(a, b) << std::endl
+                    << " 6.x.1 InterfaceNormalVector(" << 1 + c
+                    << "): " << unit_interface_normal_vector.get(1 + c)
+                    << std::endl
+                    << " 6.x.1 CdK vals: " << CdK.get(c, a, b) << std::endl
+                    << CdK.get(b, a, c) << std::endl
+                    << CdK.get(a, b, c) << std::endl
+                    << std::flush;
+          std::cout << " 6.x.1 temp(" << a << ", " << b
+                    << "): " << temp.get(a, b) << std::endl
+                    << std::flush;
+        }  // debugPK
+
         temp.get(a, b) -=
-            sign * unit_interface_normal_vector.get(c) *
+            sign * unit_interface_normal_vector.get(1 + c) *
             (CdK.get(c, a, b) - 0.5 * (CdK.get(b, a, c) + CdK.get(a, b, c)));
+
+        if (debugPKoff) {  // debugPK
+          std::cout << " 6.x.1 temp(" << a << ", " << b
+                    << "): " << temp.get(a, b) << std::endl
+                    << std::flush;
+        }  // debugPK
         for (size_t d = 0; d < VolumeDim; ++d) {
           temp.get(a, b) +=
               inverse_spatial_metric.get(c, d) *
               (extrinsic_curvature.get(a, b) * extrinsic_curvature.get(c, d) -
                extrinsic_curvature.get(a, c) * extrinsic_curvature.get(d, b));
+
+          if (debugPKoff) {  // debugPK
+            std::cout << " 6.x.1 WeylProp: a = " << a << ", b = " << b
+                      << ", c = " << c << ", d = " << d << std::endl
+                      << std::flush;
+            std::cout << " 6.x.1 inverse_spatial_metric(" << c << ", " << d
+                      << "): " << inverse_spatial_metric.get(c, d) << std::endl
+                      << " 6.x.1 Kij vals: " << extrinsic_curvature.get(a, b)
+                      << std::endl
+                      << extrinsic_curvature.get(c, d) << std::endl
+                      << extrinsic_curvature.get(a, c) << std::endl
+                      << extrinsic_curvature.get(d, b) << std::endl
+                      << std::flush;
+            std::cout << " 6.x.1 temp(" << a << ", " << b
+                      << "): " << temp.get(a, b) << std::endl
+                      << std::flush;
+          }  // debugPK
         }
       }
     }
@@ -304,6 +388,23 @@ void weyl_propagating(
               (projection_Ij.get(a, i) * projection_Ij.get(b, j) -
                0.5 * projection_IJ.get(a, b) * projection_ij.get(i, j)) *
               temp.get(a, b);
+
+          if (debugPKoff) {  // debugPK
+            std::cout << " 6.x.1 WeylProp: i = " << i << ", j = " << j
+                      << ", a = " << a << ", b = " << b << std::endl
+                      << std::flush;
+            std::cout << " 6.x.1 projection tensor: "
+                      << (projection_Ij.get(a, i) * projection_Ij.get(b, j) -
+                          0.5 * projection_IJ.get(a, b) *
+                              projection_ij.get(i, j))
+                      << std::endl
+                      << " unprojected (4D) quantity: " << temp.get(a, b)
+                      << std::endl
+                      << std::flush;
+            std::cout << " 6.x.1 U8(" << i << ", " << j
+                      << "): " << U8->get(i, j) << std::endl
+                      << std::flush;
+          }  // debugPK
         }
       }
     }
