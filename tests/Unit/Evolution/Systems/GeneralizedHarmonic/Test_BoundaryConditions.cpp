@@ -2098,6 +2098,598 @@ void test_constraint_preserving_bjorhus_u_minus<
   // Compare values returned by BC action vs those from SpEC
   CHECK_ITERABLE_APPROX(local_bc_dt_u_minus, spec_bc_dt_u_minus);
 }
+
+namespace {
+// Test GeneralizedHarmonic::spatial_ricci_tensor_from_KST_vars
+void test_spatial_ricci_tensor_from_KST_vars(
+    const size_t grid_size_each_dimension,
+    const std::array<double, 3>& lower_bound,
+    const std::array<double, 3>& upper_bound) noexcept {
+  // Setup grid
+  Mesh<VolumeDim> mesh{grid_size_each_dimension, Spectral::Basis::Legendre,
+                       Spectral::Quadrature::GaussLobatto};
+  const auto coord_map =
+      domain::make_coordinate_map<Frame::Logical, Frame::Inertial>(Affine3D{
+          Affine{-1., 1., lower_bound[0], upper_bound[0]},
+          Affine{-1., 1., lower_bound[1], upper_bound[1]},
+          Affine{-1., 1., lower_bound[2], upper_bound[2]},
+      });
+
+  // Setup coordinates
+  const auto x_logical = logical_coordinates(mesh);
+  const auto x = coord_map(x_logical);
+  const Direction<VolumeDim> direction(1, Side::Upper);  // +y direction
+  const size_t slice_grid_points =
+      mesh.extents().slice_away(direction.dimension()).product();
+  const auto inertial_coords = [&slice_grid_points, &lower_bound]() {
+    tnsr::I<DataVector, VolumeDim, frame> tmp(slice_grid_points, 0.);
+    // +y direction
+    get<1>(tmp) = 0.5;
+    for (size_t i = 0; i < VolumeDim; ++i) {
+      for (size_t j = 0; j < VolumeDim; ++j) {
+        get<0>(tmp)[i * VolumeDim + j] =
+            lower_bound[0] + 0.5 * static_cast<double>(i);
+        get<2>(tmp)[i * VolumeDim + j] =
+            lower_bound[2] + 0.5 * static_cast<double>(j);
+      }
+    }
+    return tmp;
+  }();
+
+  auto local_inverse_spatial_metric =
+      make_with_value<tnsr::II<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  auto local_phi =
+      make_with_value<tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  auto local_d_pi =
+      make_with_value<tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  auto local_d_phi =
+      make_with_value<tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+
+  // Setting inverse_spatial_metric
+  for (size_t i = 0; i < get<0>(inertial_coords).size(); ++i) {
+    for (size_t j = 0; j < VolumeDim; ++j) {
+      local_inverse_spatial_metric.get(0, j)[i] = 41.;
+      local_inverse_spatial_metric.get(1, j)[i] = 43.;
+      local_inverse_spatial_metric.get(2, j)[i] = 47.;
+    }
+  }
+  // Setting pi AND phi
+  for (size_t i = 0; i < get<0>(inertial_coords).size(); ++i) {
+    for (size_t a = 0; a <= VolumeDim; ++a) {
+      for (size_t b = 0; b <= VolumeDim; ++b) {
+        // local_pi.get(a, b)[i] = 1.;
+        local_phi.get(0, a, b)[i] = 3.;
+        local_phi.get(1, a, b)[i] = 5.;
+        local_phi.get(2, a, b)[i] = 7.;
+      }
+    }
+  }
+  // Setting local_d_phi
+  // initialize dPhi (with same values as for SpEC)
+  for (size_t i = 0; i < get<0>(inertial_coords).size(); ++i) {
+    for (size_t a = 0; a <= VolumeDim; ++a) {
+      for (size_t b = 0; b <= VolumeDim; ++b) {
+        local_d_pi.get(0, a, b)[i] = 1.;
+        local_d_phi.get(0, 0, a, b)[i] = 3.;
+        local_d_phi.get(0, 1, a, b)[i] = 5.;
+        local_d_phi.get(0, 2, a, b)[i] = 7.;
+        local_d_pi.get(1, a, b)[i] = 53.;
+        local_d_phi.get(1, 0, a, b)[i] = 59.;
+        local_d_phi.get(1, 1, a, b)[i] = 61.;
+        local_d_phi.get(1, 2, a, b)[i] = 67.;
+        local_d_pi.get(2, a, b)[i] = 71.;
+        local_d_phi.get(2, 0, a, b)[i] = 73.;
+        local_d_phi.get(2, 1, a, b)[i] = 79.;
+        local_d_phi.get(2, 2, a, b)[i] = 83.;
+      }
+    }
+  }
+
+  // D_(k,i,j) = (1/2) \partial_k g_(ij) and its derivative
+  tnsr::ijj<DataVector, VolumeDim, Frame::Inertial> local_kst_D(
+      get_size(get<0, 0, 0>(local_phi)));
+  tnsr::ijkk<DataVector, VolumeDim, Frame::Inertial> local_d_kst_D(
+      get_size(get<0, 0, 0>(local_phi)));
+  for (size_t i = 0; i < VolumeDim; ++i) {
+    for (size_t j = i; j < VolumeDim; ++j) {
+      for (size_t k = 0; k < VolumeDim; ++k) {
+        local_kst_D.get(k, i, j) = 0.5 * local_phi.get(k, i + 1, j + 1);
+        for (size_t l = 0; l < VolumeDim; ++l) {
+          local_d_kst_D.get(l, k, i, j) =
+              0.5 * local_d_phi.get(l, k, i + 1, j + 1);
+        }
+      }
+    }
+  }
+
+  // Call tested function
+  auto local_ricci_3 = GeneralizedHarmonic::spatial_ricci_tensor_from_KST_vars(
+      local_kst_D, local_d_kst_D, local_inverse_spatial_metric);
+
+  // Initialize with values from SpEC
+  auto spec_ricci_3 = local_ricci_3;
+  get<0, 0>(spec_ricci_3) = 153230.;
+  get<0, 1>(spec_ricci_3) = 5283.;
+  get<0, 2>(spec_ricci_3) = -142541.;
+  get<1, 0>(spec_ricci_3) = 5283.;
+  get<1, 1>(spec_ricci_3) = 2497.;
+  get<1, 2>(spec_ricci_3) = -928.;
+  get<2, 2>(spec_ricci_3) = 141189.;
+
+  // Compare values returned by BC action vs those from SpEC
+  CHECK_ITERABLE_APPROX(local_ricci_3, spec_ricci_3);
+}
+
+// Test GeneralizedHarmonic::spatial_christoffel_second_kind_from_KST_vars
+void test_spatial_christoffel_second_kind_from_KST_vars(
+    const size_t grid_size_each_dimension,
+    const std::array<double, 3>& lower_bound,
+    const std::array<double, 3>& upper_bound) noexcept {
+  // Setup grid
+  Mesh<VolumeDim> mesh{grid_size_each_dimension, Spectral::Basis::Legendre,
+                       Spectral::Quadrature::GaussLobatto};
+  const auto coord_map =
+      domain::make_coordinate_map<Frame::Logical, Frame::Inertial>(Affine3D{
+          Affine{-1., 1., lower_bound[0], upper_bound[0]},
+          Affine{-1., 1., lower_bound[1], upper_bound[1]},
+          Affine{-1., 1., lower_bound[2], upper_bound[2]},
+      });
+
+  // Setup coordinates
+  const auto x_logical = logical_coordinates(mesh);
+  const auto x = coord_map(x_logical);
+  const Direction<VolumeDim> direction(1, Side::Upper);  // +y direction
+  const size_t slice_grid_points =
+      mesh.extents().slice_away(direction.dimension()).product();
+  const auto inertial_coords = [&slice_grid_points, &lower_bound]() {
+    tnsr::I<DataVector, VolumeDim, frame> tmp(slice_grid_points, 0.);
+    // +y direction
+    get<1>(tmp) = 0.5;
+    for (size_t i = 0; i < VolumeDim; ++i) {
+      for (size_t j = 0; j < VolumeDim; ++j) {
+        get<0>(tmp)[i * VolumeDim + j] =
+            lower_bound[0] + 0.5 * static_cast<double>(i);
+        get<2>(tmp)[i * VolumeDim + j] =
+            lower_bound[2] + 0.5 * static_cast<double>(j);
+      }
+    }
+    return tmp;
+  }();
+
+  auto local_inverse_spatial_metric =
+      make_with_value<tnsr::II<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  auto local_phi =
+      make_with_value<tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  auto local_d_pi =
+      make_with_value<tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  auto local_d_phi =
+      make_with_value<tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+
+  // Setting inverse_spatial_metric
+  for (size_t i = 0; i < get<0>(inertial_coords).size(); ++i) {
+    for (size_t j = 0; j < VolumeDim; ++j) {
+      local_inverse_spatial_metric.get(0, j)[i] = 41.;
+      local_inverse_spatial_metric.get(1, j)[i] = 43.;
+      local_inverse_spatial_metric.get(2, j)[i] = 47.;
+    }
+  }
+  // Setting pi AND phi
+  for (size_t i = 0; i < get<0>(inertial_coords).size(); ++i) {
+    for (size_t a = 0; a <= VolumeDim; ++a) {
+      for (size_t b = 0; b <= VolumeDim; ++b) {
+        // local_pi.get(a, b)[i] = 1.;
+        local_phi.get(0, a, b)[i] = 3.;
+        local_phi.get(1, a, b)[i] = 5.;
+        local_phi.get(2, a, b)[i] = 7.;
+      }
+    }
+  }
+
+  // D_(k,i,j) = (1/2) \partial_k g_(ij) and its derivative
+  tnsr::ijj<DataVector, VolumeDim, Frame::Inertial> local_kst_D(
+      get_size(get<0, 0, 0>(local_phi)));
+  for (size_t i = 0; i < VolumeDim; ++i) {
+    for (size_t j = i; j < VolumeDim; ++j) {
+      for (size_t k = 0; k < VolumeDim; ++k) {
+        local_kst_D.get(k, i, j) = 0.5 * local_phi.get(k, i + 1, j + 1);
+      }
+    }
+  }
+
+  // Call tested function
+  auto local_spatial_christoffel_second_kind =
+      GeneralizedHarmonic::spatial_christoffel_second_kind_from_KST_vars(
+          local_kst_D, local_inverse_spatial_metric);
+
+  // Initialize with values from SpEC
+  auto spec_spatial_christoffel_second_kind =
+      local_spatial_christoffel_second_kind;
+  const std::array<double, 27> spec_vals = {
+      {61.5, 184.5, 307.5, 184.5, 307.5, 430.5, 307.5, 430.5, 553.5,
+       61.5, 188.5, 315.5, 188.5, 315.5, 442.5, 315.5, 442.5, 569.5,
+       59.5, 190.5, 321.5, 190.5, 321.5, 452.5, 321.5, 452.5, 583.5}};
+  for (size_t i = 0; i < VolumeDim; ++i) {
+    for (size_t j = 0; j < VolumeDim; ++j) {
+      for (size_t k = j; k < VolumeDim; ++k) {
+        spec_spatial_christoffel_second_kind.get(i, j, k) =
+            spec_vals[i * VolumeDim * VolumeDim + j * VolumeDim + k];
+      }
+    }
+  }
+
+  // Compare values returned by BC action vs those from SpEC
+  CHECK_ITERABLE_APPROX(local_spatial_christoffel_second_kind,
+                        spec_spatial_christoffel_second_kind);
+}
+
+// Test GeneralizedHarmonic::spatial_projection_tensor (3 OVERLOADS)
+void test_spatial_projection_tensors(
+    const size_t grid_size_each_dimension,
+    const std::array<double, 3>& lower_bound,
+    const std::array<double, 3>& upper_bound) noexcept {
+  // Setup grid
+  Mesh<VolumeDim> mesh{grid_size_each_dimension, Spectral::Basis::Legendre,
+                       Spectral::Quadrature::GaussLobatto};
+  const auto coord_map =
+      domain::make_coordinate_map<Frame::Logical, Frame::Inertial>(Affine3D{
+          Affine{-1., 1., lower_bound[0], upper_bound[0]},
+          Affine{-1., 1., lower_bound[1], upper_bound[1]},
+          Affine{-1., 1., lower_bound[2], upper_bound[2]},
+      });
+
+  // Setup coordinates
+  const auto x_logical = logical_coordinates(mesh);
+  const auto x = coord_map(x_logical);
+  const Direction<VolumeDim> direction(1, Side::Upper);  // +y direction
+  const size_t slice_grid_points =
+      mesh.extents().slice_away(direction.dimension()).product();
+  const auto inertial_coords = [&slice_grid_points, &lower_bound]() {
+    tnsr::I<DataVector, VolumeDim, frame> tmp(slice_grid_points, 0.);
+    // +y direction
+    get<1>(tmp) = 0.5;
+    for (size_t i = 0; i < VolumeDim; ++i) {
+      for (size_t j = 0; j < VolumeDim; ++j) {
+        get<0>(tmp)[i * VolumeDim + j] =
+            lower_bound[0] + 0.5 * static_cast<double>(i);
+        get<2>(tmp)[i * VolumeDim + j] =
+            lower_bound[2] + 0.5 * static_cast<double>(j);
+      }
+    }
+    return tmp;
+  }();
+
+  // 1. Projection IJ
+  auto local_inverse_spatial_metric =
+      make_with_value<tnsr::II<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  auto local_unit_interface_normal_vector =
+      make_with_value<tnsr::A<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  auto local_spatial_projection_IJ =
+      make_with_value<tnsr::II<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+
+  // Setting inverse_spatial_metric
+  for (size_t i = 0; i < get<0>(inertial_coords).size(); ++i) {
+    for (size_t j = 0; j < VolumeDim; ++j) {
+      local_inverse_spatial_metric.get(0, j)[i] = 41.;
+      local_inverse_spatial_metric.get(1, j)[i] = 43.;
+      local_inverse_spatial_metric.get(2, j)[i] = 47.;
+    }
+  }
+  // Setting unit_interface_normal_Vector
+  get<0>(local_unit_interface_normal_vector) = 1.e300;
+  get<1>(local_unit_interface_normal_vector) = -1.;
+  get<2>(local_unit_interface_normal_vector) = 1.;
+  get<3>(local_unit_interface_normal_vector) = 1.;
+
+  // Call tested function
+  GeneralizedHarmonic::spatial_projection_tensor(
+      make_not_null(&local_spatial_projection_IJ), local_inverse_spatial_metric,
+      local_unit_interface_normal_vector);
+
+  // Initialize with values from SpEC
+  auto spec_spatial_projection_IJ = local_spatial_projection_IJ;
+  {
+    const std::array<double, 9> spec_vals = {
+        {40., 42., 42., 42., 42., 42., 42., 42., 46.}};
+    for (size_t j = 0; j < VolumeDim; ++j) {
+      for (size_t k = j; k < VolumeDim; ++k) {
+        spec_spatial_projection_IJ.get(j, k) = spec_vals[j * VolumeDim + k];
+      }
+    }
+  }
+
+  // Compare values returned by BC action vs those from SpEC
+  CHECK_ITERABLE_APPROX(local_spatial_projection_IJ,
+                        spec_spatial_projection_IJ);
+
+  // 2. Projection ij
+  auto local_spatial_metric =
+      make_with_value<tnsr::ii<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  auto local_unit_interface_normal_one_form =
+      make_with_value<tnsr::a<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  auto local_spatial_projection_ij =
+      make_with_value<tnsr::ii<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+
+  // Setting inverse_spatial_metric
+  for (size_t i = 0; i < VolumeDim; ++i) {
+    local_spatial_metric.get(0, i) = 263.;
+    local_spatial_metric.get(1, i) = 269.;
+    local_spatial_metric.get(2, i) = 271.;
+  }
+  // Setting unit_interface_normal_Vector
+  get<0>(local_unit_interface_normal_one_form) = 1.e300;
+  get<1>(local_unit_interface_normal_one_form) = -1.;
+  get<2>(local_unit_interface_normal_one_form) = 1.;
+  get<3>(local_unit_interface_normal_one_form) = 1.;
+
+  // Call tested function
+  GeneralizedHarmonic::spatial_projection_tensor(
+      make_not_null(&local_spatial_projection_ij), local_spatial_metric,
+      local_unit_interface_normal_one_form);
+
+  // Initialize with values from SpEC
+  auto spec_spatial_projection_ij = local_spatial_projection_ij;
+  {
+    const std::array<double, 9> spec_vals = {
+        {262., 264., 264., 264., 268., 268., 264., 268., 270.}};
+    for (size_t j = 0; j < VolumeDim; ++j) {
+      for (size_t k = j; k < VolumeDim; ++k) {
+        spec_spatial_projection_ij.get(j, k) = spec_vals[j * VolumeDim + k];
+      }
+    }
+  }
+
+  // Compare values returned by BC action vs those from SpEC
+  CHECK_ITERABLE_APPROX(local_spatial_projection_ij,
+                        spec_spatial_projection_ij);
+
+  // 3. Projection Ij
+  auto local_spatial_projection_Ij =
+      make_with_value<tnsr::Ij<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+
+  // Call tested function
+  GeneralizedHarmonic::spatial_projection_tensor(
+      make_not_null(&local_spatial_projection_Ij),
+      local_unit_interface_normal_vector, local_unit_interface_normal_one_form);
+
+  // Initialize with values from SpEC
+  auto spec_spatial_projection_Ij = local_spatial_projection_Ij;
+  {
+    const std::array<double, 9> spec_vals = {
+        {0., 1., 1., 1., 0., -1., 1., -1., 0.}};
+    for (size_t j = 0; j < VolumeDim; ++j) {
+      for (size_t k = j; k < VolumeDim; ++k) {
+        spec_spatial_projection_Ij.get(j, k) = spec_vals[j * VolumeDim + k];
+      }
+    }
+  }
+
+  // Compare values returned by BC action vs those from SpEC
+  CHECK_ITERABLE_APPROX(local_spatial_projection_Ij,
+                        spec_spatial_projection_Ij);
+}
+
+// Test GeneralizedHarmonic::weyl_propagating
+void test_weyl_propagating(const size_t grid_size_each_dimension,
+                           const std::array<double, 3>& lower_bound,
+                           const std::array<double, 3>& upper_bound) noexcept {
+  // Setup grid
+  Mesh<VolumeDim> mesh{grid_size_each_dimension, Spectral::Basis::Legendre,
+                       Spectral::Quadrature::GaussLobatto};
+  const auto coord_map =
+      domain::make_coordinate_map<Frame::Logical, Frame::Inertial>(Affine3D{
+          Affine{-1., 1., lower_bound[0], upper_bound[0]},
+          Affine{-1., 1., lower_bound[1], upper_bound[1]},
+          Affine{-1., 1., lower_bound[2], upper_bound[2]},
+      });
+
+  // Setup coordinates
+  const auto x_logical = logical_coordinates(mesh);
+  const auto x = coord_map(x_logical);
+  const Direction<VolumeDim> direction(1, Side::Upper);  // +y direction
+  const size_t slice_grid_points =
+      mesh.extents().slice_away(direction.dimension()).product();
+  const auto inertial_coords = [&slice_grid_points, &lower_bound]() {
+    tnsr::I<DataVector, VolumeDim, frame> tmp(slice_grid_points, 0.);
+    // +y direction
+    get<1>(tmp) = 0.5;
+    for (size_t i = 0; i < VolumeDim; ++i) {
+      for (size_t j = 0; j < VolumeDim; ++j) {
+        get<0>(tmp)[i * VolumeDim + j] =
+            lower_bound[0] + 0.5 * static_cast<double>(i);
+        get<2>(tmp)[i * VolumeDim + j] =
+            lower_bound[2] + 0.5 * static_cast<double>(j);
+      }
+    }
+    return tmp;
+  }();
+
+  // for Projection IJ
+  auto local_inverse_spatial_metric =
+      make_with_value<tnsr::II<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  auto local_unit_interface_normal_vector =
+      make_with_value<tnsr::A<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  auto local_spatial_projection_IJ =
+      make_with_value<tnsr::II<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  // for Projection ij
+  auto local_spatial_metric =
+      make_with_value<tnsr::ii<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  auto local_unit_interface_normal_one_form =
+      make_with_value<tnsr::a<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  auto local_spatial_projection_ij =
+      make_with_value<tnsr::ii<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  // for Projection Ij
+  auto local_spatial_projection_Ij =
+      make_with_value<tnsr::Ij<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  // Ricci3
+  auto local_ricci_3 =
+      make_with_value<tnsr::ii<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  // Extrinsic curvature
+  auto local_extrinsic_curvature =
+      make_with_value<tnsr::ii<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  // CdK
+  auto local_CdK =
+      make_with_value<tnsr::ijj<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+
+  // Setting inverse_spatial_metric
+  for (size_t j = 0; j < VolumeDim; ++j) {
+    local_inverse_spatial_metric.get(0, j) = 41.;
+    local_inverse_spatial_metric.get(1, j) = 43.;
+    local_inverse_spatial_metric.get(2, j) = 47.;
+  }
+
+  // Setting unit_interface_normal_Vector
+  get<0>(local_unit_interface_normal_vector) = 1.e300;
+  get<1>(local_unit_interface_normal_vector) = -1.;
+  get<2>(local_unit_interface_normal_vector) = 1.;
+  get<3>(local_unit_interface_normal_vector) = 1.;
+
+  // Setting inverse_spatial_metric
+  for (size_t i = 0; i < VolumeDim; ++i) {
+    local_spatial_metric.get(0, i) = 263.;
+    local_spatial_metric.get(1, i) = 269.;
+    local_spatial_metric.get(2, i) = 271.;
+  }
+  // Setting unit_interface_normal_Vector
+  get<0>(local_unit_interface_normal_one_form) = 1.e300;
+  get<1>(local_unit_interface_normal_one_form) = -1.;
+  get<2>(local_unit_interface_normal_one_form) = 1.;
+  get<3>(local_unit_interface_normal_one_form) = 1.;
+
+  // Compute patial_projection_IJ
+  GeneralizedHarmonic::spatial_projection_tensor(
+      make_not_null(&local_spatial_projection_IJ), local_inverse_spatial_metric,
+      local_unit_interface_normal_vector);
+
+  // Compute patial_projection_ij
+  GeneralizedHarmonic::spatial_projection_tensor(
+      make_not_null(&local_spatial_projection_ij), local_spatial_metric,
+      local_unit_interface_normal_one_form);
+
+  // Compute patial_projection_Ij
+  GeneralizedHarmonic::spatial_projection_tensor(
+      make_not_null(&local_spatial_projection_Ij),
+      local_unit_interface_normal_vector, local_unit_interface_normal_one_form);
+
+  {  // Setting Ricci3
+    const std::array<double, 9> spec_vals = {{147398., 4162.5, -142614.5,
+                                              4162.5, 6088., 3710., -142614.5,
+                                              3710., 146874.}};
+    for (size_t j = 0; j < VolumeDim; ++j) {
+      for (size_t k = j; k < VolumeDim; ++k) {
+        local_ricci_3.get(j, k) = spec_vals[j * VolumeDim + k];
+      }
+    }
+  }
+
+  {  // Setting Kij
+    const std::array<double, 9> spec_vals = {
+        {200.2198037251189, 266.7930716334918, 333.3663395418648,
+         266.7930716334918, 333.3663395418648, 399.9396074502377,
+         333.3663395418648, 399.9396074502377, 466.5128753586106}};
+    for (size_t j = 0; j < VolumeDim; ++j) {
+      for (size_t k = j; k < VolumeDim; ++k) {
+        local_extrinsic_curvature.get(j, k) = spec_vals[j * VolumeDim + k];
+      }
+    }
+  }
+
+  {  // Setting CdK
+    const std::array<double, 27> spec_vals = {
+        {8823.321925408964,  -70195.04590349646, -149213.4137324019,
+         -70195.04590349646, -199942.2438785821, -329689.4418536677,
+         -149213.4137324019, -329689.4418536677, -510165.4699749334,
+         -125752.1709458458, -206582.9538478413, -287445.7367498368,
+         -206582.9538478413, -338142.5668960171, -469734.1799441927,
+         -287445.7367498368, -469734.1799441927, -652054.6231385486,
+         -259672.6638171005, -342347.8617921862, -425007.0597672717,
+         -342347.8617921862, -475751.889913452,  -609139.9180347177,
+         -425007.0597672717, -609139.9180347177, -793256.7763021637}};
+    for (size_t i = 0; i < VolumeDim; ++i) {
+      for (size_t j = 0; j < VolumeDim; ++j) {
+        for (size_t k = j; k < VolumeDim; ++k) {
+          local_CdK.get(i, j, k) =
+              spec_vals[i * VolumeDim * VolumeDim + j * VolumeDim + k];
+        }
+      }
+    }
+  }
+
+  // Call tested function
+  auto local_U8p =
+      make_with_value<tnsr::ii<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  auto local_U8m =
+      make_with_value<tnsr::ii<DataVector, VolumeDim, Frame::Inertial>>(
+          inertial_coords, 0.);
+  GeneralizedHarmonic::weyl_propagating(
+      make_not_null(&local_U8p), local_ricci_3, local_extrinsic_curvature,
+      local_inverse_spatial_metric, local_CdK,
+      local_unit_interface_normal_one_form, local_unit_interface_normal_vector,
+      local_spatial_projection_IJ, local_spatial_projection_ij,
+      local_spatial_projection_Ij, 1);
+  GeneralizedHarmonic::weyl_propagating(
+      make_not_null(&local_U8m), local_ricci_3, local_extrinsic_curvature,
+      local_inverse_spatial_metric, local_CdK,
+      local_unit_interface_normal_one_form, local_unit_interface_normal_vector,
+      local_spatial_projection_IJ, local_spatial_projection_ij,
+      local_spatial_projection_Ij, -1);
+  // Initialize with values from SpEC
+  auto spec_U8p = local_U8p;
+  {
+    const std::array<double, 9> spec_vals = {
+        {928952774.2567333, 940713877.3261309, 939182081.2010889,
+         940713877.3261309, 945884770.4041573, 948874196.5740113,
+         939182081.2010889, 948874196.5740113, 957472967.9928486}};
+    for (size_t j = 0; j < VolumeDim; ++j) {
+      for (size_t k = j; k < VolumeDim; ++k) {
+        spec_U8p.get(j, k) = spec_vals[j * VolumeDim + k];
+      }
+    }
+  }
+  auto spec_U8m = local_U8m;
+  {
+    const std::array<double, 9> spec_vals = {
+        {2072462877.743262, 2092514290.673862, 2091092298.798905,
+         2092514290.673862, 2114969735.595836, 2118154795.425982,
+         2091092298.798905, 2118154795.425982, 2135578770.007146}};
+    for (size_t j = 0; j < VolumeDim; ++j) {
+      for (size_t k = j; k < VolumeDim; ++k) {
+        spec_U8m.get(j, k) = spec_vals[j * VolumeDim + k];
+      }
+    }
+  }
+
+  // Compare value vs those from SpEC
+  Approx custom_approx = Approx::custom().epsilon(1.e-12).scale(1.0);
+  CHECK_ITERABLE_CUSTOM_APPROX(local_U8p, spec_U8p, custom_approx);
+  CHECK_ITERABLE_CUSTOM_APPROX(local_U8m, spec_U8m, custom_approx);
+}
+}  // namespace
 }  // namespace
 
 SPECTRE_TEST_CASE(
@@ -2124,9 +2716,27 @@ SPECTRE_TEST_CASE(
 }
 
 SPECTRE_TEST_CASE(
+    "Unit.Evolution.Systems.GeneralizedHarmonic.BoundaryConditions.UMinus."
+    "Helpers",
+    "[Unit][Evolution]") {
+  // Piece-wise tests with SpEC output
+  // These only work with the grid specified below
+  const size_t grid_size = 3;
+  const std::array<double, 3> lower_bound{{299., -0.5, -0.5}};
+  const std::array<double, 3> upper_bound{{300., 0.5, 0.5}};
+
+  test_spatial_ricci_tensor_from_KST_vars(grid_size, lower_bound, upper_bound);
+  test_spatial_christoffel_second_kind_from_KST_vars(grid_size, lower_bound,
+                                                     upper_bound);
+  test_spatial_projection_tensors(grid_size, lower_bound, upper_bound);
+  test_weyl_propagating(grid_size, lower_bound, upper_bound);
+}
+
+SPECTRE_TEST_CASE(
     "Unit.Evolution.Systems.GeneralizedHarmonic.BoundaryConditions.UMinus",
     "[Unit][Evolution]") {
   // Piece-wise tests with SpEC output
+  // These only work with the grid specified below
   const size_t grid_size = 3;
   const std::array<double, 3> lower_bound{{299., -0.5, -0.5}};
   const std::array<double, 3> upper_bound{{300., 0.5, 0.5}};

@@ -55,7 +55,7 @@ void print_rank1_tensor_at_point(const std::string& name, const T1& tensor,
             << coord_y[idx] << ", " << coord_z[idx] << "] ---" << std::endl
             << std::flush;
   for (size_t a = 0; a <= VolumeDim; ++a) {
-    std::cout << "  " << tensor.get(a)[idx] << "  " << std::flush;
+    std::cout << "  " << tensor.get(a)[idx] << ",  " << std::flush;
   }
   std::cout << std::endl << std::flush;
 }
@@ -70,7 +70,7 @@ void print_rank2_tensor_at_point(const std::string& name, const T1& tensor,
             << std::flush;
   for (size_t a = 0; a <= VolumeDim; ++a) {
     for (size_t b = 0; b <= VolumeDim; ++b) {
-      std::cout << "  " << tensor.get(a, b)[idx] << "  " << std::flush;
+      std::cout << "  " << tensor.get(a, b)[idx] << ",  " << std::flush;
     }
     std::cout << std::endl << std::flush;
   }
@@ -88,7 +88,7 @@ void print_rank3_tensor_at_point(const std::string& name, const T1& tensor,
   for (size_t j = 0; j <= VolumeDim; ++j) {
     for (size_t a = 0; a <= VolumeDim; ++a) {
       for (size_t b = 0; b <= VolumeDim; ++b) {
-        std::cout << "  " << tensor.get(j, a, b)[idx] << "  " << std::flush;
+        std::cout << "  " << tensor.get(j, a, b)[idx] << ",  " << std::flush;
       }
       std::cout << std::endl << std::flush;
     }
@@ -1318,9 +1318,6 @@ struct set_dt_u_minus {
     // ONLY ON THE +Y AXIS (Y = +0.5) -- FIXME
     //
     for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
-      if (get<0>(local_inertial_coords)[i] == 299. and
-          get<1>(local_inertial_coords)[i] == 0.5 and
-          get<2>(local_inertial_coords)[i] == -0.5) {
         std::array<double, 9> spec_vals = {
             {200.2198037251189, 266.7930716334918, 333.3663395418648,
              266.7930716334918, 333.3663395418648, 399.9396074502377,
@@ -1331,117 +1328,6 @@ struct set_dt_u_minus {
                 spec_vals[j * (0 + VolumeDim) + k];
           }
         }
-      } else if (get<0>(local_inertial_coords)[i] == 299.5 and
-                 get<1>(local_inertial_coords)[i] == 0.5 and
-                 get<2>(local_inertial_coords)[i] == -0.5) {
-        std::array<double, 9> spec_vals = {
-            {200.2198037251189, 266.7930716334918, 333.3663395418648,
-             266.7930716334918, 333.3663395418648, 399.9396074502377,
-             333.3663395418648, 399.9396074502377, 466.5128753586106}};
-        for (size_t j = 0; j < VolumeDim; ++j) {
-          for (size_t k = 0; k < VolumeDim; ++k) {
-            local_extrinsic_curvature.get(j, k)[i] =
-                spec_vals[j * (0 + VolumeDim) + k];
-          }
-        }
-      } else if (get<0>(local_inertial_coords)[i] == 300. and
-                 get<1>(local_inertial_coords)[i] == 0.5 and
-                 get<2>(local_inertial_coords)[i] == -0.5) {
-        std::array<double, 9> spec_vals = {
-            {200.2198037251189, 266.7930716334918, 333.3663395418648,
-             266.7930716334918, 333.3663395418648, 399.9396074502377,
-             333.3663395418648, 399.9396074502377, 466.5128753586106}};
-        for (size_t j = 0; j < VolumeDim; ++j) {
-          for (size_t k = 0; k < VolumeDim; ++k) {
-            local_extrinsic_curvature.get(j, k)[i] =
-                spec_vals[j * (0 + VolumeDim) + k];
-          }
-        }
-      } else if (get<0>(local_inertial_coords)[i] == 299. and
-                 get<1>(local_inertial_coords)[i] == 0.5 and
-                 get<2>(local_inertial_coords)[i] == 0.) {
-        std::array<double, 9> spec_vals = {
-            {200.2198037251189, 266.7930716334918, 333.3663395418648,
-             266.7930716334918, 333.3663395418648, 399.9396074502377,
-             333.3663395418648, 399.9396074502377, 466.5128753586106}};
-        for (size_t j = 0; j < VolumeDim; ++j) {
-          for (size_t k = 0; k < VolumeDim; ++k) {
-            local_extrinsic_curvature.get(j, k)[i] =
-                spec_vals[j * (0 + VolumeDim) + k];
-          }
-        }
-      } else if (get<0>(local_inertial_coords)[i] == 299.5 and
-                 get<1>(local_inertial_coords)[i] == 0.5 and
-                 get<2>(local_inertial_coords)[i] == 0.) {
-        std::array<double, 9> spec_vals = {
-            {200.2198037251189, 266.7930716334918, 333.3663395418648,
-             266.7930716334918, 333.3663395418648, 399.9396074502377,
-             333.3663395418648, 399.9396074502377, 466.5128753586106}};
-        for (size_t j = 0; j < VolumeDim; ++j) {
-          for (size_t k = 0; k < VolumeDim; ++k) {
-            local_extrinsic_curvature.get(j, k)[i] =
-                spec_vals[j * (0 + VolumeDim) + k];
-          }
-        }
-      } else if (get<0>(local_inertial_coords)[i] == 300. and
-                 get<1>(local_inertial_coords)[i] == 0.5 and
-                 get<2>(local_inertial_coords)[i] == 0.) {
-        std::array<double, 9> spec_vals = {
-            {200.2198037251189, 266.7930716334918, 333.3663395418648,
-             266.7930716334918, 333.3663395418648, 399.9396074502377,
-             333.3663395418648, 399.9396074502377, 466.5128753586106}};
-        for (size_t j = 0; j < VolumeDim; ++j) {
-          for (size_t k = 0; k < VolumeDim; ++k) {
-            local_extrinsic_curvature.get(j, k)[i] =
-                spec_vals[j * (0 + VolumeDim) + k];
-          }
-        }
-      } else if (get<0>(local_inertial_coords)[i] == 299. and
-                 get<1>(local_inertial_coords)[i] == 0.5 and
-                 get<2>(local_inertial_coords)[i] == 0.5) {
-        std::array<double, 9> spec_vals = {
-            {200.2198037251189, 266.7930716334918, 333.3663395418648,
-             266.7930716334918, 333.3663395418648, 399.9396074502377,
-             333.3663395418648, 399.9396074502377, 466.5128753586106}};
-        for (size_t j = 0; j < VolumeDim; ++j) {
-          for (size_t k = 0; k < VolumeDim; ++k) {
-            local_extrinsic_curvature.get(j, k)[i] =
-                spec_vals[j * (0 + VolumeDim) + k];
-          }
-        }
-      } else if (get<0>(local_inertial_coords)[i] == 299.5 and
-                 get<1>(local_inertial_coords)[i] == 0.5 and
-                 get<2>(local_inertial_coords)[i] == 0.5) {
-        std::array<double, 9> spec_vals = {
-            {200.2198037251189, 266.7930716334918, 333.3663395418648,
-             266.7930716334918, 333.3663395418648, 399.9396074502377,
-             333.3663395418648, 399.9396074502377, 466.5128753586106}};
-        for (size_t j = 0; j < VolumeDim; ++j) {
-          for (size_t k = 0; k < VolumeDim; ++k) {
-            local_extrinsic_curvature.get(j, k)[i] =
-                spec_vals[j * (0 + VolumeDim) + k];
-          }
-        }
-      } else if (get<0>(local_inertial_coords)[i] == 300. and
-                 get<1>(local_inertial_coords)[i] == 0.5 and
-                 get<2>(local_inertial_coords)[i] == 0.5) {
-        std::array<double, 9> spec_vals = {
-            {200.2198037251189, 266.7930716334918, 333.3663395418648,
-             266.7930716334918, 333.3663395418648, 399.9396074502377,
-             333.3663395418648, 399.9396074502377, 466.5128753586106}};
-        for (size_t j = 0; j < VolumeDim; ++j) {
-          for (size_t k = 0; k < VolumeDim; ++k) {
-            local_extrinsic_curvature.get(j, k)[i] =
-                spec_vals[j * (0 + VolumeDim) + k];
-          }
-        }
-      } else {
-        // When applying BCs to various faces, only one face (i.e. the +y side)
-        // will be set here, others can be set however...
-        // FIXME: Disabled
-        ASSERT(true,
-               "Not checking the correct face, coordinates not recognized");
-      }
     }
 
     // Setting pi AND phi
@@ -2169,7 +2055,7 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
         }
       }  // debugPK
     }
-    if (debugPKoff) {  // debugPK
+    if (debugPKon) {  // debugPK
       std::cout << " 2.1 " << std::endl << std::flush;
       for (size_t i = 0; i < get<0, 0>(ricci_3).size(); ++i) {
         print_rank3_tensor_at_point(
@@ -2217,12 +2103,13 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
         }
       }
     }
-    if (debugPKoff) {  // debugPK
+    if (debugPKon) {  // debugPK
       std::cout << " 4.1 AdjustedUsingC4" << std::endl << std::flush;
       for (size_t i = 0; i < get<0, 0>(ricci_3).size(); ++i) {
-        print_rank2_tensor_at_point(
-            " 4.1 RICCI_3 ", ricci_3, local_inertial_coords.get(0),
-            local_inertial_coords.get(1), local_inertial_coords.get(2), i, 2);
+        print_rank2_tensor_at_point(" 4.1 RICCI_3 (AdjustedUsingC4)", ricci_3,
+                                    local_inertial_coords.get(0),
+                                    local_inertial_coords.get(1),
+                                    local_inertial_coords.get(2), i, 2);
       }
     }                  // debugPK
     if (debugPKoff) {  // debugPK
