@@ -1700,7 +1700,7 @@ struct set_dt_u_minus {
 
     // debugPK
     std::fill(bc_dt_u_minus.begin(), bc_dt_u_minus.end(), 0.);
-    if (debugPKoff) {
+    if (debugPKon) {
       auto _ = apply_bjorhus_constraint_preserving(
           make_not_null(&bc_dt_u_minus), local_incoming_null_one_form,
           local_outgoing_null_one_form, local_incoming_null_vector,
@@ -1738,7 +1738,7 @@ struct set_dt_u_minus {
         }
       }
     }
-    if (debugPKoff) {
+    if (debugPKon) {
       auto __ = apply_gauge_sommerfeld(
           make_not_null(&bc_dt_u_minus), local_constraint_gamma2,
           local_inertial_coords, local_incoming_null_one_form,
@@ -1749,7 +1749,7 @@ struct set_dt_u_minus {
       if (debugPKon) {
         for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
           print_rank2_tensor_at_point(
-              "BcDtUMinus<gauge_sommerfeld, CP>", bc_dt_u_minus,
+              "BcDtUMinus<gauge_sommerfeld>", bc_dt_u_minus,
               local_inertial_coords.get(0), local_inertial_coords.get(1),
               local_inertial_coords.get(2), i);
         }
@@ -2178,7 +2178,7 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
       }
     }  // debugPK
 
-    if (debugPKon) {  // debugPK
+    if (debugPKoff) {  // debugPK
       std::cout << " 3. Computed CdK" << std::endl << std::flush;
     }
     if (mAdjustPhysUsingC4) {
@@ -2217,15 +2217,15 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
         }
       }
     }
-    if (debugPKon) {  // debugPK
+    if (debugPKoff) {  // debugPK
       std::cout << " 4.1 AdjustedUsingC4" << std::endl << std::flush;
       for (size_t i = 0; i < get<0, 0>(ricci_3).size(); ++i) {
         print_rank2_tensor_at_point(
             " 4.1 RICCI_3 ", ricci_3, local_inertial_coords.get(0),
             local_inertial_coords.get(1), local_inertial_coords.get(2), i, 2);
       }
-    }                 // debugPK
-    if (debugPKon) {  // debugPK
+    }                  // debugPK
+    if (debugPKoff) {  // debugPK
       std::cout
           << " 4. AdjustedUsingC4: Added 4-idx constraint terms to RICCI_3"
           << std::endl
@@ -2314,15 +2314,6 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
         unit_interface_normal_vector, spatial_projection_IJ,
         spatial_projection_ij, spatial_projection_Ij, 1);
     if (debugPKon) {  // debugPK
-      std::cout << " 6.1 " << std::endl << std::flush;
-      for (size_t i = 0; i < get<0, 0>(ricci_3).size(); ++i) {
-        print_rank2_tensor_at_point(" 6.1 Spatial propagating WeylPLUS ", U8p,
-                                    local_inertial_coords.get(0),
-                                    local_inertial_coords.get(1),
-                                    local_inertial_coords.get(2), i, 2);
-      }
-    }                 // debugPK
-    if (debugPKon) {  // debugPK
       std::cout << " 6.1 Computed U8PLUS" << std::endl << std::flush;
     }
     GeneralizedHarmonic::weyl_propagating(
@@ -2333,8 +2324,12 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
     if (debugPKon) {  // debugPK
       std::cout << " 6.2 " << std::endl << std::flush;
       for (size_t i = 0; i < get<0, 0>(ricci_3).size(); ++i) {
-        print_rank2_tensor_at_point(" 6.1 Spatial propagating WeylMINUS ", U8m,
+        print_rank2_tensor_at_point(" 6.1 Spatial propagating WeylU8PLUS ", U8p,
                                     local_inertial_coords.get(0),
+                                    local_inertial_coords.get(1),
+                                    local_inertial_coords.get(2), i, 2);
+        print_rank2_tensor_at_point(" 6.1 Spatial propagating WeylU8MINUS ",
+                                    U8m, local_inertial_coords.get(0),
                                     local_inertial_coords.get(1),
                                     local_inertial_coords.get(2), i, 2);
       }
