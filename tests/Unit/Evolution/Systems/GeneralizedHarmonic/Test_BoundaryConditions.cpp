@@ -1366,6 +1366,738 @@ void test_constraint_preserving_bjorhus_u_minus<
   // Compare values returned by BC action vs those from SpEC
   CHECK_ITERABLE_APPROX(local_bc_dt_u_minus, spec_bc_dt_u_minus);
 }
+
+// This function tests the boundary condition imposed on UMinus when
+// option `ConstraintPreservingBjorhus` is specified.
+template <>
+void test_constraint_preserving_bjorhus_u_minus<
+    GeneralizedHarmonic::Actions::BoundaryConditions_detail::UMinusBcMethod::
+        ConstraintPreservingPhysicalBjorhus>(
+    const size_t grid_size_each_dimension,
+    const std::array<double, 3>& lower_bound,
+    const std::array<double, 3>& upper_bound) noexcept {
+  // Setup grid
+  Mesh<VolumeDim> mesh{grid_size_each_dimension, Spectral::Basis::Legendre,
+                       Spectral::Quadrature::GaussLobatto};
+  const auto coord_map =
+      domain::make_coordinate_map<Frame::Logical, Frame::Inertial>(Affine3D{
+          Affine{-1., 1., lower_bound[0], upper_bound[0]},
+          Affine{-1., 1., lower_bound[1], upper_bound[1]},
+          Affine{-1., 1., lower_bound[2], upper_bound[2]},
+      });
+
+  // Setup coordinates
+  const auto x_logical = logical_coordinates(mesh);
+  const auto x = coord_map(x_logical);
+  const Direction<VolumeDim> direction(1, Side::Upper);  // +y direction
+  const size_t slice_grid_points =
+      mesh.extents().slice_away(direction.dimension()).product();
+  const auto inertial_coords = [&slice_grid_points, &lower_bound]() {
+    tnsr::I<DataVector, VolumeDim, frame> tmp(slice_grid_points, 0.);
+    // +y direction
+    get<1>(tmp) = 0.5;
+    for (size_t i = 0; i < VolumeDim; ++i) {
+      for (size_t j = 0; j < VolumeDim; ++j) {
+        get<0>(tmp)[i * VolumeDim + j] =
+            lower_bound[0] + 0.5 * static_cast<double>(i);
+        get<2>(tmp)[i * VolumeDim + j] =
+            lower_bound[2] + 0.5 * static_cast<double>(j);
+      }
+    }
+    return tmp;
+  }();
+  //
+  // Create a TempTensor that stores all temporaries computed
+  // here and elsewhere
+  TempBuffer<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                 all_local_vars<VolumeDim>>
+      buffer(slice_grid_points);
+  // Also create local variables and their time derivatives, both of which we
+  // will populate as needed
+  db::item_type<GeneralizedHarmonic::System<VolumeDim>::variables_tag>
+      local_vars(slice_grid_points, 0.);
+  Variables<db::wrap_tags_in<
+      ::Tags::dt, GeneralizedHarmonic::System<VolumeDim>::gradients_tags>>
+      local_dt_vars(slice_grid_points, 0.);
+  tnsr::i<DataVector, VolumeDim, frame> local_unit_normal_one_form(
+      slice_grid_points, 0.);
+
+  {
+    // POPULATE various tensors needed to compute BcDtUpsi
+    // EXACTLY as done in SpEC
+    auto& local_inertial_coords =
+        get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto& local_constraint_gamma2 =
+        get<::Tags::TempScalar<26, DataVector>>(buffer);
+    auto& local_three_index_constraint =
+        get<::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>>(
+            buffer);
+    // timelike and spacelike SPACETIME vectors, l^a and k^a
+    auto& local_outgoing_null_one_form =
+        get<::Tags::Tempa<0, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto& local_incoming_null_one_form =
+        get<::Tags::Tempa<1, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    // timelike and spacelike SPACETIME oneforms, l_a and k_a
+    auto& local_outgoing_null_vector =
+        get<::Tags::TempA<2, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto& local_incoming_null_vector =
+        get<::Tags::TempA<3, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    // spacetime projection operator P_ab, P^ab, and P^a_b
+    auto& local_projection_AB =
+        get<::Tags::TempAA<9, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto& local_projection_ab =
+        get<::Tags::Tempaa<10, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto& local_projection_Ab =
+        get<::Tags::TempAb<11, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    // constraint characteristics
+    auto& local_constraint_char_zero_minus =
+        get<::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto& local_constraint_char_zero_plus =
+        get<::Tags::Tempa<34, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    // RhsUPsi and RhsUminus
+    auto& local_char_projected_rhs_dt_u_psi =
+        get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto& local_char_projected_rhs_dt_u_minus =
+        get<::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+
+    auto& local_unit_interface_normal_one_form =
+        get<::Tags::Tempa<4, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto& local_unit_interface_normal_vector =
+        get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto& local_spacetime_unit_normal_vector =
+        get<::Tags::TempA<7, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto& local_lapse = get<::Tags::TempScalar<19, DataVector>>(buffer);
+    auto& local_shift =
+        get<::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+
+    auto& local_inverse_spatial_metric =
+        get<::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto& local_extrinsic_curvature =
+        get<::Tags::Tempii<35, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto& local_inverse_spacetime_metric =
+        get<::Tags::TempAA<36, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+
+    auto& local_pi =
+        get<GeneralizedHarmonic::Tags::Pi<VolumeDim, frame>>(local_vars);
+    auto& local_phi =
+        get<GeneralizedHarmonic::Tags::Phi<VolumeDim, frame>>(local_vars);
+    auto& local_spacetime_metric =
+        get<gr::Tags::SpacetimeMetric<VolumeDim, frame, DataVector>>(
+            local_vars);
+    auto& local_d_pi =
+        get<::Tags::Tempiaa<32, VolumeDim, Frame::Inertial, DataVector>>(
+            buffer);
+    auto& local_d_phi =
+        get<::Tags::Tempijaa<33, VolumeDim, Frame::Inertial, DataVector>>(
+            buffer);
+
+    auto& local_char_speeds_0 = get<::Tags::TempScalar<12, DataVector>>(buffer);
+    auto& local_char_speeds_1 = get<::Tags::TempScalar<13, DataVector>>(buffer);
+    auto& local_char_speeds_2 = get<::Tags::TempScalar<14, DataVector>>(buffer);
+    auto& local_char_speeds_3 = get<::Tags::TempScalar<15, DataVector>>(buffer);
+
+    // Setting coords
+    for (size_t i = 0; i < VolumeDim; ++i) {
+      local_inertial_coords.get(i) = inertial_coords.get(i);
+    }
+    // Setting local_spacetime_unit_normal_vector
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      local_spacetime_unit_normal_vector.get(0)[i] = -1.;
+      local_spacetime_unit_normal_vector.get(1)[i] = -3.;
+      local_spacetime_unit_normal_vector.get(2)[i] = -5.;
+      local_spacetime_unit_normal_vector.get(3)[i] = -7.;
+    }
+    // Setting local_unit_interface_normal_one_form
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      local_unit_interface_normal_one_form.get(0)[i] = 1.e300;
+      local_unit_interface_normal_one_form.get(1)[i] = -1.;
+      local_unit_interface_normal_one_form.get(2)[i] = 1.;
+      local_unit_interface_normal_one_form.get(3)[i] = 1.;
+    }
+    // Setting unit_interface_normal_Vector
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      local_unit_interface_normal_vector.get(0)[i] = 1.e300;
+      local_unit_interface_normal_vector.get(1)[i] = -1.;
+      local_unit_interface_normal_vector.get(2)[i] = 1.;
+      local_unit_interface_normal_vector.get(3)[i] = 1.;
+    }
+    // Setting lapse
+    // for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+    // get(local_lapse)[i] = 2.;
+    //}
+    // Setting shift
+    // for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+    // local_shift.get(0)[i] = 1.;
+    // local_shift.get(1)[i] = 2.;
+    // local_shift.get(2)[i] = 3.;
+    //}
+    // Setting local_inverse_spatial_metric
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t j = 0; j < VolumeDim; ++j) {
+        local_inverse_spatial_metric.get(0, j)[i] = 41.;
+        local_inverse_spatial_metric.get(1, j)[i] = 43.;
+        local_inverse_spatial_metric.get(2, j)[i] = 47.;
+      }
+    }
+    // Setting local_spacetime_metric
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        local_spacetime_metric.get(0, a)[i] = 257.;
+        local_spacetime_metric.get(1, a)[i] = 263.;
+        local_spacetime_metric.get(2, a)[i] = 269.;
+        local_spacetime_metric.get(3, a)[i] = 271.;
+      }
+    }
+    // Setting local_inverse_spacetime_metric
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        local_inverse_spacetime_metric.get(0, a)[i] =
+            -277.;  // needs to be < 0 for lapse
+        local_inverse_spacetime_metric.get(1, a)[i] = 281.;
+        local_inverse_spacetime_metric.get(2, a)[i] = 283.;
+        local_inverse_spacetime_metric.get(3, a)[i] = 293.;
+      }
+    }
+    // Setting local_extrinsic_curvature
+    // ONLY ON THE +Y AXIS (Y = +0.5) -- FIXME
+    //
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      if (get<0>(local_inertial_coords)[i] == 299. and
+          get<1>(local_inertial_coords)[i] == 0.5 and
+          get<2>(local_inertial_coords)[i] == -0.5) {
+        std::array<double, 9> spec_vals = {
+            {200.2198037251189, 266.7930716334918, 333.3663395418648,
+             266.7930716334918, 333.3663395418648, 399.9396074502377,
+             333.3663395418648, 399.9396074502377, 466.5128753586106}};
+        for (size_t j = 0; j < VolumeDim; ++j) {
+          for (size_t k = 0; k < VolumeDim; ++k) {
+            local_extrinsic_curvature.get(j, k)[i] =
+                spec_vals[j * (0 + VolumeDim) + k];
+          }
+        }
+      } else if (get<0>(local_inertial_coords)[i] == 299.5 and
+                 get<1>(local_inertial_coords)[i] == 0.5 and
+                 get<2>(local_inertial_coords)[i] == -0.5) {
+        std::array<double, 9> spec_vals = {
+            {200.2198037251189, 266.7930716334918, 333.3663395418648,
+             266.7930716334918, 333.3663395418648, 399.9396074502377,
+             333.3663395418648, 399.9396074502377, 466.5128753586106}};
+        for (size_t j = 0; j < VolumeDim; ++j) {
+          for (size_t k = 0; k < VolumeDim; ++k) {
+            local_extrinsic_curvature.get(j, k)[i] =
+                spec_vals[j * (0 + VolumeDim) + k];
+          }
+        }
+      } else if (get<0>(local_inertial_coords)[i] == 300. and
+                 get<1>(local_inertial_coords)[i] == 0.5 and
+                 get<2>(local_inertial_coords)[i] == -0.5) {
+        std::array<double, 9> spec_vals = {
+            {200.2198037251189, 266.7930716334918, 333.3663395418648,
+             266.7930716334918, 333.3663395418648, 399.9396074502377,
+             333.3663395418648, 399.9396074502377, 466.5128753586106}};
+        for (size_t j = 0; j < VolumeDim; ++j) {
+          for (size_t k = 0; k < VolumeDim; ++k) {
+            local_extrinsic_curvature.get(j, k)[i] =
+                spec_vals[j * (0 + VolumeDim) + k];
+          }
+        }
+      } else if (get<0>(local_inertial_coords)[i] == 299. and
+                 get<1>(local_inertial_coords)[i] == 0.5 and
+                 get<2>(local_inertial_coords)[i] == 0.) {
+        std::array<double, 9> spec_vals = {
+            {200.2198037251189, 266.7930716334918, 333.3663395418648,
+             266.7930716334918, 333.3663395418648, 399.9396074502377,
+             333.3663395418648, 399.9396074502377, 466.5128753586106}};
+        for (size_t j = 0; j < VolumeDim; ++j) {
+          for (size_t k = 0; k < VolumeDim; ++k) {
+            local_extrinsic_curvature.get(j, k)[i] =
+                spec_vals[j * (0 + VolumeDim) + k];
+          }
+        }
+      } else if (get<0>(local_inertial_coords)[i] == 299.5 and
+                 get<1>(local_inertial_coords)[i] == 0.5 and
+                 get<2>(local_inertial_coords)[i] == 0.) {
+        std::array<double, 9> spec_vals = {
+            {200.2198037251189, 266.7930716334918, 333.3663395418648,
+             266.7930716334918, 333.3663395418648, 399.9396074502377,
+             333.3663395418648, 399.9396074502377, 466.5128753586106}};
+        for (size_t j = 0; j < VolumeDim; ++j) {
+          for (size_t k = 0; k < VolumeDim; ++k) {
+            local_extrinsic_curvature.get(j, k)[i] =
+                spec_vals[j * (0 + VolumeDim) + k];
+          }
+        }
+      } else if (get<0>(local_inertial_coords)[i] == 300. and
+                 get<1>(local_inertial_coords)[i] == 0.5 and
+                 get<2>(local_inertial_coords)[i] == 0.) {
+        std::array<double, 9> spec_vals = {
+            {200.2198037251189, 266.7930716334918, 333.3663395418648,
+             266.7930716334918, 333.3663395418648, 399.9396074502377,
+             333.3663395418648, 399.9396074502377, 466.5128753586106}};
+        for (size_t j = 0; j < VolumeDim; ++j) {
+          for (size_t k = 0; k < VolumeDim; ++k) {
+            local_extrinsic_curvature.get(j, k)[i] =
+                spec_vals[j * (0 + VolumeDim) + k];
+          }
+        }
+      } else if (get<0>(local_inertial_coords)[i] == 299. and
+                 get<1>(local_inertial_coords)[i] == 0.5 and
+                 get<2>(local_inertial_coords)[i] == 0.5) {
+        std::array<double, 9> spec_vals = {
+            {200.2198037251189, 266.7930716334918, 333.3663395418648,
+             266.7930716334918, 333.3663395418648, 399.9396074502377,
+             333.3663395418648, 399.9396074502377, 466.5128753586106}};
+        for (size_t j = 0; j < VolumeDim; ++j) {
+          for (size_t k = 0; k < VolumeDim; ++k) {
+            local_extrinsic_curvature.get(j, k)[i] =
+                spec_vals[j * (0 + VolumeDim) + k];
+          }
+        }
+      } else if (get<0>(local_inertial_coords)[i] == 299.5 and
+                 get<1>(local_inertial_coords)[i] == 0.5 and
+                 get<2>(local_inertial_coords)[i] == 0.5) {
+        std::array<double, 9> spec_vals = {
+            {200.2198037251189, 266.7930716334918, 333.3663395418648,
+             266.7930716334918, 333.3663395418648, 399.9396074502377,
+             333.3663395418648, 399.9396074502377, 466.5128753586106}};
+        for (size_t j = 0; j < VolumeDim; ++j) {
+          for (size_t k = 0; k < VolumeDim; ++k) {
+            local_extrinsic_curvature.get(j, k)[i] =
+                spec_vals[j * (0 + VolumeDim) + k];
+          }
+        }
+      } else if (get<0>(local_inertial_coords)[i] == 300. and
+                 get<1>(local_inertial_coords)[i] == 0.5 and
+                 get<2>(local_inertial_coords)[i] == 0.5) {
+        std::array<double, 9> spec_vals = {
+            {200.2198037251189, 266.7930716334918, 333.3663395418648,
+             266.7930716334918, 333.3663395418648, 399.9396074502377,
+             333.3663395418648, 399.9396074502377, 466.5128753586106}};
+        for (size_t j = 0; j < VolumeDim; ++j) {
+          for (size_t k = 0; k < VolumeDim; ++k) {
+            local_extrinsic_curvature.get(j, k)[i] =
+                spec_vals[j * (0 + VolumeDim) + k];
+          }
+        }
+      } else {
+        // When applying BCs to various faces, only one face (i.e. the +y side)
+        // will be set here, others can be set however...
+        // FIXME: Disabled
+        ASSERT(true,
+               "Not checking the correct face, coordinates not recognized");
+      }
+    }
+
+    // Setting pi AND phi
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = 0; b <= VolumeDim; ++b) {
+          // local_pi.get(a, b)[i] = 1.;
+          local_phi.get(0, a, b)[i] = 3.;
+          local_phi.get(1, a, b)[i] = 5.;
+          local_phi.get(2, a, b)[i] = 7.;
+        }
+      }
+    }
+    // Setting local_d_phi
+    // initialize dPhi (with same values as for SpEC)
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = 0; b <= VolumeDim; ++b) {
+          local_d_pi.get(0, a, b)[i] = 1.;
+          local_d_phi.get(0, 0, a, b)[i] = 3.;
+          local_d_phi.get(0, 1, a, b)[i] = 5.;
+          local_d_phi.get(0, 2, a, b)[i] = 7.;
+          local_d_pi.get(1, a, b)[i] = 53.;
+          local_d_phi.get(1, 0, a, b)[i] = 59.;
+          local_d_phi.get(1, 1, a, b)[i] = 61.;
+          local_d_phi.get(1, 2, a, b)[i] = 67.;
+          local_d_pi.get(2, a, b)[i] = 71.;
+          local_d_phi.get(2, 0, a, b)[i] = 73.;
+          local_d_phi.get(2, 1, a, b)[i] = 79.;
+          local_d_phi.get(2, 2, a, b)[i] = 83.;
+        }
+      }
+    }
+    // Setting char speeds
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      get(local_char_speeds_0)[i] = -0.3;
+      get(local_char_speeds_1)[i] = -0.1;
+      get(local_char_speeds_3)[i] = -0.2;
+    }
+    // Setting constraint_gamma2
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      get(local_constraint_gamma2)[i] = 113.;
+    }
+    // Setting incoming null one_form: ui
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      local_incoming_null_one_form.get(0)[i] = -2.;
+      local_incoming_null_one_form.get(1)[i] = 5.;
+      local_incoming_null_one_form.get(2)[i] = 3.;
+      local_incoming_null_one_form.get(3)[i] = 7.;
+    }
+    // Setting incoming null vector: uI
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      local_incoming_null_vector.get(0)[i] = -1.;
+      local_incoming_null_vector.get(1)[i] = 13.;
+      local_incoming_null_vector.get(2)[i] = 17.;
+      local_incoming_null_vector.get(3)[i] = 19.;
+    }
+    // Setting outgoing null one_form: vi
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      local_outgoing_null_one_form.get(0)[i] = -1.;
+      local_outgoing_null_one_form.get(1)[i] = 3.;
+      local_outgoing_null_one_form.get(2)[i] = 2.;
+      local_outgoing_null_one_form.get(3)[i] = 5.;
+    }
+    // Setting outgoing null vector: vI
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      local_outgoing_null_vector.get(0)[i] = -1.;
+      local_outgoing_null_vector.get(1)[i] = 2.;
+      local_outgoing_null_vector.get(2)[i] = 3.;
+      local_outgoing_null_vector.get(3)[i] = 5.;
+    }
+    // Setting projection Ab
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        local_projection_Ab.get(0, a)[i] = 233.;
+        local_projection_Ab.get(1, a)[i] = 239.;
+        local_projection_Ab.get(2, a)[i] = 241.;
+        local_projection_Ab.get(3, a)[i] = 251.;
+      }
+    }
+    // Setting projection ab
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        local_projection_ab.get(0, a)[i] = 379.;
+        local_projection_ab.get(1, a)[i] = 383.;
+        local_projection_ab.get(2, a)[i] = 389.;
+        local_projection_ab.get(3, a)[i] = 397.;
+      }
+    }
+    // Setting projection AB
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        local_projection_AB.get(0, a)[i] = 353.;
+        local_projection_AB.get(1, a)[i] = 359.;
+        local_projection_AB.get(2, a)[i] = 367.;
+        local_projection_AB.get(3, a)[i] = 373.;
+      }
+    }
+    // Setting 3idxConstraint
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = 0; b <= VolumeDim; ++b) {
+          local_three_index_constraint.get(0, a, b)[i] = 11. - 3.;
+          local_three_index_constraint.get(1, a, b)[i] = 13. - 5.;
+          local_three_index_constraint.get(2, a, b)[i] = 17. - 7.;
+        }
+      }
+    }
+    // Setting local_RhsUPsi
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        local_char_projected_rhs_dt_u_psi.get(0, a)[i] = 23.;
+        local_char_projected_rhs_dt_u_psi.get(1, a)[i] = 29.;
+        local_char_projected_rhs_dt_u_psi.get(2, a)[i] = 31.;
+        local_char_projected_rhs_dt_u_psi.get(3, a)[i] = 37.;
+      }
+    }
+    // Setting RhsUMinus
+    for (size_t i = 0; i < get<0>(local_inertial_coords).size(); ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        local_char_projected_rhs_dt_u_minus.get(0, a)[i] = 331.;
+        local_char_projected_rhs_dt_u_minus.get(1, a)[i] = 337.;
+        local_char_projected_rhs_dt_u_minus.get(2, a)[i] = 347.;
+        local_char_projected_rhs_dt_u_minus.get(3, a)[i] = 349.;
+      }
+    }
+    // Setting constraint_char_zero_plus AND constraint_char_zero_minus
+    // ONLY ON THE +Y AXIS (Y = +0.5) -- FIXME
+    for (size_t i = 0; i < slice_grid_points; ++i) {
+      if (get<0>(inertial_coords)[i] == 299. and
+          get<1>(inertial_coords)[i] == 0.5 and
+          get<2>(inertial_coords)[i] == -0.5) {
+        std::array<double, 4> spec_vals = {
+            {3722388974.799386, -16680127.68747905, -22991565.68745775,
+             -29394198.68743645}};
+        std::array<double, 4> spec_vals2 = {
+            {3866802572.424386, -19802442.06247905, -19496408.06245775,
+             -19257249.06243645}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 299.5 and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == -0.5) {
+        std::array<double, 4> spec_vals = {
+            {1718287695.133032, -35082292.16184025, -44420849.32723039,
+             -53850596.45928719}};
+        std::array<double, 4> spec_vals2 = {
+            {1866652790.548975, -38170999.90741873, -40892085.07280888,
+             -43680040.20486567}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 300. and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == -0.5) {
+        std::array<double, 4> spec_vals = {
+            {1718299060.415949, -35082089.27527188, -44420613.14790046,
+             -53850326.98725116}};
+        std::array<double, 4> spec_vals2 = {
+            {1866664134.129611, -38170797.39904065, -40891849.27166924,
+             -43679771.11101994}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 299. and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == 0.) {
+        std::array<double, 4> spec_vals = {
+            {1718276282.501221, -35082495.89577083, -44421086.49296889,
+             -53850867.05677793}};
+        std::array<double, 4> spec_vals2 = {
+            {1866641399.709844, -38171203.26157932, -40892321.85877737,
+             -43680310.4225864}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 299.5 and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == 0.) {
+        std::array<double, 4> spec_vals = {
+            {1718287685.660846, -35082292.33093269, -44420849.52407002,
+             -53850596.68387395}};
+        std::array<double, 4> spec_vals2 = {
+            {1866652781.094877, -38171000.07619599, -40892085.26933331,
+             -43680040.42913724}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 300. and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == 0.) {
+        std::array<double, 4> spec_vals = {
+            {1718299050.990844, -35082089.44352208, -44420613.34375966,
+             -53850327.21071925}};
+        std::array<double, 4> spec_vals2 = {
+            {1866664124.722503, -38170797.56697725, -40891849.46721483,
+             -43679771.33417442}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 299. and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == 0.5) {
+        std::array<double, 4> spec_vals = {
+            {1718276292.082241, -35082495.72473276, -44421086.29386414,
+             -53850866.82960649}};
+        std::array<double, 4> spec_vals2 = {
+            {1866641409.272568, -38171203.09086005, -40892321.65999144,
+             -43680310.19573379}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 299.5 and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == 0.5) {
+        std::array<double, 4> spec_vals = {
+            {1718287695.194063, -35082292.16074976, -44420849.32596073,
+             -53850596.45783833}};
+        std::array<double, 4> spec_vals2 = {
+            {1866652790.609889, -38170999.90633029, -40892085.07154126,
+             -43680040.20341886}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else if (get<0>(inertial_coords)[i] == 300. and
+                 get<1>(inertial_coords)[i] == 0.5 and
+                 get<2>(inertial_coords)[i] == 0.5) {
+        std::array<double, 4> spec_vals = {
+            {1718299060.476573, -35082089.27418864, -44420613.14663924,
+             -53850326.98581193}};
+        std::array<double, 4> spec_vals2 = {
+            {1866664134.190119, -38170797.39795944, -40891849.27041004,
+             -43679771.10958273}};
+        for (size_t j = 0; j <= VolumeDim; ++j) {
+          local_constraint_char_zero_plus.get(j)[i] = spec_vals[j];
+          local_constraint_char_zero_minus.get(j)[i] = spec_vals2[j];
+        }
+      } else {
+        // When applying BCs to various faces, only one face (i.e. the +y side)
+        // will be set here, others can be set however...
+        ASSERT(false,
+               "Not checking the correct face, coordinates not recognized");
+      }
+    }
+  }
+
+  // Compute return value from Action
+  auto local_bc_dt_u_minus =
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_u_minus<
+          typename GeneralizedHarmonic::Tags::UMinus<VolumeDim, frame>::type,
+          VolumeDim>::
+          apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                    UMinusBcMethod::ConstraintPreservingPhysicalBjorhus,
+                buffer, local_vars, local_dt_vars, inertial_coords,
+                local_unit_normal_one_form);
+
+  // Initialize with values from SpEC
+  auto spec_bc_dt_u_minus = local_bc_dt_u_minus;
+  for (size_t i = 0; i < slice_grid_points; ++i) {
+    if (get<0>(inertial_coords)[i] == 299. and
+        get<1>(inertial_coords)[i] == 0.5 and
+        get<2>(inertial_coords)[i] == -0.5) {
+      std::array<double, 16> spec_vals = {
+          {7.122948293721196e+19, 7.122948329100482e+19, 7.122948320255282e+19,
+           7.122948346787851e+19, 7.122948329100482e+19, 7.639071460057165e+19,
+           7.639071451116156e+19, 7.639071477936572e+19, 7.122948320255282e+19,
+           7.639071451116156e+19, 8.413256084990011e+19, 8.413256111738503e+19,
+           7.122948346787851e+19, 7.639071477936572e+19, 8.413256111738503e+19,
+           9.445502329090969e+19}};
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = a; b <= VolumeDim; ++b) {
+          spec_bc_dt_u_minus.get(a, b)[i] = spec_vals[a * (1 + VolumeDim) + b];
+        }
+      }
+    } else if (get<0>(inertial_coords)[i] == 299.5 and
+               get<1>(inertial_coords)[i] == 0.5 and
+               get<2>(inertial_coords)[i] == -0.5) {
+      std::array<double, 16> spec_vals = {
+          {7.122948296615504e+19, 7.122948312745003e+19, 7.122948308712251e+19,
+           7.122948320807479e+19, 7.122948312745003e+19, 7.639071424306128e+19,
+           7.639071420196236e+19, 7.639071432523298e+19, 7.122948308712251e+19,
+           7.639071420196236e+19, 8.413256058789916e+19, 8.413256071059056e+19,
+           7.122948320807479e+19, 7.639071432523298e+19, 8.413256071059056e+19,
+           9.445502273747989e+19}};
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = a; b <= VolumeDim; ++b) {
+          spec_bc_dt_u_minus.get(a, b)[i] = spec_vals[a * (1 + VolumeDim) + b];
+        }
+      }
+    } else if (get<0>(inertial_coords)[i] == 300. and
+               get<1>(inertial_coords)[i] == 0.5 and
+               get<2>(inertial_coords)[i] == -0.5) {
+      std::array<double, 16> spec_vals = {
+          {7.122948296615481e+19, 7.122948312745094e+19, 7.122948308712312e+19,
+           7.122948320807626e+19, 7.122948312745094e+19, 7.639071424306332e+19,
+           7.639071420196412e+19, 7.639071432523558e+19, 7.122948308712312e+19,
+           7.639071420196412e+19, 8.413256058790063e+19, 8.413256071059287e+19,
+           7.122948320807626e+19, 7.639071432523558e+19, 8.413256071059287e+19,
+           9.445502273748306e+19}};
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = a; b <= VolumeDim; ++b) {
+          spec_bc_dt_u_minus.get(a, b)[i] = spec_vals[a * (1 + VolumeDim) + b];
+        }
+      }
+    } else if (get<0>(inertial_coords)[i] == 299. and
+               get<1>(inertial_coords)[i] == 0.5 and
+               get<2>(inertial_coords)[i] == 0.) {
+      std::array<double, 16> spec_vals = {
+          {7.122948296615527e+19, 7.122948312744913e+19, 7.122948308712188e+19,
+           7.122948320807332e+19, 7.122948312744913e+19, 7.639071424305924e+19,
+           7.639071420196061e+19, 7.639071432523037e+19, 7.122948308712188e+19,
+           7.639071420196061e+19, 8.413256058789768e+19, 8.413256071058824e+19,
+           7.122948320807332e+19, 7.639071432523037e+19, 8.413256071058824e+19,
+           9.445502273747671e+19}};
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = a; b <= VolumeDim; ++b) {
+          spec_bc_dt_u_minus.get(a, b)[i] = spec_vals[a * (1 + VolumeDim) + b];
+        }
+      }
+    } else if (get<0>(inertial_coords)[i] == 299.5 and
+               get<1>(inertial_coords)[i] == 0.5 and
+               get<2>(inertial_coords)[i] == 0.) {
+      std::array<double, 16> spec_vals = {
+          {7.122948296615504e+19, 7.122948312745003e+19, 7.122948308712251e+19,
+           7.122948320807479e+19, 7.122948312745003e+19, 7.639071424306128e+19,
+           7.639071420196236e+19, 7.639071432523298e+19, 7.122948308712251e+19,
+           7.639071420196236e+19, 8.413256058789916e+19, 8.413256071059056e+19,
+           7.122948320807479e+19, 7.639071432523298e+19, 8.413256071059056e+19,
+           9.445502273747989e+19}};
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = a; b <= VolumeDim; ++b) {
+          spec_bc_dt_u_minus.get(a, b)[i] = spec_vals[a * (1 + VolumeDim) + b];
+        }
+      }
+    } else if (get<0>(inertial_coords)[i] == 300. and
+               get<1>(inertial_coords)[i] == 0.5 and
+               get<2>(inertial_coords)[i] == 0.) {
+      std::array<double, 16> spec_vals = {
+          {7.122948296615482e+19, 7.122948312745094e+19, 7.122948308712312e+19,
+           7.122948320807626e+19, 7.122948312745094e+19, 7.63907142430633e+19,
+           7.63907142019641e+19, 7.639071432523556e+19, 7.122948308712312e+19,
+           7.63907142019641e+19, 8.413256058790063e+19, 8.413256071059287e+19,
+           7.122948320807626e+19, 7.639071432523556e+19, 8.413256071059287e+19,
+           9.445502273748306e+19}};
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = a; b <= VolumeDim; ++b) {
+          spec_bc_dt_u_minus.get(a, b)[i] = spec_vals[a * (1 + VolumeDim) + b];
+        }
+      }
+    } else if (get<0>(inertial_coords)[i] == 299. and
+               get<1>(inertial_coords)[i] == 0.5 and
+               get<2>(inertial_coords)[i] == 0.5) {
+      std::array<double, 16> spec_vals = {
+          {7.122948296615527e+19, 7.122948312744913e+19, 7.122948308712188e+19,
+           7.122948320807332e+19, 7.122948312744913e+19, 7.639071424305924e+19,
+           7.639071420196061e+19, 7.639071432523039e+19, 7.122948308712188e+19,
+           7.639071420196061e+19, 8.413256058789768e+19, 8.413256071058824e+19,
+           7.122948320807332e+19, 7.639071432523039e+19, 8.413256071058824e+19,
+           9.445502273747671e+19}};
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = a; b <= VolumeDim; ++b) {
+          spec_bc_dt_u_minus.get(a, b)[i] = spec_vals[a * (1 + VolumeDim) + b];
+        }
+      }
+    } else if (get<0>(inertial_coords)[i] == 299.5 and
+               get<1>(inertial_coords)[i] == 0.5 and
+               get<2>(inertial_coords)[i] == 0.5) {
+      std::array<double, 16> spec_vals = {
+          {7.122948296615504e+19, 7.122948312745003e+19, 7.122948308712251e+19,
+           7.122948320807479e+19, 7.122948312745003e+19, 7.639071424306128e+19,
+           7.639071420196236e+19, 7.639071432523298e+19, 7.122948308712251e+19,
+           7.639071420196236e+19, 8.413256058789916e+19, 8.413256071059056e+19,
+           7.122948320807479e+19, 7.639071432523298e+19, 8.413256071059056e+19,
+           9.445502273747989e+19}};
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = a; b <= VolumeDim; ++b) {
+          spec_bc_dt_u_minus.get(a, b)[i] = spec_vals[a * (1 + VolumeDim) + b];
+        }
+      }
+    } else if (get<0>(inertial_coords)[i] == 300. and
+               get<1>(inertial_coords)[i] == 0.5 and
+               get<2>(inertial_coords)[i] == 0.5) {
+      std::array<double, 16> spec_vals = {
+          {7.122948296615481e+19, 7.122948312745094e+19, 7.122948308712312e+19,
+           7.122948320807626e+19, 7.122948312745094e+19, 7.639071424306332e+19,
+           7.639071420196412e+19, 7.639071432523558e+19, 7.122948308712312e+19,
+           7.639071420196412e+19, 8.413256058790063e+19, 8.413256071059287e+19,
+           7.122948320807626e+19, 7.639071432523558e+19, 8.413256071059287e+19,
+           9.445502273748306e+19}};
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = a; b <= VolumeDim; ++b) {
+          spec_bc_dt_u_minus.get(a, b)[i] = spec_vals[a * (1 + VolumeDim) + b];
+        }
+      }
+    } else {
+      ASSERT(false,
+             "Not checking the correct face, coordinates not recognized");
+    }
+  }
+
+  // Compare values returned by BC action vs those from SpEC
+  CHECK_ITERABLE_APPROX(local_bc_dt_u_minus, spec_bc_dt_u_minus);
+}
 }  // namespace
 
 SPECTRE_TEST_CASE(
@@ -1405,8 +2137,8 @@ SPECTRE_TEST_CASE(
   test_constraint_preserving_bjorhus_u_minus<
       GeneralizedHarmonic::Actions::BoundaryConditions_detail::UMinusBcMethod::
           ConstraintPreservingBjorhus>(grid_size, lower_bound, upper_bound);
-  // test_constraint_preserving_bjorhus_u_minus<
-  // GeneralizedHarmonic::Actions::BoundaryConditions_detail::UMinusBcMethod::
-  // ConstraintPreservingPhysicalBjorhus>(grid_size, lower_bound,
-  // upper_bound);
+  test_constraint_preserving_bjorhus_u_minus<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::UMinusBcMethod::
+          ConstraintPreservingPhysicalBjorhus>(grid_size, lower_bound,
+                                               upper_bound);
 }

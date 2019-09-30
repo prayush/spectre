@@ -1217,7 +1217,7 @@ struct set_dt_u_minus {
     ReturnType& bc_dt_u_minus =
         get<::Tags::Tempaa<30, VolumeDim, Frame::Inertial, DataVector>>(buffer);
     // --------------------------------------- TESTS
-#if 1
+#if 0
     std::cout << std::setprecision(16);
     // POPULATE various tensors needed to compute BcDtUMinus
     // EXACTLY as done in SpEC
