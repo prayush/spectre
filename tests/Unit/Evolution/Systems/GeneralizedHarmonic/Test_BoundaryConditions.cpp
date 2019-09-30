@@ -54,7 +54,18 @@ using Affine3D = domain::CoordinateMaps::ProductOf3Maps<Affine, Affine, Affine>;
 using frame = Frame::Inertial;
 constexpr size_t VolumeDim = 3;
 
+// Test boundary conditions on dt<UPsi>
+template <GeneralizedHarmonic::Actions::BoundaryConditions_detail::UPsiBcMethod
+              BcMethod>
 void test_constraint_preserving_bjorhus_u_psi(
+    const size_t grid_size_each_dimension,
+    const std::array<double, 3>& lower_bound,
+    const std::array<double, 3>& upper_bound) noexcept;
+
+template <>
+void test_constraint_preserving_bjorhus_u_psi<
+    GeneralizedHarmonic::Actions::BoundaryConditions_detail::UPsiBcMethod::
+        ConstraintPreservingBjorhus>(
     const size_t grid_size_each_dimension,
     const std::array<double, 3>& lower_bound,
     const std::array<double, 3>& upper_bound) noexcept {
@@ -251,7 +262,18 @@ void test_constraint_preserving_bjorhus_u_psi(
   CHECK_ITERABLE_APPROX(local_bc_dt_u_psi, spec_bd_dt_u_psi);
 }
 
+// Test boundary conditions on dt<UZero>
+template <GeneralizedHarmonic::Actions::BoundaryConditions_detail::UZeroBcMethod
+              BcMethod>
 void test_constraint_preserving_bjorhus_u_zero(
+    const size_t grid_size_each_dimension,
+    const std::array<double, 3>& lower_bound,
+    const std::array<double, 3>& upper_bound) noexcept;
+
+template <>
+void test_constraint_preserving_bjorhus_u_zero<
+    GeneralizedHarmonic::Actions::BoundaryConditions_detail::UZeroBcMethod::
+        ConstraintPreservingBjorhus>(
     const size_t grid_size_each_dimension,
     const std::array<double, 3>& lower_bound,
     const std::array<double, 3>& upper_bound) noexcept {
@@ -498,6 +520,7 @@ void test_constraint_preserving_bjorhus_u_zero(
   CHECK_ITERABLE_APPROX(local_bc_dt_u_zero, spec_bc_dt_u_zero);
 }
 
+// Test boundary conditions on dt<UMinus>
 template <GeneralizedHarmonic::Actions::BoundaryConditions_detail::
               UMinusBcMethod BcMethod>
 void test_constraint_preserving_bjorhus_u_minus(
@@ -505,7 +528,7 @@ void test_constraint_preserving_bjorhus_u_minus(
     const std::array<double, 3>& lower_bound,
     const std::array<double, 3>& upper_bound) noexcept;
 
-// This function tests the boundary condition imposed on UMinus when
+// Test the boundary condition imposed on UMinus when
 // option `Freezing` is specified. Only the gauge portion of the RHS is set.
 template <>
 void test_constraint_preserving_bjorhus_u_minus<
@@ -865,7 +888,7 @@ void test_constraint_preserving_bjorhus_u_minus<
   CHECK_ITERABLE_APPROX(local_bc_dt_u_minus, spec_bc_dt_u_minus);
 }
 
-// This function tests the boundary condition imposed on UMinus when
+// Test the boundary condition imposed on UMinus when
 // option `ConstraintPreservingBjorhus` is specified.
 template <>
 void test_constraint_preserving_bjorhus_u_minus<
@@ -1367,7 +1390,7 @@ void test_constraint_preserving_bjorhus_u_minus<
   CHECK_ITERABLE_APPROX(local_bc_dt_u_minus, spec_bc_dt_u_minus);
 }
 
-// This function tests the boundary condition imposed on UMinus when
+// Test the boundary condition imposed on UMinus when
 // option `ConstraintPreservingBjorhus` is specified.
 template <>
 void test_constraint_preserving_bjorhus_u_minus<
@@ -2099,6 +2122,7 @@ void test_constraint_preserving_bjorhus_u_minus<
   CHECK_ITERABLE_APPROX(local_bc_dt_u_minus, spec_bc_dt_u_minus);
 }
 
+// Test helper functions needed to set dt<UMinus>
 namespace {
 // Test GeneralizedHarmonic::spatial_ricci_tensor_from_KST_vars
 void test_spatial_ricci_tensor_from_KST_vars(
@@ -2620,15 +2644,15 @@ void test_weyl_propagating(const size_t grid_size_each_dimension,
 
   {  // Setting CdK
     const std::array<double, 27> spec_vals = {
-        {8823.321925408964,  -70195.04590349646, -149213.4137324019,
+        {8823.321925408985,  -70195.04590349646, -149213.4137324019,
          -70195.04590349646, -199942.2438785821, -329689.4418536677,
-         -149213.4137324019, -329689.4418536677, -510165.4699749334,
-         -125752.1709458458, -206582.9538478413, -287445.7367498368,
-         -206582.9538478413, -338142.5668960171, -469734.1799441927,
-         -287445.7367498368, -469734.1799441927, -652054.6231385486,
+         -149213.4137324019, -329689.4418536677, -510165.4699749335,
+         -125752.1709458457, -206582.9538478412, -287445.7367498368,
+         -206582.9538478412, -338142.566896017,  -469734.1799441926,
+         -287445.7367498368, -469734.1799441926, -652054.6231385486,
          -259672.6638171005, -342347.8617921862, -425007.0597672717,
-         -342347.8617921862, -475751.889913452,  -609139.9180347177,
-         -425007.0597672717, -609139.9180347177, -793256.7763021637}};
+         -342347.8617921862, -475751.8899134519, -609139.9180347177,
+         -425007.0597672717, -609139.9180347177, -793256.7763021636}};
     for (size_t i = 0; i < VolumeDim; ++i) {
       for (size_t j = 0; j < VolumeDim; ++j) {
         for (size_t k = j; k < VolumeDim; ++k) {
@@ -2700,7 +2724,9 @@ SPECTRE_TEST_CASE(
   const std::array<double, 3> lower_bound{{299., -0.5, -0.5}};
   const std::array<double, 3> upper_bound{{300., 0.5, 0.5}};
 
-  test_constraint_preserving_bjorhus_u_psi(grid_size, lower_bound, upper_bound);
+  test_constraint_preserving_bjorhus_u_psi<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::UPsiBcMethod::
+          ConstraintPreservingBjorhus>(grid_size, lower_bound, upper_bound);
 }
 
 SPECTRE_TEST_CASE(
@@ -2711,8 +2737,9 @@ SPECTRE_TEST_CASE(
   const std::array<double, 3> lower_bound{{299., -0.5, -0.5}};
   const std::array<double, 3> upper_bound{{300., 0.5, 0.5}};
 
-  test_constraint_preserving_bjorhus_u_zero(grid_size, lower_bound,
-                                            upper_bound);
+  test_constraint_preserving_bjorhus_u_zero<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::UZeroBcMethod::
+          ConstraintPreservingBjorhus>(grid_size, lower_bound, upper_bound);
 }
 
 SPECTRE_TEST_CASE(
