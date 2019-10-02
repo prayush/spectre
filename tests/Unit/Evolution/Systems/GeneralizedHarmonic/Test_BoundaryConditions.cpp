@@ -192,20 +192,6 @@ void test_constraint_preserving_bjorhus_u_psi<
                     UPsiBcMethod::ConstraintPreservingBjorhus,
                 buffer, local_vars, local_dt_vars, local_unit_normal_one_form);
 
-  // debugPK: DISPLAY results of the TEST
-  if (debugPKoff) {
-    auto& local_inertial_coords =
-        get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    // for (size_t i = 0; i < VolumeDim; ++i) {
-    // local_inertial_coords.get(i) = x.get(i);
-    //}
-    for (size_t i = 0; i < slice_grid_points; ++i) {
-      print_rank2_tensor_at_point(
-          "BcDtUpsi", local_bc_dt_u_psi, local_inertial_coords.get(0),
-          local_inertial_coords.get(1), local_inertial_coords.get(2), i);
-    }
-  }
-
   // Initialize with values from SpEC
   auto spec_bd_dt_u_psi = local_bc_dt_u_psi;
   for (size_t i = 0; i < slice_grid_points; ++i) {
