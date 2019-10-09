@@ -87,8 +87,8 @@ void UpwindFlux<Dim>::package_data(
   // to fill the exterior fields. This introduces a sign flip for each normal
   // used in computing the exterior fields.
   get<Pi>(*packaged_data) = pi;
-  get<Tags::NormalDotFlux<Pi>>(*packaged_data) = normal_dot_flux_pi;
-  get<Tags::NormalDotFlux<Phi<Dim>>>(*packaged_data) = normal_dot_flux_phi;
+  get<::Tags::NormalDotFlux<Pi>>(*packaged_data) = normal_dot_flux_pi;
+  get<::Tags::NormalDotFlux<Phi<Dim>>>(*packaged_data) = normal_dot_flux_phi;
   auto& normal_times_flux_pi = get<NormalTimesFluxPi>(*packaged_data);
   for (size_t d = 0; d < Dim; ++d) {
     normal_times_flux_pi.get(d) =
@@ -152,7 +152,7 @@ using derivative_frame = Frame::Inertial;
   template class ScalarWave::ComputeNormalDotFluxes<DIM(data)>;              \
   template class ScalarWave::UpwindFlux<DIM(data)>;                          \
   template Variables<                                                        \
-      db::wrap_tags_in<Tags::deriv, derivative_tags<DIM(data)>,              \
+      db::wrap_tags_in<::Tags::deriv, derivative_tags<DIM(data)>,            \
                        tmpl::size_t<DIM(data)>, derivative_frame>>           \
   partial_derivatives<derivative_tags<DIM(data)>, variables_tags<DIM(data)>, \
                       DIM(data), derivative_frame>(                          \
