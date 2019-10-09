@@ -33,6 +33,11 @@ struct Phi : db::SimpleTag {
 };
 
 namespace Tags {
+struct ConstraintGamma2 : db::SimpleTag {
+  using type = Scalar<DataVector>;
+  static std::string name() noexcept { return "ConstraintGamma2"; }
+};
+
 // @{
 /// \brief Tags corresponding to the characteristic fields of the flat-spacetime
 /// scalar-wave system.
@@ -43,9 +48,9 @@ struct UPsi : db::SimpleTag {
   using type = Scalar<DataVector>;
   static std::string name() noexcept { return "UPsi"; }
 };
-template <size_t Dim, typename Frame = Frame::Inertial>
+template <size_t Dim>
 struct UZero : db::SimpleTag {
-  using type = tnsr::i<DataVector, Dim, Frame>;
+  using type = tnsr::i<DataVector, Dim, Frame::Inertial>;
   static std::string name() noexcept { return "UZero"; }
 };
 struct UPlus : db::SimpleTag {
@@ -64,13 +69,13 @@ struct CharacteristicSpeeds : db::SimpleTag {
   static std::string name() noexcept { return "CharacteristicSpeeds"; }
 };
 
-template <size_t Dim, typename Frame = Frame::Inertial>
+template <size_t Dim>
 struct CharacteristicFields : db::SimpleTag {
-  using type = Variables<tmpl::list<UPsi, UZero<Dim, Frame>, UPlus, UMinus>>;
+  using type = Variables<tmpl::list<UPsi, UZero<Dim>, UPlus, UMinus>>;
   static std::string name() noexcept { return "CharacteristicFields"; }
 };
 
-template <size_t Dim, typename Frame>
+template <size_t Dim>
 struct EvolvedFieldsFromCharacteristicFields : db::SimpleTag {
   using type = Variables<tmpl::list<Psi, Pi, Phi<Dim>>>;
   static std::string name() noexcept {

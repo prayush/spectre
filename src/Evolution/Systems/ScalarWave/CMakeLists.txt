@@ -4,6 +4,7 @@
 set(LIBRARY ScalarWave)
 
 set(LIBRARY_SOURCES
+    Characteristics.cpp
     Equations.cpp
     )
 
