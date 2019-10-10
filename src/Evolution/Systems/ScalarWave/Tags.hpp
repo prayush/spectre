@@ -82,5 +82,23 @@ struct EvolvedFieldsFromCharacteristicFields : db::SimpleTag {
     return "EvolvedFieldsFromCharacteristicFields";
   }
 };
+
+/*!
+ * \brief Tags corresponding to various constraints of the scalar
+ * wave system, and their diagnostically useful combinations.
+ * \details For details on how these are defined and computed, see
+ * `OneIndexConstraintCompute`, `TwoIndexConstraintCompute`
+ */
+template <size_t Dim>
+struct OneIndexConstraint : db::SimpleTag {
+  using type = tnsr::i<DataVector, Dim, Frame::Inertial>;
+  static std::string name() noexcept { return "OneIndexConstraint"; }
+};
+/// \copydoc OneIndexConstraint
+template <size_t Dim>
+struct TwoIndexConstraint : db::SimpleTag {
+  using type = tnsr::ij<DataVector, Dim, Frame::Inertial>;
+  static std::string name() noexcept { return "TwoIndexConstraint"; }
+};
 }  // namespace Tags
 }  // namespace ScalarWave
