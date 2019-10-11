@@ -16,7 +16,9 @@
 #include "Evolution/Initialization/DiscontinuousGalerkin.hpp"
 #include "Evolution/Initialization/Evolution.hpp"
 #include "Evolution/Initialization/NonconservativeSystem.hpp"
+#include "Evolution/Systems/ScalarWave/BoundaryConditions.hpp"
 #include "Evolution/Systems/ScalarWave/Equations.hpp"  // IWYU pragma: keep // for UpwindFlux
+#include "Evolution/Systems/ScalarWave/Initialize.hpp"
 #include "Evolution/Systems/ScalarWave/System.hpp"
 #include "IO/Observer/Actions.hpp"            // IWYU pragma: keep
 #include "IO/Observer/Helpers.hpp"            // IWYU pragma: keep
@@ -124,10 +126,12 @@ struct EvolutionMetavars {
       Actions::ComputeTimeDerivative,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
           Tags::BoundaryDirectionsInterior<Dim>>,
-      dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
+      // dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
       dg::Actions::ReceiveDataForFluxes<EvolutionMetavars>,
       tmpl::conditional_t<local_time_stepping, tmpl::list<>,
                           dg::Actions::ApplyFluxes>,
+      ScalarWave::Actions::ImposeConstraintPreservingBoundaryConditions<
+          EvolutionMetavars>,
       Actions::RecordTimeStepperData>>;
   // To add filtering to the executable add the action:
   //
@@ -152,13 +156,24 @@ struct EvolutionMetavars {
   using initialization_actions = tmpl::list<
       dg::Actions::InitializeDomain<system::volume_dim>,
       Initialization::Actions::NonconservativeSystem,
+      Initialization::Actions::Evolution<EvolutionMetavars>,
+      ScalarWave::Actions::InitializeConstraints<system::volume_dim>,
       dg::Actions::InitializeInterfaces<
           system,
           dg::Initialization::slice_tags_to_face<
               typename system::variables_tag>,
-          dg::Initialization::slice_tags_to_exterior<>>,
-      Initialization::Actions::Evolution<EvolutionMetavars>,
-      dg::Actions::InitializeMortars<EvolutionMetavars>,
+          dg::Initialization::slice_tags_to_exterior<
+              typename system::variables_tag>,
+          dg::Initialization::face_compute_tags<
+              ScalarWave::Tags::ConstraintGamma2Compute,
+              ScalarWave::CharacteristicFieldsCompute<system::volume_dim>,
+              ScalarWave::CharacteristicSpeedsCompute<system::volume_dim>>,
+          dg::Initialization::face_compute_tags<
+              ScalarWave::Tags::ConstraintGamma2Compute,
+              ScalarWave::CharacteristicFieldsCompute<system::volume_dim>,
+              ScalarWave::CharacteristicSpeedsCompute<system::volume_dim>>,
+          false>,
+      dg::Actions::InitializeMortars<EvolutionMetavars, false>,
       Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavars>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
