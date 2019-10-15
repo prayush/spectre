@@ -37,3 +37,10 @@ add_spectre_parallel_executable(
   EvolutionMetavars<3>
   "${LIBS_TO_LINK}"
 )
+add_spectre_parallel_executable(
+  EvolveRegularSphericalScalarWave3D
+  EvolveRegularSphericalScalarWave
+  Evolution/Executables/ScalarWave
+  EvolutionMetavars
+  "${LIBS_TO_LINK}"
+)
