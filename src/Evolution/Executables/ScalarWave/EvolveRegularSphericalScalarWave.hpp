@@ -20,6 +20,7 @@
 #include "Evolution/Systems/ScalarWave/Equations.hpp"  // IWYU pragma: keep // for UpwindFlux
 #include "Evolution/Systems/ScalarWave/Initialize.hpp"
 #include "Evolution/Systems/ScalarWave/System.hpp"
+#include "Evolution/Systems/ScalarWave/Tags.hpp"
 #include "IO/Observer/Actions.hpp"            // IWYU pragma: keep
 #include "IO/Observer/Helpers.hpp"            // IWYU pragma: keep
 #include "IO/Observer/ObserverComponent.hpp"  // IWYU pragma: keep
@@ -94,7 +95,13 @@ struct EvolutionMetavars {
   // public for use by the Charm++ registration code
   using events = tmpl::list<
       dg::Events::Registrars::ObserveFields<
-          Dim, db::get_variables_tags_list<typename system::variables_tag>,
+          Dim,
+          tmpl::append<
+              db::get_variables_tags_list<typename system::variables_tag>,
+              tmpl::list<::Tags::PointwiseL2Norm<
+                             ScalarWave::Tags::TwoIndexConstraint<Dim>>,
+                         ::Tags::PointwiseL2Norm<
+                             ScalarWave::Tags::OneIndexConstraint<Dim>>>>,
           db::get_variables_tags_list<typename system::variables_tag>>,
       dg::Events::Registrars::ObserveErrorNorms<
           Dim, db::get_variables_tags_list<typename system::variables_tag>>>;
@@ -127,12 +134,12 @@ struct EvolutionMetavars {
       Actions::ComputeTimeDerivative,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
           Tags::BoundaryDirectionsInterior<Dim>>,
-      dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
+      // dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
       dg::Actions::ReceiveDataForFluxes<EvolutionMetavars>,
       tmpl::conditional_t<local_time_stepping, tmpl::list<>,
                           dg::Actions::ApplyFluxes>,
-      // ScalarWave::Actions::ImposeConstraintPreservingBoundaryConditions<
-      //     EvolutionMetavars>,
+      ScalarWave::Actions::ImposeConstraintPreservingBoundaryConditions<
+          EvolutionMetavars>,
       Actions::RecordTimeStepperData>>;
   // To add filtering to the executable add the action:
   //
@@ -164,8 +171,7 @@ struct EvolutionMetavars {
           dg::Initialization::slice_tags_to_face<
               typename system::variables_tag>,
           dg::Initialization::slice_tags_to_exterior<
-              // typename system::variables_tag
-              >,
+              typename system::variables_tag>,
           dg::Initialization::face_compute_tags<
               ScalarWave::Tags::ConstraintGamma2Compute,
               ScalarWave::CharacteristicFieldsCompute<system::volume_dim>,
@@ -174,8 +180,8 @@ struct EvolutionMetavars {
               ScalarWave::Tags::ConstraintGamma2Compute,
               ScalarWave::CharacteristicFieldsCompute<system::volume_dim>,
               ScalarWave::CharacteristicSpeedsCompute<system::volume_dim>>,
-          true>,
-      dg::Actions::InitializeMortars<EvolutionMetavars, true>,
+          false>,
+      dg::Actions::InitializeMortars<EvolutionMetavars, false>,
       Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavars>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 

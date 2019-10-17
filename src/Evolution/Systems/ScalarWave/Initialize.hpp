@@ -53,7 +53,12 @@ struct InitializeConstraints {
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
     using compute_tags =
-        db::AddComputeTags<ScalarWave::Tags::TwoIndexConstraintCompute<Dim>>;
+        db::AddComputeTags<ScalarWave::Tags::OneIndexConstraintCompute<Dim>,
+                           ScalarWave::Tags::TwoIndexConstraintCompute<Dim>,
+                           ::Tags::PointwiseL2NormCompute<
+                               ScalarWave::Tags::OneIndexConstraint<Dim>>,
+                           ::Tags::PointwiseL2NormCompute<
+                               ScalarWave::Tags::TwoIndexConstraint<Dim>>>;
 
     return std::make_tuple(
         Initialization::merge_into_databox<InitializeConstraints,
