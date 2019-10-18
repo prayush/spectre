@@ -8,6 +8,7 @@
 
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "Domain/FaceNormal.hpp"
+#include "Evolution/Systems/ScalarWave/Tags.hpp"
 #include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"
 #include "Options/Options.hpp"
 #include "Utilities/ForceInline.hpp"
@@ -32,6 +33,7 @@ struct Normalized;
 }  // namespace Tags
 
 namespace ScalarWave {
+struct Psi;
 struct Pi;
 template <size_t Dim>
 struct Phi;
@@ -63,14 +65,21 @@ namespace ScalarWave {
 template <size_t Dim>
 struct ComputeDuDt {
   using argument_tags =
-      tmpl::list<Pi, ::Tags::deriv<Pi, tmpl::size_t<Dim>, Frame::Inertial>,
-                 ::Tags::deriv<Phi<Dim>, tmpl::size_t<Dim>, Frame::Inertial>>;
+      tmpl::list<::Tags::deriv<Psi, tmpl::size_t<Dim>, Frame::Inertial>, Pi,
+                 ::Tags::deriv<Pi, tmpl::size_t<Dim>, Frame::Inertial>,
+                 Phi<Dim>,
+                 ::Tags::deriv<Phi<Dim>, tmpl::size_t<Dim>, Frame::Inertial>,
+                 Tags::ConstraintGamma2>;
   static void apply(
       gsl::not_null<Scalar<DataVector>*> dt_pi,
       gsl::not_null<tnsr::i<DataVector, Dim, Frame::Inertial>*> dt_phi,
-      gsl::not_null<Scalar<DataVector>*> dt_psi, const Scalar<DataVector>& pi,
+      gsl::not_null<Scalar<DataVector>*> dt_psi,
+      const tnsr::i<DataVector, Dim, Frame::Inertial>& d_psi,
+      const Scalar<DataVector>& pi,
       const tnsr::i<DataVector, Dim, Frame::Inertial>& d_pi,
-      const tnsr::ij<DataVector, Dim, Frame::Inertial>& d_phi) noexcept;
+      const tnsr::i<DataVector, Dim, Frame::Inertial>& phi,
+      const tnsr::ij<DataVector, Dim, Frame::Inertial>& d_phi,
+      const Scalar<DataVector>& gamma2) noexcept;
 };
 
 /*!
@@ -122,6 +131,14 @@ struct UpwindFlux {
     using type = tnsr::i<DataVector, Dim, Frame::Inertial>;
     static std::string name() noexcept { return "NormalTimesFluxPi"; }
   };
+  struct NormalTimesGamma2Psi {
+    using type = tnsr::i<DataVector, Dim, Frame::Inertial>;
+    static std::string name() noexcept { return "NormalTimesGamma2TimesPsi"; }
+  };
+  struct Gamma2Psi {
+    using type = Scalar<DataVector>;
+    static std::string name() noexcept { return "Gamma2TimesPsi"; }
+  };
 
  public:
   using options = tmpl::list<>;
@@ -139,12 +156,13 @@ struct UpwindFlux {
   // `()` operator.
   using package_tags =
       tmpl::list<::Tags::NormalDotFlux<Pi>, ::Tags::NormalDotFlux<Phi<Dim>>, Pi,
-                 NormalTimesFluxPi>;
+                 NormalTimesFluxPi, Gamma2Psi, NormalTimesGamma2Psi>;
 
   // These tags on the interface of the element are passed to
   // `package_data` to provide the data needed to compute the numerical fluxes.
   using argument_tags =
       tmpl::list<::Tags::NormalDotFlux<Pi>, ::Tags::NormalDotFlux<Phi<Dim>>, Pi,
+                 Psi, Tags::ConstraintGamma2,
                  ::Tags::Normalized<::Tags::UnnormalizedFaceNormal<Dim>>>;
 
   // pseudo-interface: used internally by Algorithm infrastructure, not
@@ -152,10 +170,11 @@ struct UpwindFlux {
   // Following the not-null pointer to packaged_data, this function expects as
   // arguments the databox types of the `argument_tags`.
   void package_data(
-      gsl::not_null<Variables<package_tags>*> packaged_data,
+      const gsl::not_null<Variables<package_tags>*> packaged_data,
       const Scalar<DataVector>& normal_dot_flux_pi,
       const tnsr::i<DataVector, Dim, Frame::Inertial>& normal_dot_flux_phi,
-      const Scalar<DataVector>& pi,
+      const Scalar<DataVector>& pi, const Scalar<DataVector>& psi,
+      const Scalar<DataVector>& constraint_gamma2,
       const tnsr::i<DataVector, Dim, Frame::Inertial>& interface_unit_normal)
       const noexcept;
 
@@ -166,22 +185,28 @@ struct UpwindFlux {
   // into, then the package_tags on the interior side of the mortar followed by
   // the package_tags on the exterior side.
   void operator()(
-      gsl::not_null<Scalar<DataVector>*> pi_normal_dot_numerical_flux,
-      gsl::not_null<tnsr::i<DataVector, Dim, Frame::Inertial>*>
+      const gsl::not_null<Scalar<DataVector>*> pi_normal_dot_numerical_flux,
+      const gsl::not_null<tnsr::i<DataVector, Dim, Frame::Inertial>*>
           phi_normal_dot_numerical_flux,
-      gsl::not_null<Scalar<DataVector>*> psi_normal_dot_numerical_flux,
+      const gsl::not_null<Scalar<DataVector>*> psi_normal_dot_numerical_flux,
       const Scalar<DataVector>& normal_dot_flux_pi_interior,
       const tnsr::i<DataVector, Dim, Frame::Inertial>&
           normal_dot_flux_phi_interior,
       const Scalar<DataVector>& pi_interior,
       const tnsr::i<DataVector, Dim, Frame::Inertial>&
           normal_times_flux_pi_interior,
+      const Scalar<DataVector>& gamma2_psi_interior,
+      const tnsr::i<DataVector, Dim, Frame::Inertial>&
+          normal_times_gamma2_psi_interior,
       const Scalar<DataVector>& minus_normal_dot_flux_pi_exterior,
       const tnsr::i<DataVector, Dim, Frame::Inertial>&
           minus_normal_dot_flux_phi_exterior,
       const Scalar<DataVector>& pi_exterior,
       const tnsr::i<DataVector, Dim, Frame::Inertial>&
-          normal_times_flux_pi_exterior) const noexcept;
+          normal_times_flux_pi_exterior,
+      const Scalar<DataVector>& gamma2_psi_exterior,
+      const tnsr::i<DataVector, Dim, Frame::Inertial>&
+          minus_normal_times_gamma2_psi_exterior) const noexcept;
 };
 
 /// Compute the maximum magnitude of the characteristic speeds.

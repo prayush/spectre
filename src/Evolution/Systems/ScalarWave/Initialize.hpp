@@ -53,7 +53,8 @@ struct InitializeConstraints {
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
     using compute_tags =
-        db::AddComputeTags<ScalarWave::Tags::OneIndexConstraintCompute<Dim>,
+        db::AddComputeTags<ScalarWave::Tags::ConstraintGamma2Compute,
+                           ScalarWave::Tags::OneIndexConstraintCompute<Dim>,
                            ScalarWave::Tags::TwoIndexConstraintCompute<Dim>,
                            ::Tags::PointwiseL2NormCompute<
                                ScalarWave::Tags::OneIndexConstraint<Dim>>,

@@ -48,20 +48,30 @@ void check_du_dt(const size_t npts, const double time) {
   }();
 
   auto box = db::create<db::AddSimpleTags<
-      Tags::dt<ScalarWave::Pi>, Tags::dt<ScalarWave::Phi<Dim>>,
-      Tags::dt<ScalarWave::Psi>, ScalarWave::Pi,
+      ScalarWave::Tags::ConstraintGamma2, Tags::dt<ScalarWave::Pi>,
+      Tags::dt<ScalarWave::Phi<Dim>>, Tags::dt<ScalarWave::Psi>, ScalarWave::Pi,
+      ScalarWave::Phi<Dim>,
       Tags::deriv<ScalarWave::Pi, tmpl::size_t<Dim>, Frame::Inertial>,
+      Tags::deriv<ScalarWave::Psi, tmpl::size_t<Dim>, Frame::Inertial>,
       Tags::deriv<ScalarWave::Phi<Dim>, tmpl::size_t<Dim>, Frame::Inertial>>>(
+      Scalar<DataVector>(pow<Dim>(npts), 0.0),
       Scalar<DataVector>(pow<Dim>(npts), 0.0),
       tnsr::i<DataVector, Dim, Frame::Inertial>(pow<Dim>(npts), 0.0),
       Scalar<DataVector>(pow<Dim>(npts), 0.0),
       Scalar<DataVector>(-1.0 * solution.dpsi_dt(x, time).get()),
+      [&x, &time, &solution ]() noexcept {
+        return solution.dpsi_dx(x, time);
+      }(),
       [&x, &time, &solution ]() noexcept {
         auto dpi_dx = solution.d2psi_dtdx(x, time);
         for (size_t i = 0; i < Dim; ++i) {
           dpi_dx.get(i) *= -1.0;
         }
         return dpi_dx;
+      }(),
+      [&x, &time, &solution ]() noexcept {
+        auto dpsi_dx = solution.dpsi_dx(x, time);
+        return dpsi_dx;
       }(),
       [&npts, &x, &time, &solution ]() noexcept {
         tnsr::ij<DataVector, Dim, Frame::Inertial> d2psi_dxdx{pow<Dim>(npts),
@@ -203,12 +213,14 @@ void check_upwind_flux(const size_t npts, const double t) {
   ScalarWave::UpwindFlux<Dim> flux_computer{};
   flux_computer.package_data(
       make_not_null(&packaged_data_int), solution.dpsi_dt(x, t + 1.0),
-      solution.dpsi_dx(x, t + 2.0),
-      solution.psi(x, t + 4.0), unit_normal);
+      solution.dpsi_dx(x, t + 2.0), solution.psi(x, t + 4.0),
+      solution.psi(x, t + 4.0), Scalar<DataVector>(pow<Dim>(npts), 0.0),
+      unit_normal);
   flux_computer.package_data(
       make_not_null(&packaged_data_ext), solution.dpsi_dt(x, 2.0 * t + 10.0),
-      solution.dpsi_dx(x, 2.0 * t + 9.0),
-      solution.psi(x, 2.0 * t + 7.0), unit_normal);
+      solution.dpsi_dx(x, 2.0 * t + 9.0), solution.psi(x, 2.0 * t + 7.0),
+      solution.psi(x, t + 4.0), Scalar<DataVector>(pow<Dim>(npts), 0.0),
+      unit_normal);
 
   Scalar<DataVector> normal_dot_numerical_flux_pi(pow<Dim>(npts), 0.0);
   Scalar<DataVector> normal_dot_numerical_flux_psi(pow<Dim>(npts), 0.0);

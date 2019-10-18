@@ -9,8 +9,8 @@
 #include "DataStructures/DataVector.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Variables.hpp"  // IWYU pragma: keep
+#include "Evolution/Systems/ScalarWave/Constraints.hpp"
 #include "Evolution/Systems/ScalarWave/System.hpp"
-#include "Evolution/Systems/ScalarWave/Tags.hpp"  // IWYU pragma: keep
 #include "Utilities/GenerateInstantiations.hpp"
 #include "Utilities/Gsl.hpp"   // IWYU pragma: keep
 #include "Utilities/TMPL.hpp"  // IWYU pragma: keep
@@ -25,16 +25,20 @@ void ComputeDuDt<Dim>::apply(
     const gsl::not_null<Scalar<DataVector>*> dt_pi,
     const gsl::not_null<tnsr::i<DataVector, Dim, Frame::Inertial>*> dt_phi,
     const gsl::not_null<Scalar<DataVector>*> dt_psi,
+    const tnsr::i<DataVector, Dim, Frame::Inertial>& d_psi,
     const Scalar<DataVector>& pi,
     const tnsr::i<DataVector, Dim, Frame::Inertial>& d_pi,
-    const tnsr::ij<DataVector, Dim, Frame::Inertial>& d_phi) noexcept {
+    const tnsr::i<DataVector, Dim, Frame::Inertial>& phi,
+    const tnsr::ij<DataVector, Dim, Frame::Inertial>& d_phi,
+    const Scalar<DataVector>& gamma2) noexcept {
   get(*dt_psi) = -get(pi);
   get(*dt_pi) = -get<0, 0>(d_phi);
   for (size_t d = 1; d < Dim; ++d) {
     get(*dt_pi) -= d_phi.get(d, d);
   }
+  const auto constraint = one_index_constraint(d_psi, phi);
   for (size_t d = 0; d < Dim; ++d) {
-    dt_phi->get(d) = -d_pi.get(d);
+    dt_phi->get(d) = -d_pi.get(d) + get(gamma2) * constraint.get(d);
   }
 }
 
@@ -70,7 +74,8 @@ void UpwindFlux<Dim>::package_data(
     const gsl::not_null<Variables<package_tags>*> packaged_data,
     const Scalar<DataVector>& normal_dot_flux_pi,
     const tnsr::i<DataVector, Dim, Frame::Inertial>& normal_dot_flux_phi,
-    const Scalar<DataVector>& pi,
+    const Scalar<DataVector>& pi, const Scalar<DataVector>& psi,
+    const Scalar<DataVector>& constraint_gamma2,
     const tnsr::i<DataVector, Dim, Frame::Inertial>& interface_unit_normal)
     const noexcept {
   // Computes the contribution to the numerical flux from one side of the
@@ -94,6 +99,14 @@ void UpwindFlux<Dim>::package_data(
     normal_times_flux_pi.get(d) =
         interface_unit_normal.get(d) * get(normal_dot_flux_pi);
   }
+  // Extract memory from package data, and populate it with quantities needed
+  // for constraint damping terms
+  get(get<Gamma2Psi>(*packaged_data)) = get(constraint_gamma2) * get(psi);
+  auto& normal_times_flux_psi = get<NormalTimesGamma2Psi>(*packaged_data);
+  for (size_t d = 0; d < Dim; ++d) {
+    normal_times_flux_psi.get(d) =
+        get(get<Gamma2Psi>(*packaged_data)) * interface_unit_normal.get(d);
+  }
 }
 
 template <size_t Dim>
@@ -108,24 +121,33 @@ void UpwindFlux<Dim>::operator()(
     const Scalar<DataVector>& pi_interior,
     const tnsr::i<DataVector, Dim, Frame::Inertial>&
         normal_times_flux_pi_interior,
+    const Scalar<DataVector>& gamma2_psi_interior,
+    const tnsr::i<DataVector, Dim, Frame::Inertial>&
+        normal_times_gamma2_psi_interior,
     const Scalar<DataVector>& minus_normal_dot_flux_pi_exterior,
     const tnsr::i<DataVector, Dim, Frame::Inertial>&
         minus_normal_dot_flux_phi_exterior,
     const Scalar<DataVector>& pi_exterior,
     const tnsr::i<DataVector, Dim, Frame::Inertial>&
-        normal_times_flux_pi_exterior) const noexcept {
+        normal_times_flux_pi_exterior,
+    const Scalar<DataVector>& gamma2_psi_exterior,
+    const tnsr::i<DataVector, Dim, Frame::Inertial>&
+        minus_normal_times_gamma2_psi_exterior) const noexcept {
   std::fill(psi_normal_dot_numerical_flux->get().begin(),
             psi_normal_dot_numerical_flux->get().end(), 0.);
   get(*pi_normal_dot_numerical_flux) =
       0.5 *
       (get(pi_interior) - get(pi_exterior) + get(normal_dot_flux_pi_interior) -
-       get(minus_normal_dot_flux_pi_exterior));
+       get(minus_normal_dot_flux_pi_exterior) + get(gamma2_psi_exterior) -
+       get(gamma2_psi_interior));
   for (size_t d = 0; d < Dim; ++d) {
     phi_normal_dot_numerical_flux->get(d) =
         0.5 * (normal_dot_flux_phi_interior.get(d) -
                minus_normal_dot_flux_phi_exterior.get(d) +
                normal_times_flux_pi_interior.get(d) -
-               normal_times_flux_pi_exterior.get(d));
+               normal_times_flux_pi_exterior.get(d) -
+               normal_times_gamma2_psi_interior.get(d) +
+               minus_normal_times_gamma2_psi_exterior.get(d));
   }
 }
 /// \endcond

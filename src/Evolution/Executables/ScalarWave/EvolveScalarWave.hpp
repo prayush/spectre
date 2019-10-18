@@ -161,15 +161,15 @@ struct EvolutionMetavars {
       dg::Actions::InitializeInterfaces<
           system,
           dg::Initialization::slice_tags_to_face<
-              typename system::variables_tag>,
+              typename system::variables_tag,
+              ScalarWave::Tags::ConstraintGamma2>,
           dg::Initialization::slice_tags_to_exterior<
-              typename system::variables_tag>,
+              typename system::variables_tag,
+              ScalarWave::Tags::ConstraintGamma2>,
           dg::Initialization::face_compute_tags<
-              ScalarWave::Tags::ConstraintGamma2Compute,
               ScalarWave::CharacteristicFieldsCompute<system::volume_dim>,
               ScalarWave::CharacteristicSpeedsCompute<system::volume_dim>>,
           dg::Initialization::face_compute_tags<
-              ScalarWave::Tags::ConstraintGamma2Compute,
               ScalarWave::CharacteristicFieldsCompute<system::volume_dim>,
               ScalarWave::CharacteristicSpeedsCompute<system::volume_dim>>,
           false>,
