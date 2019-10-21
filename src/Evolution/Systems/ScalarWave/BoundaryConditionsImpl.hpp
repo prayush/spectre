@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <iomanip>   // debugPK
+#include <iostream>  // debugPK
 #include <tuple>
 #include <utility>
 
@@ -29,6 +31,7 @@
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Tags.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
 #include "Parallel/Invoke.hpp"
+#include "Parallel/Printf.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/Tags.hpp"
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
@@ -46,6 +49,9 @@ struct Magnitude;
 }  // namespace Tags
 // IWYU pragma: no_forward_declare db::DataBox
 /// \endcond
+
+// debugPK
+constexpr bool debugPK = false;
 
 namespace ScalarWave {
 namespace Actions {
@@ -67,6 +73,8 @@ template <typename T, typename DataType>
 T set_bc_when_char_speed_is_negative(const T& rhs_char_dt_u,
                                      const T& desired_bc_dt_u,
                                      const DataType& char_speed_u) noexcept {
+  // debugPK
+  bool char_speed_always_positive = true;
   auto bc_dt_u = rhs_char_dt_u;
   auto it1 = bc_dt_u.begin();
   auto it2 = desired_bc_dt_u.begin();
@@ -74,8 +82,13 @@ T set_bc_when_char_speed_is_negative(const T& rhs_char_dt_u,
     for (size_t i = 0; i < it1->size(); ++i) {
       if (char_speed_u[i] < 0.) {
         (*it1)[i] = (*it2)[i];
+        char_speed_always_positive = false;  // debugPK
       }
     }
+  }
+  // debugPK
+  if (char_speed_always_positive and debugPK) {
+    Parallel::printf("Char speeds NEVER NEGATIVE..!\n");
   }
   return bc_dt_u;
 }
@@ -345,13 +358,27 @@ struct set_dt_u_minus {
   template <typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
   static ReturnType apply(const UMinusBcMethod Method,
                           TempBuffer<TagsList>& buffer,
-                          const Variables<VarsTagsList>& /* vars */,
+                          const Variables<VarsTagsList>& vars,
                           const Variables<DtVarsTagsList>& /* dt_vars */,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
                           /* unit_normal_one_form */) noexcept {
     const auto& bc_dt_u_psi = get<::Tags::TempScalar<6, DataVector>>(buffer);
     const typename Tags::ConstraintGamma2::type& constraint_gamma2 =
         get<::Tags::TempScalar<10, DataVector>>(buffer);
+
+    // debugPK
+    if (debugPK) {
+      const auto& local_pi = get<Pi>(vars);
+      std::cout << std::setprecision(9);
+      std::cout << "BC set for UPsi: \n"
+                << get(bc_dt_u_psi) << std::endl
+                << " It should be (i.e. -Pi): \n"
+                << -get(local_pi) << std::endl
+                << "their difference: \n"
+                << get(bc_dt_u_psi) + get(local_pi) << std::endl
+                << std::flush;
+    }
+
     // Memory allocated for return type
     ReturnType& bc_dt_u_minus = get<::Tags::TempScalar<15, DataVector>>(buffer);
     std::fill(bc_dt_u_minus.begin(), bc_dt_u_minus.end(), 0.);

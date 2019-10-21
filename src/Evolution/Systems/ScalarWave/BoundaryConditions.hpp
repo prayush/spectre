@@ -219,6 +219,10 @@ struct ImposeConstraintPreservingBoundaryConditions {
               // (given) characteristic field is +ve, we "do nothing", and
               // when its -ve, we apply Bjorhus BCs. This is achieved through
               // `set_bc_when_char_speed_is_negative`.
+              // debugPK
+              if (debugPK) {
+                Parallel::printf("\n\nGoing to set BC for UPsi...\n");
+              }
               const auto bc_dt_u_psi =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
                       get<::Tags::TempScalar<6, DataVector>>(buffer),
@@ -227,6 +231,10 @@ struct ImposeConstraintPreservingBoundaryConditions {
                           VolumeDim>::apply(UPsiMethod, buffer, vars, dt_vars,
                                             unit_normal_one_form),
                       char_speeds.at(0));
+              // debugPK
+              if (debugPK) {
+                Parallel::printf("Going to set BC for UZero...\n");
+              }
               const auto bc_dt_u_zero =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
                       get<::Tags::Tempi<7, VolumeDim, Frame::Inertial,
@@ -236,6 +244,10 @@ struct ImposeConstraintPreservingBoundaryConditions {
                           VolumeDim>::apply(UZeroMethod, buffer, vars, dt_vars,
                                             unit_normal_one_form),
                       char_speeds.at(1));
+              // debugPK
+              if (debugPK) {
+                Parallel::printf("Going to set BC for U+...\n");
+              }
               const auto bc_dt_u_plus =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
                       get<::Tags::TempScalar<8, DataVector>>(buffer),
@@ -248,6 +260,10 @@ struct ImposeConstraintPreservingBoundaryConditions {
               // for the char speed of UPsi. This will be used to set Dt<UMinus>
               get(get<::Tags::TempScalar<6, DataVector>>(buffer)) =
                   get(bc_dt_u_psi);
+              // debugPK
+              if (debugPK) {
+                Parallel::printf("Going to set BC for U-...\n");
+              }
               const auto bc_dt_u_minus =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
                       get<::Tags::TempScalar<9, DataVector>>(buffer),
@@ -319,7 +335,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
                       // BC choice for U_\Psi
                       UPsiBcMethod::ConstraintPreservingBjorhus,
                       // BC choice for U_0
-                      UZeroBcMethod::ConstraintPreservingBjorhus,
+                      UZeroBcMethod::ConstraintPreservingDirichlet,
                       // BC choice for U_+
                       UPlusBcMethod::Freezing,
                       // BC choice for U_-
