@@ -215,12 +215,37 @@ struct ImposeConstraintPreservingBoundaryConditions {
                   "volume_dt_vars has wrong number of grid points.  Expected "
                       << volume_grid_points << ", got "
                       << volume_dt_vars->number_of_grid_points());
-              // ------------------------------- (2)
-              // Compute desired values of dt_volume_vars
-              //
-              // ------------------------------- (2.1)
-              // Get desired values of CharProjection<dt<U>>
-              //
+          // ------------------------------- (2)
+          // Compute desired values of dt_volume_vars
+          //
+          // ------------------------------- (2.1)
+          // Get desired values of CharProjection<dt<U>>
+          //
+          //
+#if 1
+              // ---
+              // debugPK : We want to compute the freezing / cp Bjorhus-type bc
+              // alongwith all ingredients here:
+              // 6-9. Characteristic projected time derivatives of evolved
+              // fields
+              // storage for DT<UChar> = CharProjection(dt<U>)
+              const auto& rhs_dt_psi = get<::Tags::dt<Psi>>(dt_vars);
+              const auto& rhs_dt_pi = get<::Tags::dt<Pi>>(dt_vars);
+              const auto& rhs_dt_phi = get<::Tags::dt<Phi<VolumeDim>>>(dt_vars);
+              // get<Tags::ConstraintGamma2>(vars_on_this_slice);
+              const auto char_projected_dt_u = characteristic_fields(
+                  constraint_gamma2, rhs_dt_psi, rhs_dt_pi, rhs_dt_phi,
+                  unit_normal_one_form);
+              auto& bc_dt_u_psi = get<Tags::UPsi>(char_projected_dt_u);
+              auto& bc_dt_u_zero =
+                  get<Tags::UZero<VolumeDim>>(char_projected_dt_u);
+              auto& bc_dt_u_plus = get<Tags::UPlus>(char_projected_dt_u);
+              auto bc_dt_u_minus = get<Tags::UMinus>(char_projected_dt_u);
+              // Set BC (note that only U- is incoming in flat spacetime)
+              // And the right hand side set is multiplied in
+              get(bc_dt_u_minus) = -get(constraint_gamma2) * get(bc_dt_u_psi);
+#endif
+#if 0
               // At all points on the interface where the char speed of any
               // (given) characteristic field is +ve, we "do nothing", and
               // when its -ve, we apply Bjorhus BCs. This is achieved through
@@ -280,6 +305,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
                           VolumeDim>::apply(UMinusMethod, buffer, vars, dt_vars,
                                             unit_normal_one_form),
                       char_speeds.at(3));
+#endif
               // Convert them to desired values on dt<U>
               const auto bc_dt_all_u =
                   evolved_fields_from_characteristic_fields(
