@@ -176,6 +176,12 @@ struct ImposeConstraintPreservingBoundaryConditions {
                           index_to_slice_at(mesh.extents(), direction));
         // Get characteristic speeds
         const auto& char_speeds = external_bdry_char_speeds.at(direction);
+        // Get constraint damping parameter: gamma2
+        const auto& constraint_gamma2 =
+            (db::get<::Tags::Interface<
+                 ::Tags::BoundaryDirectionsInterior<VolumeDim>,
+                 Tags::ConstraintGamma2>>(box))
+                .at(direction);
 
         // ------------------------------- (2)
         // Create a TempTensor that stores all temporaries computed
@@ -189,7 +195,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
         // (C) dt<U> on this slice from `volume_all_dt_vars`
         BoundaryConditions_detail::local_variables(
             make_not_null(&buffer), box, direction, dimension, mesh, vars,
-            dt_vars, unit_normal_one_form, char_speeds);
+            dt_vars, unit_normal_one_form, char_speeds, constraint_gamma2);
 
         db::mutate<dt_variables_tag>(
             make_not_null(&box),
@@ -197,7 +203,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
             [
               &volume_grid_points, &slice_grid_points, &mesh, &dimension,
               &direction, &buffer, &vars, &dt_vars, &unit_normal_one_form,
-              /*&inertial_coords,*/ &char_speeds
+              /*&inertial_coords,*/ &char_speeds, &constraint_gamma2
             ](const gsl::not_null<db::item_type<dt_variables_tag>*>
                   volume_dt_vars,
               const double /* time */, const auto& /* boundary_condition */
@@ -219,6 +225,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
               // (given) characteristic field is +ve, we "do nothing", and
               // when its -ve, we apply Bjorhus BCs. This is achieved through
               // `set_bc_when_char_speed_is_negative`.
+              //
               // debugPK
               if (debugPK) {
                 Parallel::printf("\n\nGoing to set BC for UPsi...\n");
@@ -257,7 +264,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
                                             unit_normal_one_form),
                       char_speeds.at(2));
               // copy over the value of bc_dt_u_psi finally set, accounting
-              // for the char speed of UPsi. This will be used to set Dt<UMinus>
+              // for the char speed of UPsi. This will be used to set
+              // Dt<UMinus>
               get(get<::Tags::TempScalar<6, DataVector>>(buffer)) =
                   get(bc_dt_u_psi);
               // debugPK
@@ -275,10 +283,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
               // Convert them to desired values on dt<U>
               const auto bc_dt_all_u =
                   evolved_fields_from_characteristic_fields(
-                      get<::Tags::TempScalar<10, DataVector>>(
-                          buffer),  // gamma2
-                      bc_dt_u_psi, bc_dt_u_zero, bc_dt_u_plus, bc_dt_u_minus,
-                      unit_normal_one_form);
+                      constraint_gamma2, bc_dt_u_psi, bc_dt_u_zero,
+                      bc_dt_u_plus, bc_dt_u_minus, unit_normal_one_form);
               // Now store final values of dt<U> in suitable data structure
               // FIXME: How can I extract this list of dt<U> tags directly
               // from `dt_variables_tag`?
