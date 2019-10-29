@@ -121,17 +121,16 @@ using all_local_vars = tmpl::list<
 // ScalarWave system
 template <size_t VolumeDim, typename TagsList, typename DbTags,
           typename VarsTagsList, typename DtVarsTagsList>
-void local_variables(gsl::not_null<TempBuffer<TagsList>*> buffer,
-                     const db::DataBox<DbTags>& box,
-                     const Direction<VolumeDim>& direction,
-                     const size_t& dimension,
-                     const typename ::Tags::Mesh<VolumeDim>::type& mesh,
-                     const Variables<VarsTagsList>& /* vars */,
-                     const Variables<DtVarsTagsList>& dt_vars,
-                     const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-                         unit_interface_normal_one_form,
-                     const typename Tags::CharacteristicSpeeds<VolumeDim>::type&
-                         char_speeds) noexcept {
+void local_variables(
+    gsl::not_null<TempBuffer<TagsList>*> buffer, const db::DataBox<DbTags>& box,
+    const Direction<VolumeDim>& direction, const size_t& dimension,
+    const typename ::Tags::Mesh<VolumeDim>::type& mesh,
+    const Variables<VarsTagsList>& /* vars */,
+    const Variables<DtVarsTagsList>& dt_vars,
+    const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+        unit_interface_normal_one_form,
+    const typename Tags::CharacteristicSpeeds<VolumeDim>::type& char_speeds,
+    const Scalar<DataVector>& constraint_gamma2) noexcept {
   // Extract quantities from databox that are needed to compute
   // intermediate variables
   using tags_needed_on_slice = tmpl::list<
@@ -161,11 +160,6 @@ void local_variables(gsl::not_null<TempBuffer<TagsList>*> buffer,
   const auto& rhs_dt_psi = get<::Tags::dt<Psi>>(dt_vars);
   const auto& rhs_dt_pi = get<::Tags::dt<Pi>>(dt_vars);
   const auto& rhs_dt_phi = get<::Tags::dt<Phi<VolumeDim>>>(dt_vars);
-  const auto& constraint_gamma2 =
-      (db::get<::Tags::Interface<::Tags::BoundaryDirectionsInterior<VolumeDim>,
-                                 Tags::ConstraintGamma2>>(box))
-          .at(direction);
-  // get<Tags::ConstraintGamma2>(vars_on_this_slice);
   const auto char_projected_dt_u =
       characteristic_fields(constraint_gamma2, rhs_dt_psi, rhs_dt_pi,
                             rhs_dt_phi, unit_interface_normal_one_form);
