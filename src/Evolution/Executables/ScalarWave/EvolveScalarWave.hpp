@@ -88,7 +88,7 @@ struct EvolutionMetavars {
       Tags::AnalyticSolution<ScalarWave::Solutions::PlaneWave<Dim>>;
   using boundary_condition_tag = initial_data_tag;
   using normal_dot_numerical_flux =
-      Tags::NumericalFlux<ScalarWave::UpwindFlux<Dim>>;
+      Tags::NumericalFlux<ScalarWave::PenaltyFlux<Dim>>;
 
   // public for use by the Charm++ registration code
   using events = tmpl::list<

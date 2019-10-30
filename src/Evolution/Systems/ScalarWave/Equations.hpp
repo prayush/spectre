@@ -108,6 +108,103 @@ struct ComputeNormalDotFluxes {
 
 /*!
  * \ingroup NumericalFluxesGroup
+ * \brief Computes the penalty flux
+ *
+ * The penalty flux is given by:
+ * \f{align}
+ * F^*(\Psi) =& F(\Psi) = 0 \\
+ * F^*(\Pi) =& F(\Pi)_{\mathrm{int}} + \\
+ *         \frac{1}{2} p \left(U^-_{\mathrm{ext}} - U^-_{\mathrm{int}}\right) \\
+ * F^*(\Phi_i) =& F(\Phi_i)_{\mathrm{int}} - \\
+ *         \frac{1}{2} p \left(U^-_{\mathrm{ext}} - U^-_{\mathrm{int}}\right)
+ * \f}
+ * where \f$F^*\f$ is the normal dotted with the numerical flux and \f$F\f$ is
+ * the normal dotted with the flux, which is computed in
+ * ScalarWave::ComputeNormalDotFluxes.
+ */
+template <size_t Dim>
+struct PenaltyFlux {
+ private:
+  struct NormalTimesUPlus {
+    using type = tnsr::i<DataVector, Dim, Frame::Inertial>;
+    static std::string name() noexcept { return "NormalTimesUPlus"; }
+  };
+  struct NormalTimesUMinus {
+    using type = tnsr::i<DataVector, Dim, Frame::Inertial>;
+    static std::string name() noexcept { return "NormalTimesUMinus"; }
+  };
+
+ public:
+  using options = tmpl::list<>;
+  static constexpr OptionString help = {
+      "Computes the upwind flux for a scalar wave system. It requires no "
+      "options."};
+  static std::string name() noexcept { return "Penalty"; }
+
+  // clang-tidy: non-const reference
+  void pup(PUP::er& /*p*/) noexcept {}  // NOLINT
+
+  // This is the data needed to compute the numerical flux.
+  // `dg::SendBoundaryFluxes` calls `package_data` to store these tags in a
+  // Variables. Local and remote values of this data are then combined in the
+  // `()` operator.
+  using package_tags =
+      tmpl::list<::Tags::NormalDotFlux<Pi>, ::Tags::NormalDotFlux<Phi<Dim>>,
+                 Tags::UPlus, Tags::UMinus, NormalTimesUPlus,
+                 NormalTimesUMinus>;
+
+  // These tags on the interface of the element are passed to
+  // `package_data` to provide the data needed to compute the numerical fluxes.
+  using argument_tags =
+      tmpl::list<::Tags::NormalDotFlux<Pi>, ::Tags::NormalDotFlux<Phi<Dim>>,
+                 Tags::UPlus, Tags::UMinus,
+                 ::Tags::Normalized<::Tags::UnnormalizedFaceNormal<Dim>>>;
+
+  // pseudo-interface: used internally by Algorithm infrastructure, not
+  // user-level code
+  // Following the not-null pointer to packaged_data, this function expects as
+  // arguments the databox types of the `argument_tags`.
+  void package_data(
+      const gsl::not_null<Variables<package_tags>*> packaged_data,
+      const Scalar<DataVector>& normal_dot_flux_pi,
+      const tnsr::i<DataVector, Dim, Frame::Inertial>& normal_dot_flux_phi,
+      const Scalar<DataVector>& u_plus, const Scalar<DataVector>& u_minus,
+      const tnsr::i<DataVector, Dim, Frame::Inertial>& interface_unit_normal)
+      const noexcept;
+
+  // pseudo-interface: used internally by Algorithm infrastructure, not
+  // user-level code
+  // The arguments are first the system::variables_tag::tags_list wrapped in
+  // Tags::NormalDotNumericalFLux as not-null pointers to write the results
+  // into, then the package_tags on the interior side of the mortar followed by
+  // the package_tags on the exterior side.
+  void operator()(
+      const gsl::not_null<Scalar<DataVector>*> pi_normal_dot_numerical_flux,
+      const gsl::not_null<tnsr::i<DataVector, Dim, Frame::Inertial>*>
+          phi_normal_dot_numerical_flux,
+      const gsl::not_null<Scalar<DataVector>*> psi_normal_dot_numerical_flux,
+      const Scalar<DataVector>& normal_dot_flux_pi_interior,
+      const tnsr::i<DataVector, Dim, Frame::Inertial>&
+          normal_dot_flux_phi_interior,
+      const Scalar<DataVector>& u_plus_interior,
+      const Scalar<DataVector>& u_minus_interior,
+      const tnsr::i<DataVector, Dim, Frame::Inertial>&
+          normal_times_u_plus_interior,
+      const tnsr::i<DataVector, Dim, Frame::Inertial>&
+          normal_times_u_minus_interior,
+      const Scalar<DataVector>& minus_normal_dot_flux_pi_exterior,
+      const tnsr::i<DataVector, Dim, Frame::Inertial>&
+          minus_normal_dot_flux_phi_exterior,
+      const Scalar<DataVector>& u_plus_exterior,
+      const Scalar<DataVector>& u_minus_exterior,
+      const tnsr::i<DataVector, Dim, Frame::Inertial>&
+          minus_normal_times_u_plus_exterior,
+      const tnsr::i<DataVector, Dim, Frame::Inertial>&
+          minus_normal_times_u_minus_exterior) const noexcept;
+};
+
+/*!
+ * \ingroup NumericalFluxesGroup
  * \brief Computes the upwind flux
  *
  * The upwind flux is given by:
