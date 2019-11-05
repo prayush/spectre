@@ -31,6 +31,7 @@ struct Phi : db::SimpleTag {
   static std::string name() noexcept { return "Phi"; }
 };
 
+namespace Tags {
 struct ConstraintGamma1 : db::SimpleTag {
   using type = Scalar<DataVector>;
   static std::string name() noexcept { return "ConstraintGamma1"; }
@@ -40,4 +41,23 @@ struct ConstraintGamma2 : db::SimpleTag {
   using type = Scalar<DataVector>;
   static std::string name() noexcept { return "ConstraintGamma2"; }
 };
+
+/*!
+ * \brief Tags corresponding to various constraints of the scalar
+ * wave system, and their diagnostically useful combinations.
+ * \details For details on how these are defined and computed, see
+ * `OneIndexConstraintCompute`, `TwoIndexConstraintCompute`
+ */
+template <size_t Dim>
+struct OneIndexConstraint : db::SimpleTag {
+  using type = tnsr::i<DataVector, Dim, Frame::Inertial>;
+  static std::string name() noexcept { return "OneIndexConstraint"; }
+};
+/// \copydoc OneIndexConstraint
+template <size_t Dim>
+struct TwoIndexConstraint : db::SimpleTag {
+  using type = tnsr::ij<DataVector, Dim, Frame::Inertial>;
+  static std::string name() noexcept { return "TwoIndexConstraint"; }
+};
+}  // namespace Tags
 }  // namespace CurvedScalarWave
