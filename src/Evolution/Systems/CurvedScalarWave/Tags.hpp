@@ -12,7 +12,11 @@
 #include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
 
+/// \cond
 class DataVector;
+template <typename TagsList>
+class Variables;
+/// \endcond
 
 namespace CurvedScalarWave {
 struct Psi : db::SimpleTag {
@@ -58,6 +62,51 @@ template <size_t Dim>
 struct TwoIndexConstraint : db::SimpleTag {
   using type = tnsr::ij<DataVector, Dim, Frame::Inertial>;
   static std::string name() noexcept { return "TwoIndexConstraint"; }
+};
+
+// @{
+/// \brief Tags corresponding to the characteristic fields of the
+/// scalar-wave system in curved spacetime.
+///
+/// \details For details on how these are defined and computed, \see
+/// CharacteristicSpeedsCompute
+struct UPsi : db::SimpleTag {
+  using type = Scalar<DataVector>;
+  static std::string name() noexcept { return "UPsi"; }
+};
+template <size_t Dim>
+struct UZero : db::SimpleTag {
+  using type = tnsr::i<DataVector, Dim, Frame::Inertial>;
+  static std::string name() noexcept { return "UZero"; }
+};
+struct UPlus : db::SimpleTag {
+  using type = Scalar<DataVector>;
+  static std::string name() noexcept { return "UPlus"; }
+};
+struct UMinus : db::SimpleTag {
+  using type = Scalar<DataVector>;
+  static std::string name() noexcept { return "UMinus"; }
+};
+// @}
+
+template <size_t Dim>
+struct CharacteristicSpeeds : db::SimpleTag {
+  using type = std::array<DataVector, 4>;
+  static std::string name() noexcept { return "CharacteristicSpeeds"; }
+};
+
+template <size_t Dim>
+struct CharacteristicFields : db::SimpleTag {
+  using type = Variables<tmpl::list<UPsi, UZero<Dim>, UPlus, UMinus>>;
+  static std::string name() noexcept { return "CharacteristicFields"; }
+};
+
+template <size_t Dim>
+struct EvolvedFieldsFromCharacteristicFields : db::SimpleTag {
+  using type = Variables<tmpl::list<Psi, Pi, Phi<Dim>>>;
+  static std::string name() noexcept {
+    return "EvolvedFieldsFromCharacteristicFields";
+  }
 };
 }  // namespace Tags
 }  // namespace CurvedScalarWave
