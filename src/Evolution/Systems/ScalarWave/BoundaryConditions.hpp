@@ -243,7 +243,19 @@ struct ImposeConstraintPreservingBoundaryConditions {
               auto bc_dt_u_minus = get<Tags::UMinus>(char_projected_dt_u);
               // Set BC (note that only U- is incoming in flat spacetime)
               // And the right hand side set is multiplied in
-              get(bc_dt_u_minus) = -get(constraint_gamma2) * get(bc_dt_u_psi);
+              // 1) freezing Neumann on UMinus
+              // get(bc_dt_u_minus) = -get(constraint_gamma2) *
+              // get(bc_dt_u_psi);
+
+              // 2) impose penalty on U- not being zero
+              constexpr double penalty_factor = -1. / 6.;
+              const auto& psi = get<Psi>(vars);
+              const auto& pi = get<Pi>(vars);
+              const auto& phi = get<Phi<VolumeDim>>(vars);
+              const auto char_projected_u = characteristic_fields(
+                  constraint_gamma2, psi, pi, phi, unit_normal_one_form);
+              auto& u_minus_now = get<Tags::UMinus>(char_projected_u);
+              get(bc_dt_u_minus) += penalty_factor * get(u_minus_now);
 #endif
 #if 0
               // At all points on the interface where the char speed of any
