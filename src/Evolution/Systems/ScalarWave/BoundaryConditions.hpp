@@ -151,6 +151,17 @@ struct ImposeConstraintPreservingBoundaryConditions {
           ::Tags::Interface<::Tags::BoundaryDirectionsInterior<VolumeDim>,
                             Tags::CharacteristicSpeeds<VolumeDim>>>(box);
 
+      // Get analytic solution
+      const auto& inertial_coords =
+          db::get<::Tags::Coordinates<VolumeDim, Frame::Inertial>>(box);
+      using solution_tag = ::Tags::AnalyticSolutionBase;
+      using Vars = typename variables_tag::type;
+      Vars analytic_solution_vars{volume_grid_points};
+      analytic_solution_vars.assign_subset(
+          Parallel::get<solution_tag>(cache).variables(
+              inertial_coords, db::get<::Tags::Time>(box),
+              typename Vars::tags_list{}));
+
       // ------------------------------- (2)
       // Apply the boundary condition
       // Loop over external boundaries and set dt_volume_vars on them
@@ -170,6 +181,10 @@ struct ImposeConstraintPreservingBoundaryConditions {
                "Expected "
                    << slice_grid_points << ", got "
                    << vars.number_of_grid_points());
+        // Get analytic U on this slice
+        const auto analytic_vars =
+            data_on_slice(analytic_solution_vars, mesh.extents(), dimension,
+                          index_to_slice_at(mesh.extents(), direction));
         // Get dt<U> on this slice
         const auto dt_vars =
             data_on_slice(volume_all_dt_vars, mesh.extents(), dimension,
@@ -202,7 +217,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
             // Function that applies bdry conditions to dt<variables>
             [
               &volume_grid_points, &slice_grid_points, &mesh, &dimension,
-              &direction, &buffer, &vars, &dt_vars, &unit_normal_one_form,
+              &direction, &buffer, &vars, &analytic_vars, &dt_vars,
+              &unit_normal_one_form,
               /*&inertial_coords,*/ &char_speeds, &constraint_gamma2
             ](const gsl::not_null<db::item_type<dt_variables_tag>*>
                   volume_dt_vars,
@@ -215,6 +231,67 @@ struct ImposeConstraintPreservingBoundaryConditions {
                   "volume_dt_vars has wrong number of grid points.  Expected "
                       << volume_grid_points << ", got "
                       << volume_dt_vars->number_of_grid_points());
+#if 1
+              // ---
+              // debugPK : We want to compute the freezing / cp Bjorhus-type bc
+              // alongwith all ingredients here:
+              // 6-9. Characteristic projected time derivatives of evolved
+              // fields
+              // storage for DT<UChar> = CharProjection(dt<U>)
+              const auto& rhs_dt_psi = get<::Tags::dt<Psi>>(dt_vars);
+              const auto& rhs_dt_pi = get<::Tags::dt<Pi>>(dt_vars);
+              const auto& rhs_dt_phi = get<::Tags::dt<Phi<VolumeDim>>>(dt_vars);
+              // get<Tags::ConstraintGamma2>(vars_on_this_slice);
+              const auto char_projected_dt_u = characteristic_fields(
+                  constraint_gamma2, rhs_dt_psi, rhs_dt_pi, rhs_dt_phi,
+                  unit_normal_one_form);
+              auto& bc_dt_u_psi = get<Tags::UPsi>(char_projected_dt_u);
+              auto& bc_dt_u_zero =
+                  get<Tags::UZero<VolumeDim>>(char_projected_dt_u);
+              auto& bc_dt_u_plus = get<Tags::UPlus>(char_projected_dt_u);
+              auto bc_dt_u_minus = get<Tags::UMinus>(char_projected_dt_u);
+              // Set BC (note that only U- is incoming in flat spacetime)
+              // And the right hand side set is multiplied in
+              // 1) freezing Neumann on UMinus
+              if (false) {
+                const auto& pi = get<Pi>(vars);
+                get(bc_dt_u_minus) = -get(constraint_gamma2) * get(pi);
+              }
+              // 2) impose penalty on U- not being zero
+              if (false) {
+                constexpr double penalty_factor = 0.1;
+                const auto& psi = get<Psi>(vars);
+                const auto& pi = get<Pi>(vars);
+                const auto& phi = get<Phi<VolumeDim>>(vars);
+                const auto char_projected_u = characteristic_fields(
+                    constraint_gamma2, psi, pi, phi, unit_normal_one_form);
+                auto& u_minus_now = get<Tags::UMinus>(char_projected_u);
+                get(bc_dt_u_minus) += penalty_factor * (get(u_minus_now) - 0.);
+              }
+              // 3) impose penalty on U- not matching the analytic solution
+              if (true) {
+                constexpr double penalty_factor = 1.;
+                const auto& psi = get<Psi>(vars);
+                const auto& pi = get<Pi>(vars);
+                const auto& phi = get<Phi<VolumeDim>>(vars);
+                const auto char_projected_u = characteristic_fields(
+                    constraint_gamma2, psi, pi, phi, unit_normal_one_form);
+                const auto& u_minus_now = get<Tags::UMinus>(char_projected_u);
+
+                const auto& analytic_psi = get<Psi>(analytic_vars);
+                const auto& analytic_pi = get<Pi>(analytic_vars);
+                const auto& analytic_phi = get<Phi<VolumeDim>>(analytic_vars);
+                const auto analytic_char_projected_u = characteristic_fields(
+                    constraint_gamma2, analytic_psi, analytic_pi, analytic_phi,
+                    unit_normal_one_form);
+                const auto& analytic_u_minus =
+                    get<Tags::UMinus>(analytic_char_projected_u);
+
+                get(bc_dt_u_minus) +=
+                    penalty_factor * (get(u_minus_now) - get(analytic_u_minus));
+              }
+#endif
+#if 0
               // ------------------------------- (2)
               // Compute desired values of dt_volume_vars
               //
@@ -280,6 +357,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
                           VolumeDim>::apply(UMinusMethod, buffer, vars, dt_vars,
                                             unit_normal_one_form),
                       char_speeds.at(3));
+#endif
               // Convert them to desired values on dt<U>
               const auto bc_dt_all_u =
                   evolved_fields_from_characteristic_fields(
