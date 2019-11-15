@@ -7,11 +7,12 @@ set(LIBRARY "Test_WaveEquation")
 set(LIBRARY_SOURCES
   Test_PlaneWave.cpp
   Test_RegularSphericalWave.cpp
+  Test_RegularSphericalWaveKerrSchild.cpp
   )
 
 add_test_library(
   ${LIBRARY}
   "PointwiseFunctions/AnalyticSolutions/WaveEquation/"
   "${LIBRARY_SOURCES}"
-  "WaveEquation;MathFunctions;Utilities"
+  "GeneralRelativitySolutions;GeneralRelativity;WaveEquation;MathFunctions;Utilities"
   )
