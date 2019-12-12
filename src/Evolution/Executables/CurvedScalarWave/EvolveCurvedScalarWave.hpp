@@ -17,6 +17,7 @@
 #include "Evolution/Initialization/Evolution.hpp"
 #include "Evolution/Initialization/GrTagsForHydro.hpp"
 #include "Evolution/Initialization/NonconservativeSystem.hpp"
+#include "Evolution/Systems/CurvedScalarWave/BoundaryConditions.hpp"
 #include "Evolution/Systems/CurvedScalarWave/Characteristics.hpp"
 #include "Evolution/Systems/CurvedScalarWave/Constraints.hpp"
 #include "Evolution/Systems/CurvedScalarWave/Equations.hpp"
@@ -163,7 +164,13 @@ struct EvolutionMetavars {
               gr::Tags::Lapse<DataVector>,
               gr::Tags::Shift<volume_dim, Frame::Inertial, DataVector>,
               gr::Tags::InverseSpatialMetric<volume_dim, Frame::Inertial,
-                                             DataVector>>>,
+                                             DataVector>>,
+          dg::Initialization::face_compute_tags<
+              CurvedScalarWave::CharacteristicSpeedsCompute<volume_dim>,
+              CurvedScalarWave::CharacteristicFieldsCompute<volume_dim>>,
+          dg::Initialization::exterior_compute_tags<
+              CurvedScalarWave::CharacteristicSpeedsCompute<volume_dim>,
+              CurvedScalarWave::CharacteristicFieldsCompute<volume_dim>>>,
       Initialization::Actions::Evolution<EvolutionMetavars>,
       Initialization::Actions::AddComputeTags<
           tmpl::list<evolution::Tags::AnalyticCompute<
@@ -184,6 +191,8 @@ struct EvolutionMetavars {
       dg::Actions::ReceiveDataForFluxes<EvolutionMetavars>,
       tmpl::conditional_t<local_time_stepping, tmpl::list<>,
                           dg::Actions::ApplyFluxes>,
+      CurvedScalarWave::Actions::ImposeConstraintPreservingBoundaryConditions<
+          EvolutionMetavars>,
       Actions::RecordTimeStepperData,
       tmpl::conditional_t<local_time_stepping,
                           dg::Actions::ApplyBoundaryFluxesLocalTimeStepping,

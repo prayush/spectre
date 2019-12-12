@@ -86,7 +86,6 @@ struct InitializeConstraints {
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
     using compute_tags = db::AddComputeTags<
-        // CharacteristicSpeedsCompute<Dim>, CharacteristicFieldsCompute<Dim>,
         Tags::OneIndexConstraintCompute<Dim>,
         Tags::TwoIndexConstraintCompute<Dim>,
         // following tags added to observe constraints
