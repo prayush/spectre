@@ -159,6 +159,7 @@ struct EvolutionMetavars {
               gr::Tags::InverseSpatialMetric<volume_dim, Frame::Inertial,
                                              DataVector>>,
           dg::Initialization::slice_tags_to_exterior<
+              typename system::variables_tag,
               CurvedScalarWave::Tags::ConstraintGamma1,
               CurvedScalarWave::Tags::ConstraintGamma2,
               gr::Tags::Lapse<DataVector>,
@@ -170,13 +171,14 @@ struct EvolutionMetavars {
               CurvedScalarWave::CharacteristicFieldsCompute<volume_dim>>,
           dg::Initialization::exterior_compute_tags<
               CurvedScalarWave::CharacteristicSpeedsCompute<volume_dim>,
-              CurvedScalarWave::CharacteristicFieldsCompute<volume_dim>>>,
+              CurvedScalarWave::CharacteristicFieldsCompute<volume_dim>>,
+          false>,
       Initialization::Actions::Evolution<EvolutionMetavars>,
       Initialization::Actions::AddComputeTags<
           tmpl::list<evolution::Tags::AnalyticCompute<
               Dim, initial_data_tag, analytic_solution_fields>>>,
       CurvedScalarWave::Actions::InitializeConstraints<system::volume_dim>,
-      dg::Actions::InitializeMortars<EvolutionMetavars>,
+      dg::Actions::InitializeMortars<EvolutionMetavars, false>,
       Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavars>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
