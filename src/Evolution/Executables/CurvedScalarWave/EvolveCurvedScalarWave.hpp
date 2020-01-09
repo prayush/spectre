@@ -100,13 +100,20 @@ struct EvolutionMetavars {
 
   // public for use by the Charm++ registration code
   using observe_fields =
+      tmpl::list<::Tags::PointwiseL2Norm<
+                     CurvedScalarWave::Tags::OneIndexConstraint<volume_dim>>,
+                 ::Tags::PointwiseL2Norm<
+                     CurvedScalarWave::Tags::TwoIndexConstraint<volume_dim>>>;
+  using analytic_solution_fields =
       db::get_variables_tags_list<typename system::variables_tag>;
-  using analytic_solution_fields = observe_fields;
+
   using events =
       tmpl::list<dg::Events::Registrars::ObserveFields<
-                     Dim, Tags::Time, observe_fields, analytic_solution_fields>,
-                 dg::Events::Registrars::ObserveErrorNorms<
-                     Tags::Time, analytic_solution_fields>>;
+          Dim, Tags::Time,
+          tmpl::append<observe_fields, analytic_solution_fields>, tmpl::list<>>
+                 // dg::Events::Registrars::ObserveErrorNorms<Tags::Time,
+                 // analytic_solution_fields>
+                 >;
   using triggers = Triggers::time_triggers;
 
   // A tmpl::list of tags to be added to the ConstGlobalCache by the
