@@ -7,13 +7,13 @@
 AnalyticSolution:
   RegularSphWaveKerr:
     BlackHoleMass: 1.
-    BlackHoleSpin: [0.1, 0.2, 0.3]
+    BlackHoleSpin: [0., 0., 0.]
     BlackHoleCenter: [0., 0., 0.]
     WaveProfile:
       Gaussian:
         Amplitude: 1.
-        Width: 1.
-        Center: 0.
+        Width: 10.
+        Center: 3.
 
 Evolution:
   InitialTime: 0.0
@@ -60,14 +60,14 @@ NumericalFlux:
 
 EventsAndTriggers:
   ? EveryNSlabs:
-      N: 3
+      N: 200
       Offset: 0
-  : - ObserveErrorNorms
-  ? SpecifiedSlabs:
-      Slabs: [0, 100]
   : - ObserveFields
   ? PastTime: 100.0
   : - Completion
+#  ? SpecifiedSlabs:
+#      Slabs: [0, 100]
+#  : - ObserveErrorNorms
 
 Observers:
   VolumeFileName: "CurvedScalarWave3DRegSphWaveVolume"
