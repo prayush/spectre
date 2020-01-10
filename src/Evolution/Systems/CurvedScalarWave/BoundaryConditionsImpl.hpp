@@ -59,17 +59,28 @@ namespace Actions {
 namespace BoundaryConditions_detail {}  // namespace BoundaryConditions_detail
 
 namespace BoundaryConditions_detail {
-enum class UPsiBcMethod { Freezing, ConstraintPreservingBjorhus, Unknown };
+enum class UPsiBcMethod {
+  Freezing,
+  ConstraintPreservingBjorhus,
+  ConstraintPreservingBjorhusDG,
+  Unknown
+};
 enum class UZeroBcMethod {
   Freezing,
   ConstraintPreservingBjorhus,
+  ConstraintPreservingBjorhusDG,
   // The condition below is borrowed from SpEC, where it is used as the
   // BC on UZero when "Constraint" is the requested BC type
   ConstraintPreservingPenalty,
   Unknown
 };
 enum class UPlusBcMethod { Freezing, Unknown };
-enum class UMinusBcMethod { Freezing, ConstraintPreservingBjorhus, Unknown };
+enum class UMinusBcMethod {
+  Freezing,
+  ConstraintPreservingBjorhus,
+  ConstraintPreservingBjorhusDG,
+  Unknown
+};
 
 // Function to compute the smallest positive (or largest negative)
 // characteristic speed
@@ -258,6 +269,8 @@ struct set_dt_u_psi {
     const auto& lapse = get<gr::Tags::Lapse<DataVector>>(buffer);
     const auto& shift =
         get<gr::Tags::Shift<VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    const auto& char_projected_rhs_dt_u_psi =
+        get<::Tags::TempScalar<6, DataVector>>(buffer);
 
     // Memory allocated for return type
     ReturnType& bc_dt_u_psi = get<::Tags::TempScalar<12, DataVector>>(buffer);
@@ -270,6 +283,10 @@ struct set_dt_u_psi {
       case UPsiBcMethod::ConstraintPreservingBjorhus:
         return apply_bjorhus_constraint_preserving(make_not_null(&bc_dt_u_psi),
                                                    lapse, shift, phi, pi);
+      case UPsiBcMethod::ConstraintPreservingBjorhusDG:
+        return apply_bjorhus_dg_constraint_preserving(
+            make_not_null(&bc_dt_u_psi), char_projected_rhs_dt_u_psi, lapse,
+            shift, phi, pi, one_over_dg_weight);
       case UPsiBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method for UPsi not implemented!");
@@ -290,6 +307,39 @@ struct set_dt_u_psi {
            "Size of input variables and temporary memory do not match.");
     const auto shift_dot_phi = dot_product(shift, phi);
     get(*bc_dt_u_psi) = get(shift_dot_phi) - get(lapse) * get(pi);
+    return *bc_dt_u_psi;
+  }
+  // Here we take the constraint preserving expressions from
+  // `apply_bjorhus_constraint_preserving` and apply suitable
+  // pre-factors that are needed for DG form of evolution
+  // equations.
+  static ReturnType apply_bjorhus_dg_constraint_preserving(
+      const gsl::not_null<ReturnType*> bc_dt_u_psi,
+      const Scalar<DataVector>& char_projected_rhs_dt_u_psi,
+      const Scalar<DataVector>& lapse,
+      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& phi,
+      const Scalar<DataVector>& pi, const double one_over_dg_weight) noexcept {
+    ASSERT(get_size(get(*bc_dt_u_psi)) == get_size(get(pi)),
+           "Size of input variables and temporary memory do not match.");
+    auto _ =
+        apply_bjorhus_constraint_preserving(bc_dt_u_psi, lapse, shift, phi, pi);
+    // Now let us apply pre-factors for DG, which are of the form
+    // dtU = dtU_volume + M^{-1}\dot M^{2} Bjorhus_terms
+    // as derived in <https://www.overleaf.com/project/5db8acf89a7daa0001d5d7d4>
+    // As the prescription of Holst+2004 is to set
+    // dtU = Holst_terms at the boundary, completely replacing dtU_volume,
+    // we can write
+    // Holst_terms := dtU_volume + Bjorhus_terms
+    // If this identification is correct (FIXME), the new BC becomes:
+    // dtU = dtU_volume + M^{-1}\dot M^{2} (Holst_terms - dtU_volume), i.e.
+    // dtU = (1 - M^{-1}\dot M^{2}) dtU_volume + M^{-1}\dot M^{2} Holst_terms
+    // we already have Holst_terms from the above function call, we also
+    // need dtU_volume here
+    get(*bc_dt_u_psi) =
+        (1. - one_over_dg_weight) * get(char_projected_rhs_dt_u_psi) +
+        one_over_dg_weight * get(*bc_dt_u_psi);
+
     return *bc_dt_u_psi;
   }
 };
@@ -360,6 +410,12 @@ struct set_dt_u_zero {
             make_not_null(&bc_dt_u_zero), deriv_lapse, deriv_shift, deriv_phi,
             deriv_pi, lapse, shift, phi, pi, unit_interface_normal_vector,
             unit_normal_one_form);
+      case UZeroBcMethod::ConstraintPreservingBjorhusDG:
+        return apply_bjorhus_dg_constraint_preserving(
+            make_not_null(&bc_dt_u_zero), char_projected_rhs_dt_u_zero,
+            deriv_lapse, deriv_shift, deriv_phi, deriv_pi, lapse, shift, phi,
+            pi, unit_interface_normal_vector, unit_normal_one_form,
+            one_over_dg_weight);
       case UZeroBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method fo UZero not implemented!");
@@ -369,6 +425,47 @@ struct set_dt_u_zero {
   }
 
  private:
+  // According to Holst+ 2004, this condition for UZero also depends on
+  // whether UPsi is incoming or not. SpEC only uses the expression valid for
+  // the case when UPsi is incoming...!
+  static ReturnType apply_bjorhus_constraint_preserving(
+      const gsl::not_null<ReturnType*> bc_dt_u_zero,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& deriv_lapse,
+      const tnsr::iJ<DataVector, VolumeDim, Frame::Inertial>& deriv_shift,
+      const tnsr::ij<DataVector, VolumeDim, Frame::Inertial>& deriv_phi,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& deriv_pi,
+      const Scalar<DataVector>& lapse,
+      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& phi,
+      const Scalar<DataVector>& pi,
+      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>&
+          unit_interface_normal_vector,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+          unit_interface_normal_one_form) noexcept {
+    ASSERT(get_size(get<0>(*bc_dt_u_zero)) == get_size(get(pi)),
+           "Size of input variables and temporary memory do not match.");
+
+    auto tmp = make_with_value<tnsr::i<DataVector, VolumeDim, Frame::Inertial>>(
+        pi, 0.);
+    for (size_t j = 0; j < VolumeDim; ++j) {
+      tmp.get(j) = -get(lapse) * deriv_pi.get(j) - get(pi) * deriv_lapse.get(j);
+      for (size_t k = 0; k < VolumeDim; ++k) {
+        tmp.get(j) += deriv_shift.get(j, k) * phi.get(k) +
+                      shift.get(k) * deriv_phi.get(j, k);
+      }
+    }
+
+    for (size_t i = 0; i < VolumeDim; ++i) {
+      bc_dt_u_zero->get(i) = tmp.get(i);
+      for (size_t j = 0; j < VolumeDim; ++j) {
+        bc_dt_u_zero->get(i) -= unit_interface_normal_one_form.get(i) *
+                                unit_interface_normal_vector.get(j) *
+                                tmp.get(j);
+      }
+    }
+
+    return *bc_dt_u_zero;
+  }
   // Here we take the constraint preserving expressions from
   // `apply_bjorhus_constraint_preserving` and apply suitable
   // pre-factors that are needed for DG form of evolution
@@ -414,47 +511,6 @@ struct set_dt_u_zero {
       bc_dt_u_zero->get(j) =
           (1. - one_over_dg_weight) * char_projected_rhs_dt_u_zero.get(j) +
           one_over_dg_weight * bc_dt_u_zero->get(j);
-    }
-
-    return *bc_dt_u_zero;
-  }
-  // According to Holst+ 2004, this condition for UZero also depends on
-  // whether UPsi is incoming or not. SpEC only uses the expression valid for
-  // the case when UPsi is incoming...!
-  static ReturnType apply_bjorhus_constraint_preserving(
-      const gsl::not_null<ReturnType*> bc_dt_u_zero,
-      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& deriv_lapse,
-      const tnsr::iJ<DataVector, VolumeDim, Frame::Inertial>& deriv_shift,
-      const tnsr::ij<DataVector, VolumeDim, Frame::Inertial>& deriv_phi,
-      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& deriv_pi,
-      const Scalar<DataVector>& lapse,
-      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
-      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& phi,
-      const Scalar<DataVector>& pi,
-      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>&
-          unit_interface_normal_vector,
-      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-          unit_interface_normal_one_form) noexcept {
-    ASSERT(get_size(get<0>(*bc_dt_u_zero)) == get_size(get(pi)),
-           "Size of input variables and temporary memory do not match.");
-
-    auto tmp = make_with_value<tnsr::i<DataVector, VolumeDim, Frame::Inertial>>(
-        pi, 0.);
-    for (size_t j = 0; j < VolumeDim; ++j) {
-      tmp.get(j) = -get(lapse) * deriv_pi.get(j) - get(pi) * deriv_lapse.get(j);
-      for (size_t k = 0; k < VolumeDim; ++k) {
-        tmp.get(j) += deriv_shift.get(j, k) * phi.get(k) +
-                      shift.get(k) * deriv_phi.get(j, k);
-      }
-    }
-
-    for (size_t i = 0; i < VolumeDim; ++i) {
-      bc_dt_u_zero->get(i) = tmp.get(i);
-      for (size_t j = 0; j < VolumeDim; ++j) {
-        bc_dt_u_zero->get(i) -= unit_interface_normal_one_form.get(i) *
-                                unit_interface_normal_vector.get(j) *
-                                tmp.get(j);
-      }
     }
 
     return *bc_dt_u_zero;
@@ -509,6 +565,8 @@ struct set_dt_u_minus {
                           /* unit_normal_one_form */,
                           const double one_over_dg_weight) noexcept {
     const auto& constraint_gamma2 = get<Tags::ConstraintGamma2>(buffer);
+    const auto& char_projected_rhs_dt_u_minus =
+        get<::Tags::TempScalar<9, DataVector>>(buffer);
     // Note that `bc_dt_u_psi` is the *final* value of dt<UPsi> that has been
     // set after considering the sign of char speeds of the char field UPsi
     const auto& bc_dt_u_psi = get<::Tags::TempScalar<6, DataVector>>(buffer);
@@ -523,6 +581,10 @@ struct set_dt_u_minus {
       case UMinusBcMethod::ConstraintPreservingBjorhus:
         return apply_bjorhus_constraint_preserving(
             make_not_null(&bc_dt_u_minus), constraint_gamma2, bc_dt_u_psi);
+      case UMinusBcMethod::ConstraintPreservingBjorhusDG:
+        return apply_bjorhus_dg_constraint_preserving(
+            make_not_null(&bc_dt_u_minus), char_projected_rhs_dt_u_minus,
+            constraint_gamma2, bc_dt_u_psi, one_over_dg_weight);
       case UMinusBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method for UMinus is not implemented!");
@@ -539,6 +601,38 @@ struct set_dt_u_minus {
     ASSERT(get_size(get(*bc_dt_u_minus)) == get_size(get(constraint_gamma2)),
            "Size of input variables and temporary memory do not match.");
     get(*bc_dt_u_minus) = -get(constraint_gamma2) * get(bc_dt_u_psi);
+    return *bc_dt_u_minus;
+  }
+  // Here we take the constraint preserving expressions from
+  // `apply_bjorhus_constraint_preserving` and apply suitable
+  // pre-factors that are needed for DG form of evolution
+  // equations.
+  static ReturnType apply_bjorhus_dg_constraint_preserving(
+      const gsl::not_null<ReturnType*> bc_dt_u_minus,
+      const Scalar<DataVector>& char_projected_rhs_dt_u_minus,
+      const Scalar<DataVector>& constraint_gamma2,
+      const Scalar<DataVector>& bc_dt_u_psi,
+      const double one_over_dg_weight) noexcept {
+    ASSERT(get_size(get(*bc_dt_u_minus)) == get_size(get(constraint_gamma2)),
+           "Size of input variables and temporary memory do not match.");
+    auto _ = apply_bjorhus_constraint_preserving(
+        bc_dt_u_minus, constraint_gamma2, bc_dt_u_psi);
+    // Now let us apply pre-factors for DG, which are of the form
+    // dtU = dtU_volume + M^{-1}\dot M^{2} Bjorhus_terms
+    // as derived in <https://www.overleaf.com/project/5db8acf89a7daa0001d5d7d4>
+    // As the prescription of Holst+2004 is to set
+    // dtU = Holst_terms at the boundary, completely replacing dtU_volume,
+    // we can write
+    // Holst_terms := dtU_volume + Bjorhus_terms
+    // If this identification is correct (FIXME), the new BC becomes:
+    // dtU = dtU_volume + M^{-1}\dot M^{2} (Holst_terms - dtU_volume), i.e.
+    // dtU = (1 - M^{-1}\dot M^{2}) dtU_volume + M^{-1}\dot M^{2} Holst_terms
+    // we already have Holst_terms from the above function call, we also
+    // need dtU_volume here
+    get(*bc_dt_u_minus) =
+        (1. - one_over_dg_weight) * get(char_projected_rhs_dt_u_minus) +
+        one_over_dg_weight * get(*bc_dt_u_minus);
+
     return *bc_dt_u_minus;
   }
 };
