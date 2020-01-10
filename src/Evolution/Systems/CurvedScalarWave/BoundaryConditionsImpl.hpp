@@ -63,12 +63,14 @@ enum class UPsiBcMethod {
   Freezing,
   ConstraintPreservingBjorhus,
   ConstraintPreservingBjorhusDG,
+  ConstraintPreservingBjorhusDGDummy,
   Unknown
 };
 enum class UZeroBcMethod {
   Freezing,
   ConstraintPreservingBjorhus,
   ConstraintPreservingBjorhusDG,
+  ConstraintPreservingBjorhusDGDummy,
   // The condition below is borrowed from SpEC, where it is used as the
   // BC on UZero when "Constraint" is the requested BC type
   ConstraintPreservingPenalty,
@@ -79,6 +81,7 @@ enum class UMinusBcMethod {
   Freezing,
   ConstraintPreservingBjorhus,
   ConstraintPreservingBjorhusDG,
+  ConstraintPreservingBjorhusDGDummy,
   Unknown
 };
 
@@ -287,6 +290,10 @@ struct set_dt_u_psi {
         return apply_bjorhus_dg_constraint_preserving(
             make_not_null(&bc_dt_u_psi), char_projected_rhs_dt_u_psi, lapse,
             shift, phi, pi, one_over_dg_weight);
+      case UPsiBcMethod::ConstraintPreservingBjorhusDGDummy:
+        return apply_bjorhus_dg_dummy_constraint_preserving(
+            make_not_null(&bc_dt_u_psi), lapse, shift, phi, pi,
+            one_over_dg_weight);
       case UPsiBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method for UPsi not implemented!");
@@ -339,6 +346,20 @@ struct set_dt_u_psi {
     get(*bc_dt_u_psi) =
         (1. - one_over_dg_weight) * get(char_projected_rhs_dt_u_psi) +
         one_over_dg_weight * get(*bc_dt_u_psi);
+
+    return *bc_dt_u_psi;
+  }
+  static ReturnType apply_bjorhus_dg_dummy_constraint_preserving(
+      const gsl::not_null<ReturnType*> bc_dt_u_psi,
+      const Scalar<DataVector>& lapse,
+      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& phi,
+      const Scalar<DataVector>& pi, const double one_over_dg_weight) noexcept {
+    ASSERT(get_size(get(*bc_dt_u_psi)) == get_size(get(pi)),
+           "Size of input variables and temporary memory do not match.");
+    auto _ =
+        apply_bjorhus_constraint_preserving(bc_dt_u_psi, lapse, shift, phi, pi);
+    get(*bc_dt_u_psi) = one_over_dg_weight * get(*bc_dt_u_psi);
 
     return *bc_dt_u_psi;
   }
@@ -416,6 +437,11 @@ struct set_dt_u_zero {
             deriv_lapse, deriv_shift, deriv_phi, deriv_pi, lapse, shift, phi,
             pi, unit_interface_normal_vector, unit_normal_one_form,
             one_over_dg_weight);
+      case UZeroBcMethod::ConstraintPreservingBjorhusDGDummy:
+        return apply_bjorhus_dg_dummy_constraint_preserving(
+            make_not_null(&bc_dt_u_zero), deriv_lapse, deriv_shift, deriv_phi,
+            deriv_pi, lapse, shift, phi, pi, unit_interface_normal_vector,
+            unit_normal_one_form, one_over_dg_weight);
       case UZeroBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method fo UZero not implemented!");
@@ -515,6 +541,35 @@ struct set_dt_u_zero {
 
     return *bc_dt_u_zero;
   }
+  static ReturnType apply_bjorhus_dg_dummy_constraint_preserving(
+      const gsl::not_null<ReturnType*> bc_dt_u_zero,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& deriv_lapse,
+      const tnsr::iJ<DataVector, VolumeDim, Frame::Inertial>& deriv_shift,
+      const tnsr::ij<DataVector, VolumeDim, Frame::Inertial>& deriv_phi,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& deriv_pi,
+      const Scalar<DataVector>& lapse,
+      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>& phi,
+      const Scalar<DataVector>& pi,
+      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>&
+          unit_interface_normal_vector,
+      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+          unit_interface_normal_one_form,
+      const double one_over_dg_weight) noexcept {
+    ASSERT(get_size(get<0>(*bc_dt_u_zero)) == get_size(get(pi)),
+           "Size of input variables and temporary memory do not match.");
+    // First get the expression evaluated
+    auto _ = apply_bjorhus_constraint_preserving(
+        bc_dt_u_zero, deriv_lapse, deriv_shift, deriv_phi, deriv_pi, lapse,
+        shift, phi, pi, unit_interface_normal_vector,
+        unit_interface_normal_one_form);
+
+    for (size_t j = 0; j < VolumeDim; ++j) {
+      bc_dt_u_zero->get(j) = one_over_dg_weight * bc_dt_u_zero->get(j);
+    }
+
+    return *bc_dt_u_zero;
+  }
   // The condition below is borrowed from SpEC, where it is used as the
   // BC on UZero when "Constraint" is the requested BC type. It applies
   // penalty-type correction to the RHS for dt<UZero>.
@@ -585,6 +640,10 @@ struct set_dt_u_minus {
         return apply_bjorhus_dg_constraint_preserving(
             make_not_null(&bc_dt_u_minus), char_projected_rhs_dt_u_minus,
             constraint_gamma2, bc_dt_u_psi, one_over_dg_weight);
+      case UMinusBcMethod::ConstraintPreservingBjorhusDGDummy:
+        return apply_bjorhus_dg_dummy_constraint_preserving(
+            make_not_null(&bc_dt_u_minus), constraint_gamma2, bc_dt_u_psi,
+            one_over_dg_weight);
       case UMinusBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method for UMinus is not implemented!");
@@ -632,6 +691,20 @@ struct set_dt_u_minus {
     get(*bc_dt_u_minus) =
         (1. - one_over_dg_weight) * get(char_projected_rhs_dt_u_minus) +
         one_over_dg_weight * get(*bc_dt_u_minus);
+
+    return *bc_dt_u_minus;
+  }
+  static ReturnType apply_bjorhus_dg_dummy_constraint_preserving(
+      const gsl::not_null<ReturnType*> bc_dt_u_minus,
+      const Scalar<DataVector>& constraint_gamma2,
+      const Scalar<DataVector>& bc_dt_u_psi,
+      const double one_over_dg_weight) noexcept {
+    ASSERT(get_size(get(*bc_dt_u_minus)) == get_size(get(constraint_gamma2)),
+           "Size of input variables and temporary memory do not match.");
+    auto _ = apply_bjorhus_constraint_preserving(
+        bc_dt_u_minus, constraint_gamma2, bc_dt_u_psi);
+
+    get(*bc_dt_u_minus) = one_over_dg_weight * get(*bc_dt_u_minus);
 
     return *bc_dt_u_minus;
   }
