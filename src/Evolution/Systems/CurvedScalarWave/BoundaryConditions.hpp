@@ -198,13 +198,26 @@ struct ImposeConstraintPreservingBoundaryConditions {
             make_not_null(&buffer), box, direction, dimension, mesh, vars,
             dt_vars, unit_normal_one_form, char_speeds, constraint_gamma2);
 
+        // compute M^{-1}\dot M^{2} = 1 / LGL_weight[0]
+        //                          = num_points * (num_points - 1) / 2
+        // = 21 (when num_points = 7)
+        // = 15 (when num_points = 6)
+        // = 10 (when num_points = 5)
+        // = 6  (when num_points = 4)
+        // = 3  (when num_points = 3)
+        // = 1  (when num_points = 2)
+        const double one_over_dg_weight_at_boundary =
+            [](const double num_points) {
+              return 0.5 * num_points * (num_points - 1);
+            }(static_cast<double>(mesh.extents(dimension)));
+
         db::mutate<dt_variables_tag>(
             make_not_null(&box),
             // Function that applies bdry conditions to dt<variables>
             [
               &volume_grid_points, &slice_grid_points, &mesh, &dimension,
               &direction, &buffer, &vars, &dt_vars, &unit_normal_one_form,
-              &char_speeds, &constraint_gamma2
+              &char_speeds, &constraint_gamma2, &one_over_dg_weight_at_boundary
             ](const gsl::not_null<db::item_type<dt_variables_tag>*>
                   volume_dt_vars,
               const double /* time */, const auto& /* boundary_condition */
@@ -227,7 +240,7 @@ struct ImposeConstraintPreservingBoundaryConditions {
                       get<::Tags::TempScalar<6, DataVector>>(buffer),
                       BoundaryConditions_detail::set_dt_u_psi<VolumeDim>::apply(
                           UPsiMethod, buffer, vars, dt_vars,
-                          unit_normal_one_form),
+                          unit_normal_one_form, one_over_dg_weight_at_boundary),
                       char_speeds.at(0));
               // copy over the value of bc_dt_u_psi finally set, accounting for
               // the char speeds of UPsi. This is then used to set Dt<UMinus>
@@ -240,7 +253,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
                                         DataVector>>(buffer),
                       BoundaryConditions_detail::set_dt_u_zero<
                           VolumeDim>::apply(UZeroMethod, buffer, vars, dt_vars,
-                                            unit_normal_one_form),
+                                            unit_normal_one_form,
+                                            one_over_dg_weight_at_boundary),
                       char_speeds.at(1));
 
               const auto bc_dt_u_plus =
@@ -248,7 +262,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
                       get<::Tags::TempScalar<8, DataVector>>(buffer),
                       BoundaryConditions_detail::set_dt_u_plus<
                           VolumeDim>::apply(UPlusMethod, buffer, vars, dt_vars,
-                                            unit_normal_one_form),
+                                            unit_normal_one_form,
+                                            one_over_dg_weight_at_boundary),
                       char_speeds.at(2));
 
               const auto bc_dt_u_minus =
@@ -256,7 +271,8 @@ struct ImposeConstraintPreservingBoundaryConditions {
                       get<::Tags::TempScalar<9, DataVector>>(buffer),
                       BoundaryConditions_detail::set_dt_u_minus<
                           VolumeDim>::apply(UMinusMethod, buffer, vars, dt_vars,
-                                            unit_normal_one_form),
+                                            unit_normal_one_form,
+                                            one_over_dg_weight_at_boundary),
                       char_speeds.at(3));
               // Convert them to desired values on dt<U>
               const auto bc_dt_all_u =

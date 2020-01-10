@@ -251,7 +251,8 @@ struct set_dt_u_psi {
                           const Variables<VarsTagsList>& vars,
                           const Variables<DtVarsTagsList>& /* dt_vars */,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-                          /* unit_normal_one_form */) noexcept {
+                          /* unit_normal_one_form */,
+                          const double one_over_dg_weight) noexcept {
     const auto& pi = get<Pi>(vars);
     const auto& phi = get<Phi<VolumeDim>>(vars);
     const auto& lapse = get<gr::Tags::Lapse<DataVector>>(buffer);
@@ -306,7 +307,8 @@ struct set_dt_u_zero {
                           const Variables<VarsTagsList>& vars,
                           const Variables<DtVarsTagsList>& /* dt_vars */,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-                              unit_normal_one_form) noexcept {
+                              unit_normal_one_form,
+                          const double one_over_dg_weight) noexcept {
     // Not using auto below to enforce a loose test on the quantity being
     // fetched from the buffer
     const auto& deriv_lapse =
@@ -386,7 +388,8 @@ struct set_dt_u_zero {
       const tnsr::I<DataVector, VolumeDim, Frame::Inertial>&
           unit_interface_normal_vector,
       const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-          unit_interface_normal_one_form) noexcept {
+          unit_interface_normal_one_form,
+      const double one_over_dg_weight) noexcept {
     ASSERT(get_size(get<0>(*bc_dt_u_zero)) == get_size(get(pi)),
            "Size of input variables and temporary memory do not match.");
     // First get the expression evaluated
@@ -407,14 +410,10 @@ struct set_dt_u_zero {
     // dtU = (1 - M^{-1}\dot M^{2}) dtU_volume + M^{-1}\dot M^{2} Holst_terms
     // we already have Holst_terms from the above function call, we also
     // need dtU_volume here
-
-    // compute M^{-1}\dot M^{2} = 1 / LGL_weight
-    double dg_mult_factor = 1. / 6.;  // FIXME
-    // Set RHS
     for (size_t j = 0; j < VolumeDim; ++j) {
       bc_dt_u_zero->get(j) =
-          (1. - dg_mult_factor) * char_projected_rhs_dt_u_zero.get(j) +
-          dg_mult_factor * bc_dt_u_zero->get(j);
+          (1. - one_over_dg_weight) * char_projected_rhs_dt_u_zero.get(j) +
+          one_over_dg_weight * bc_dt_u_zero->get(j);
     }
 
     return *bc_dt_u_zero;
@@ -507,7 +506,8 @@ struct set_dt_u_minus {
                           const Variables<VarsTagsList>& /* vars */,
                           const Variables<DtVarsTagsList>& /* dt_vars */,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-                          /* unit_normal_one_form */) noexcept {
+                          /* unit_normal_one_form */,
+                          const double one_over_dg_weight) noexcept {
     const auto& constraint_gamma2 = get<Tags::ConstraintGamma2>(buffer);
     // Note that `bc_dt_u_psi` is the *final* value of dt<UPsi> that has been
     // set after considering the sign of char speeds of the char field UPsi
@@ -556,7 +556,8 @@ struct set_dt_u_plus {
                           const Variables<VarsTagsList>& /* vars */,
                           const Variables<DtVarsTagsList>& /* dt_vars */,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-                          /* unit_normal_one_form */) noexcept {
+                          /* unit_normal_one_form */,
+                          const double /* one_over_dg_weight */) noexcept {
     // Memory allocated for return type
     ReturnType& bc_dt_u_plus = get<::Tags::TempScalar<14, DataVector>>(buffer);
     std::fill(bc_dt_u_plus.begin(), bc_dt_u_plus.end(), 0.);
