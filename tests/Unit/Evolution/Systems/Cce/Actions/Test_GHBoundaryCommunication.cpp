@@ -13,10 +13,11 @@
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
+#include "Evolution/Systems/Cce/Actions/BlockUntilBoundaryDataReceived.hpp"
 #include "Evolution/Systems/Cce/Actions/BoundaryComputeAndSendToEvolution.hpp"
-#include "Evolution/Systems/Cce/Actions/InitializeCharacteristicEvolutionTime.hpp"
-#include "Evolution/Systems/Cce/Actions/InitializeCharacteristicEvolutionVariables.hpp"
+#include "Evolution/Systems/Cce/Actions/InitializeCharacteristicEvolution.hpp"
 #include "Evolution/Systems/Cce/Actions/InitializeWorldtubeBoundary.hpp"
+#include "Evolution/Systems/Cce/Actions/ReceiveGHWorldtubeData.hpp"
 #include "Evolution/Systems/Cce/Actions/ReceiveWorldtubeData.hpp"
 #include "Evolution/Systems/Cce/Actions/RequestBoundaryData.hpp"
 #include "Evolution/Systems/Cce/BoundaryData.hpp"
@@ -44,13 +45,13 @@
 namespace Cce {
 namespace {
 template <typename Metavariables>
-struct mock_h5_worldtube_boundary {
-  using component_being_mocked = H5WorldtubeBoundary<Metavariables>;
+struct mock_gh_worldtube_boundary : GHWorldtubeBoundary<Metavariables> {
+  using component_being_mocked = GHWorldtubeBoundary<Metavariables>;
   using replace_these_simple_actions = tmpl::list<>;
   using with_these_simple_actions = tmpl::list<>;
 
   using initialize_action_list =
-      tmpl::list<Actions::InitializeH5WorldtubeBoundary>;
+      tmpl::list<Actions::InitializeGHWorldtubeBoundary>;
   using initialization_tags =
       Parallel::get_initialization_tags<initialize_action_list>;
 
@@ -77,9 +78,7 @@ struct mock_characteristic_evolution {
   using with_these_simple_actions = tmpl::list<>;
 
   using initialize_action_list =
-      tmpl::list<Actions::InitializeCharacteristicEvolutionVariables,
-                 Actions::InitializeCharacteristicEvolutionTime,
-                 Initialization::Actions::RemoveOptionsAndTerminatePhase>;
+      tmpl::list<Actions::InitializeCharacteristicEvolution>;
   using initialization_tags =
       Parallel::get_initialization_tags<initialize_action_list>;
 
@@ -95,11 +94,11 @@ struct mock_characteristic_evolution {
       Parallel::PhaseActions<
           typename Metavariables::Phase, Metavariables::Phase::Evolve,
           tmpl::list<Actions::RequestBoundaryData<
-                         H5WorldtubeBoundary<Metavariables>,
+                         GHWorldtubeBoundary<Metavariables>,
                          mock_characteristic_evolution<Metavariables>>,
-                     Actions::ReceiveWorldtubeData<Metavariables>,
+                     Actions::BlockUntilBoundaryDataReceived,
                      Actions::RequestNextBoundaryData<
-                         H5WorldtubeBoundary<Metavariables>,
+                         GHWorldtubeBoundary<Metavariables>,
                          mock_characteristic_evolution<Metavariables>>>>>;
   using const_global_cache_tags =
       Parallel::get_const_global_cache_tags_from_actions<
@@ -113,7 +112,7 @@ struct test_metavariables {
       tmpl::list<Tags::CauchyCartesianCoords, Tags::InertialRetardedTime>>;
   using cce_boundary_communication_tags =
       Tags::characteristic_worldtube_boundary_tags<Tags::BoundaryValue>;
-  using cce_boundary_component = H5WorldtubeBoundary<test_metavariables>;
+  using cce_boundary_component = GHWorldtubeBoundary<test_metavariables>;
   using cce_gauge_boundary_tags = tmpl::flatten<tmpl::list<
       tmpl::transform<
           tmpl::list<Tags::BondiR, Tags::DuRDividedByR, Tags::BondiJ,
@@ -147,22 +146,25 @@ struct test_metavariables {
                  Cce::Tags::ScriPlusFactor<Cce::Tags::Psi4>>;
 
   using component_list =
-      tmpl::list<mock_h5_worldtube_boundary<test_metavariables>,
+      tmpl::list<mock_gh_worldtube_boundary<test_metavariables>,
                  mock_characteristic_evolution<test_metavariables>>;
   enum class Phase { Initialization, Evolve, Exit };
 };
 }  // namespace
 
-SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.H5BoundaryCommunication",
+SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.GHBoundaryCommunication",
                   "[Unit][Cce]") {
   using evolution_component = mock_characteristic_evolution<test_metavariables>;
-  using worldtube_component = mock_h5_worldtube_boundary<test_metavariables>;
+  using worldtube_component = mock_gh_worldtube_boundary<test_metavariables>;
   const size_t number_of_radial_points = 10;
   const size_t l_max = 8;
-
-  const std::string filename = "H5BoundaryCommunicationTestCceR0100.h5";
-  // create the test file, because on initialization the manager will need to
-  // get basic data out of the file
+  const double extraction_radius = 100.0;
+  ActionTesting::MockRuntimeSystem<test_metavariables> runner{
+      tuples::tagged_tuple_from_typelist<
+          Parallel::get_const_global_cache_tags<test_metavariables>>{
+          l_max, extraction_radius,
+          std::make_unique<::TimeSteppers::RungeKutta3>(),
+          number_of_radial_points, l_max - 2, 36.0, 32_st}};
 
   MAKE_GENERATOR(gen);
   UniformCustomDistribution<double> value_dist{0.1, 0.5};
@@ -172,98 +174,83 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.H5BoundaryCommunication",
       {value_dist(gen), value_dist(gen), value_dist(gen)}};
   const std::array<double, 3> center{
       {value_dist(gen), value_dist(gen), value_dist(gen)}};
-  gr::Solutions::KerrSchild solution{mass, spin, center};
+  const gr::Solutions::KerrSchild solution{mass, spin, center};
 
-  const double extraction_radius = 100.0;
   const double frequency = 0.1 * value_dist(gen);
   const double amplitude = 0.1 * value_dist(gen);
   const double target_time = 50.0 * value_dist(gen);
-  if (file_system::check_if_file_exists(filename)) {
-    file_system::rm(filename, true);
-  }
-  TestHelpers::write_test_file(solution, filename, target_time,
-                               extraction_radius, frequency, amplitude, l_max);
-
-  const double start_time = target_time;
-  const double target_step_size = 0.01 * value_dist(gen);
-  const double end_time = std::numeric_limits<double>::quiet_NaN();
-  ActionTesting::MockRuntimeSystem<test_metavariables> runner{
-      {l_max, number_of_radial_points,
-       std::make_unique<::TimeSteppers::RungeKutta3>(), start_time,
-       Tags::EndTime::create_from_options<test_metavariables>(end_time,
-                                                              filename)}};
 
   // create the test file, because on initialization the manager will need
   // to get basic data out of the file
+  const double start_time = target_time;
+  const double target_step_size = 0.01 * value_dist(gen);
+  const double end_time = target_time + 10.0 * target_step_size;
   const size_t buffer_size = 5;
+  const size_t scri_plus_interpolation_order = 3;
 
-  ActionTesting::set_phase(make_not_null(&runner),
-                           test_metavariables::Phase::Initialization);
-  ActionTesting::emplace_component<evolution_component>(&runner, 0,
-                                                        target_step_size);
+  runner.set_phase(test_metavariables::Phase::Initialization);
+  ActionTesting::emplace_component<evolution_component>(
+      &runner, 0, start_time,
+      InitializationTags::EndTime::create_from_options<test_metavariables>(
+          end_time, "unused"),
+      target_step_size, scri_plus_interpolation_order);
   ActionTesting::emplace_component<worldtube_component>(
       &runner, 0,
-      InitializationTags::H5WorldtubeBoundaryDataManager::create_from_options<
-          test_metavariables>(
-          l_max, filename, buffer_size,
-          std::make_unique<intrp::BarycentricRationalSpanInterpolator>(3u,
-                                                                       4u)));
+      InitializationTags::GHInterfaceManager::create_from_options<
+          test_metavariables>(std::make_unique<GHLockstepInterfaceManager>()));
 
   // this should run the initializations
   ActionTesting::next_action<evolution_component>(make_not_null(&runner), 0);
-  ActionTesting::next_action<evolution_component>(make_not_null(&runner), 0);
-  ActionTesting::next_action<evolution_component>(make_not_null(&runner), 0);
   ActionTesting::next_action<worldtube_component>(make_not_null(&runner), 0);
-  ActionTesting::set_phase(make_not_null(&runner),
-                           test_metavariables::Phase::Evolve);
+  runner.set_phase(test_metavariables::Phase::Evolve);
 
   // the first request
   ActionTesting::next_action<evolution_component>(make_not_null(&runner), 0);
   // check that the 'block' appropriately reports that it's not ready:
   CHECK_FALSE(ActionTesting::is_ready<evolution_component>(runner, 0));
 
+  // send the current timestep data to the boundary component
+  const auto current_time =
+      ActionTesting::get_databox_tag<evolution_component, ::Tags::TimeStepId>(
+          runner, 0);
+  tnsr::aa<DataVector, 3> spacetime_metric{
+      Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+  tnsr::iaa<DataVector, 3> phi{
+      Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+  tnsr::aa<DataVector, 3> pi{
+      Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+  TestHelpers::create_fake_time_varying_gh_nodal_data(
+      make_not_null(&spacetime_metric), make_not_null(&phi), make_not_null(&pi),
+      solution, extraction_radius, amplitude, frequency, target_time, l_max);
+  printf("first\n");
+  ActionTesting::simple_action<
+      worldtube_component,
+      Actions::ReceiveGHWorldtubeData<evolution_component>>(
+      make_not_null(&runner), 0, current_time, spacetime_metric, phi, pi);
+  printf("second\n");
+
   // the first response (`BoundaryComputeAndSendToEvolution`)
   ActionTesting::invoke_queued_simple_action<worldtube_component>(
       make_not_null(&runner), 0);
+  printf("third\n");
+  ActionTesting::invoke_queued_simple_action<worldtube_component>(
+      make_not_null(&runner), 0);
+  printf("fourth\n");
+  // then `ReceiveWorldtubeBoundaryData` in the evolution
+  ActionTesting::invoke_queued_simple_action<evolution_component>(
+      make_not_null(&runner), 0);
+  printf("fifth\n");
   CHECK(ActionTesting::is_ready<evolution_component>(runner, 0));
-  ActionTesting::next_action<evolution_component>(make_not_null(&runner), 0);
 
-  // generate the 'expected' boundary variables and compare them to the
-  // variables obtained from the actions.
-  const size_t libsharp_size =
-      Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max);
   const size_t number_of_angular_points =
       Spectral::Swsh::number_of_swsh_collocation_points(l_max);
-  tnsr::ii<ComplexModalVector, 3> spatial_metric_coefficients{libsharp_size};
-  tnsr::ii<ComplexModalVector, 3> dt_spatial_metric_coefficients{libsharp_size};
-  tnsr::ii<ComplexModalVector, 3> dr_spatial_metric_coefficients{libsharp_size};
-  tnsr::I<ComplexModalVector, 3> shift_coefficients{libsharp_size};
-  tnsr::I<ComplexModalVector, 3> dt_shift_coefficients{libsharp_size};
-  tnsr::I<ComplexModalVector, 3> dr_shift_coefficients{libsharp_size};
-  Scalar<ComplexModalVector> lapse_coefficients{libsharp_size};
-  Scalar<ComplexModalVector> dt_lapse_coefficients{libsharp_size};
-  Scalar<ComplexModalVector> dr_lapse_coefficients{libsharp_size};
-  TestHelpers::create_fake_time_varying_modal_data(
-      make_not_null(&spatial_metric_coefficients),
-      make_not_null(&dt_spatial_metric_coefficients),
-      make_not_null(&dr_spatial_metric_coefficients),
-      make_not_null(&shift_coefficients), make_not_null(&dt_shift_coefficients),
-      make_not_null(&dr_shift_coefficients), make_not_null(&lapse_coefficients),
-      make_not_null(&dt_lapse_coefficients),
-      make_not_null(&dr_lapse_coefficients), solution, extraction_radius,
-      amplitude, frequency, target_time, l_max, false);
-
   using boundary_variables_tag = ::Tags::Variables<
       Tags::characteristic_worldtube_boundary_tags<Tags::BoundaryValue>>;
   auto expected_boundary_box =
       db::create<db::AddSimpleTags<boundary_variables_tag>>(
           db::item_type<boundary_variables_tag>{number_of_angular_points});
-  create_bondi_boundary_data(
-      make_not_null(&expected_boundary_box), spatial_metric_coefficients,
-      dt_spatial_metric_coefficients, dr_spatial_metric_coefficients,
-      shift_coefficients, dt_shift_coefficients, dr_shift_coefficients,
-      lapse_coefficients, dt_lapse_coefficients, dr_lapse_coefficients,
-      extraction_radius, l_max);
+  create_bondi_boundary_data(make_not_null(&expected_boundary_box), phi, pi,
+                             spacetime_metric, extraction_radius, l_max);
 
   Approx angular_derivative_approx =
       Approx::custom()
@@ -282,8 +269,5 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.H5BoundaryCommunication",
         CHECK_ITERABLE_CUSTOM_APPROX(test_lhs, test_rhs,
                                      angular_derivative_approx);
       });
-  if (file_system::check_if_file_exists(filename)) {
-    file_system::rm(filename, true);
-  }
 }
 }  // namespace Cce

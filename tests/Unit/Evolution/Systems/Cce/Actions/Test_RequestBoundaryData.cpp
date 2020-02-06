@@ -35,7 +35,7 @@ namespace Cce {
 namespace Actions {
 namespace {
 std::vector<double> times_requested;
-template <typename EvolutionComponent>
+template <typename BoundaryComponent, typename EvolutionComponent>
 struct MockBoundaryComputeAndSendToEvolution {
   template <typename ParallelComponent, typename... DbTags,
             typename Metavariables, typename ArrayIndex,
@@ -79,10 +79,10 @@ struct mock_characteristic_evolution {
       Parallel::PhaseActions<
           typename Metavariables::Phase, Metavariables::Phase::Evolve,
           tmpl::list<Actions::RequestBoundaryData<
-                         mock_h5_worldtube_boundary<Metavariables>,
+                         H5WorldtubeBoundary<Metavariables>,
                          mock_characteristic_evolution<Metavariables>>,
                      Actions::RequestNextBoundaryData<
-                         mock_h5_worldtube_boundary<Metavariables>,
+                         H5WorldtubeBoundary<Metavariables>,
                          mock_characteristic_evolution<Metavariables>>>>>;
   using const_global_cache_tags =
       Parallel::get_const_global_cache_tags_from_actions<
