@@ -9,11 +9,13 @@
 
 #include "Evolution/Systems/Cce/OptionTags.hpp"
 #include "Evolution/Systems/Cce/ReadBoundaryDataH5.hpp"
+#include "Evolution/Systems/Cce/WorldtubeInterfaceManager.hpp"
 #include "NumericalAlgorithms/Interpolation/CubicSpanInterpolator.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/KerrSchild.hpp"
 #include "Utilities/FileSystem.hpp"
 #include "Utilities/Literals.hpp"
 #include "tests/Unit/DataStructures/DataBox/TestHelpers.hpp"
+#include "Utilities/TypeTraits.hpp"
 #include "tests/Unit/Evolution/Systems/Cce/BoundaryTestHelpers.hpp"
 #include "tests/Unit/TestCreation.hpp"
 
@@ -44,6 +46,9 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.OptionTags", "[Unit][Cce]") {
   CHECK(
       TestHelpers::test_creation<size_t, Cce::OptionTags::NumberOfRadialPoints>(
           "3") == 3_st);
+  CHECK(TestHelpers::test_creation<double, Cce::OptionTags::ExtractionRadius>(
+            "100.0") == 100.0);
+
   CHECK(TestHelpers::test_creation<double, Cce::OptionTags::EndTime>("4.0") ==
         4.0);
   CHECK(TestHelpers::test_creation<double, Cce::OptionTags::StartTime>("2.0") ==
@@ -58,6 +63,13 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.OptionTags", "[Unit][Cce]") {
   CHECK(TestHelpers::test_creation<size_t,
                                    Cce::OptionTags::ScriInterpolationOrder>(
             "4") == 4_st);
+
+  auto option_created_lockstep_interface_manager = TestHelpers::test_creation<
+      std::unique_ptr<Cce::GHWorldtubeInterfaceManager>,
+      Cce::OptionTags::GHInterfaceManager>(
+      "GHLockstepInterfaceManager");
+  CHECK(cpp17::is_same_v<decltype(option_created_lockstep_interface_manager),
+                         std::unique_ptr<Cce::GHWorldtubeInterfaceManager>>);
 
   CHECK(TestHelpers::test_creation<size_t, Cce::OptionTags::ScriOutputDensity>(
             "6") == 6_st);

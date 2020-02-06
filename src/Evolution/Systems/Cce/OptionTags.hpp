@@ -7,6 +7,7 @@
 #include <limits>
 
 #include "Evolution/Systems/Cce/ReadBoundaryDataH5.hpp"
+#include "Evolution/Systems/Cce/WorldtubeInterfaceManager.hpp"
 #include "NumericalAlgorithms/Interpolation/SpanInterpolator.hpp"
 #include "Options/Options.hpp"
 
@@ -64,6 +65,12 @@ struct NumberOfRadialPoints {
   using group = Cce;
 };
 
+struct ExtractionRadius {
+  using type = double;
+  static constexpr OptionString help{"Extraction radius from the GH system."};
+  using group = Cce;
+};
+
 struct EndTime {
   using type = double;
   static constexpr OptionString help{"End time for the Cce Evolution."};
@@ -111,6 +118,13 @@ struct H5Interpolator {
   using group = Cce;
 };
 
+struct GHInterfaceManager {
+  using type = std::unique_ptr<GHWorldtubeInterfaceManager>;
+  static constexpr OptionString help{
+      "Class to manage worldtube data from a GH system."};
+  using group = Cce;
+};
+
 struct ScriInterpolationOrder {
   static std::string name() noexcept { return "ScriInterpOrder"; }
   using type = size_t;
@@ -145,6 +159,18 @@ struct H5WorldtubeBoundaryDataManager : db::SimpleTag {
     return WorldtubeDataManager{
         std::make_unique<SpecWorldtubeH5BufferUpdater>(filename), l_max,
         number_of_lookahead_times, interpolator->get_clone()};
+  }
+};
+
+struct GHInterfaceManager {
+  using type = std::unique_ptr<GHWorldtubeInterfaceManager>;
+  using option_tags = tmpl::list<OptionTags::GHInterfaceManager>;
+
+  template <typename Metavariables>
+  static std::unique_ptr<::Cce::GHWorldtubeInterfaceManager>
+  create_from_options(const std::unique_ptr<::Cce::GHWorldtubeInterfaceManager>&
+                          interface_handler) noexcept {
+    return interface_handler->get_clone();
   }
 };
 
@@ -183,6 +209,16 @@ struct EndTime : db::SimpleTag {
       end_time = time_buffer[time_buffer.size() - 1];
     }
     return end_time;
+  }
+};
+
+struct ExtractionRadius : db::SimpleTag {
+  using type = double;
+  using option_tags = tmpl::list<OptionTags::ExtractionRadius>;
+
+  template <typename Metavariables>
+  static double create_from_options(const double extraction_radius) noexcept {
+    return extraction_radius;
   }
 };
 
