@@ -13,6 +13,7 @@
 #include "Evolution/Systems/Cce/OptionTags.hpp"
 #include "Evolution/Systems/Cce/ReadBoundaryDataH5.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"
+#include "Evolution/Systems/Cce/WorldtubeInterfaceManager.hpp"
 #include "NumericalAlgorithms/Interpolation/SpanInterpolator.hpp"
 #include "Parallel/Algorithm.hpp"
 #include "Parallel/Info.hpp"
@@ -24,6 +25,7 @@
 #include "Utilities/TaggedTuple.hpp"
 
 namespace Cce {
+namespace Actions {
 /*!
  * \ingroup ActionsGroup
  * \brief Initializes a H5WorldtubeBoundary
@@ -105,4 +107,79 @@ struct InitializeH5WorldtubeBoundary {
     return std::make_tuple(std::move(box));
   }
 };
+
+/*!
+ * \ingroup ActionsGroup
+ * \brief Initializes a GHWorldtubeBoundary
+ *
+ * \details Uses:
+ * - initialization tag
+ * `Cce::InitializationTags::GHWorldtubeBoundaryDataManager`,
+ * - const global cache tags `InitializationTags::LMax`,
+ * `InitializationTags::ExtractionRadius`.
+ *
+ * Databox changes:
+ * - Adds:
+ *   - `Tags::Variables<typename
+ * Metavariables::cce_boundary_communication_tags>`
+ *   - `Tags::GHInterfaceManager` (cloned from
+ * `InitializationTags::GHInterfaceManager`)
+ * - Removes: nothing
+ * - Modifies: nothing
+ */
+struct InitializeGHWorldtubeBoundary {
+  using initialization_tags =
+      tmpl::list<InitializationTags::GHInterfaceManager>;
+
+  using const_global_cache_tags =
+      tmpl::list<InitializationTags::LMax,
+                 InitializationTags::ExtractionRadius>;
+
+  template <class Metavariables>
+  using gh_boundary_manager_simple_tags = db::AddSimpleTags<
+      ::Tags::Variables<
+          typename Metavariables::cce_boundary_communication_tags>,
+      Tags::GHInterfaceManager>;
+
+  template <typename DbTags, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent,
+            Requires<tmpl::list_contains_v<
+                DbTags, InitializationTags::GHInterfaceManager>> = nullptr>
+  static auto apply(db::DataBox<DbTags>& box,
+                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const ArrayIndex& /*array_index*/,
+                    const ActionList /*meta*/,
+                    const ParallelComponent* const /*meta*/) noexcept {
+    const size_t l_max = Parallel::get<Spectral::Swsh::Tags::LMax>(cache);
+    Variables<typename Metavariables::cce_boundary_communication_tags>
+        boundary_variables{
+            Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+
+    auto initial_box = Initialization::merge_into_databox<
+        InitializeGHWorldtubeBoundary,
+        gh_boundary_manager_simple_tags<Metavariables>, db::AddComputeTags<>,
+        Initialization::MergePolicy::Overwrite>(
+        std::move(box), std::move(boundary_variables),
+        db::get<InitializationTags::GHInterfaceManager>(box).get_clone());
+
+    return std::make_tuple(std::move(initial_box));
+  }
+
+  template <typename DbTags, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent,
+            Requires<not tmpl::list_contains_v<
+                DbTags, InitializationTags::GHInterfaceManager>> = nullptr>
+  static auto apply(db::DataBox<DbTags>& box,
+                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                    const ArrayIndex& /*array_index*/,
+                    const ActionList /*meta*/,
+                    const ParallelComponent* const /*meta*/) noexcept {
+    return std::make_tuple(std::move(box));
+  }
+};
+}  // namespace Actions
 }  // namespace Cce

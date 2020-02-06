@@ -40,7 +40,7 @@ struct H5WorldtubeBoundary {
   using chare_type = Parallel::Algorithms::Singleton;
   using metavariables = Metavariables;
   using initialize_action_list =
-      tmpl::list<InitializeH5WorldtubeBoundary,
+      tmpl::list<Actions::InitializeH5WorldtubeBoundary,
                  Initialization::Actions::RemoveOptionsAndTerminatePhase>;
   using initialization_tags =
       Parallel::get_initialization_tags<initialize_action_list>;
@@ -107,7 +107,7 @@ struct GHWorldtubeBoundary {
   using chare_type = Parallel::Algorithms::Singleton;
   using metavariables = Metavariables;
   using initialize_action_list =
-      tmpl::list<InitializeGHWorldtubeBoundary,
+      tmpl::list<Actions::InitializeGHWorldtubeBoundary,
                  Initialization::Actions::RemoveOptionsAndTerminatePhase>;
   using initialization_tags =
       Parallel::get_initialization_tags<initialize_action_list>;

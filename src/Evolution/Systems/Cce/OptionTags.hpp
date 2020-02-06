@@ -162,7 +162,7 @@ struct H5WorldtubeBoundaryDataManager : db::SimpleTag {
   }
 };
 
-struct GHInterfaceManager {
+struct GHInterfaceManager : db::SimpleTag {
   using type = std::unique_ptr<GHWorldtubeInterfaceManager>;
   using option_tags = tmpl::list<OptionTags::GHInterfaceManager>;
 
