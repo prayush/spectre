@@ -21,6 +21,7 @@ set(LIBRARY_SOURCES
   Test_ScriPlusValues.cpp
   Test_SwshDerivatives.cpp
   Test_Tags.cpp
+  Test_WorldtubeInterfaceManager.cpp
   )
 
 add_test_library(
