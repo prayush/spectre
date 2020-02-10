@@ -188,7 +188,8 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.BoundaryCommunication",
   ActionTesting::MockRuntimeSystem<test_metavariables> runner{
       {l_max, number_of_radial_points,
        std::make_unique<::TimeSteppers::RungeKutta3>(), start_time,
-       Tags::EndTime::create_from_options(end_time, filename)}};
+       Tags::EndTime::create_from_options<test_metavariables>(end_time,
+                                                              filename)}};
 
   // create the test file, because on initialization the manager will need
   // to get basic data out of the file
@@ -200,7 +201,8 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.BoundaryCommunication",
                                                         target_step_size);
   ActionTesting::emplace_component<worldtube_component>(
       &runner, 0,
-      InitializationTags::H5WorldtubeBoundaryDataManager::create_from_options(
+      InitializationTags::H5WorldtubeBoundaryDataManager::create_from_options<
+          test_metavariables>(
           l_max, filename, buffer_size,
           std::make_unique<intrp::BarycentricRationalSpanInterpolator>(3u,
                                                                        4u)));

@@ -75,7 +75,8 @@ SPECTRE_TEST_CASE(
                            metavariables::Phase::Initialization);
   ActionTesting::emplace_component<component>(
       &runner, 0,
-      InitializationTags::H5WorldtubeBoundaryDataManager::create_from_options(
+      InitializationTags::H5WorldtubeBoundaryDataManager::create_from_options<
+          metavariables>(
           l_max, filename, buffer_size,
           std::make_unique<intrp::BarycentricRationalSpanInterpolator>(3u,
                                                                        4u)));

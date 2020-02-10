@@ -11,10 +11,6 @@
 #include "Options/Options.hpp"
 
 namespace Cce {
-/// \cond
-class Interpolator;
-/// \endcond
-
 namespace OptionTags {
 
 /// %Option group
@@ -109,7 +105,7 @@ struct H5LookaheadTimes {
 };
 
 struct H5Interpolator {
-  using type = std::unique_ptr<Interpolator>;
+  using type = std::unique_ptr<intrp::SpanInterpolator>;
   static constexpr OptionString help{
       "The interpolator for imported h5 worldtube data."};
   using group = Cce;
@@ -173,6 +169,23 @@ struct TargetStepSize : db::SimpleTag {
   }
 };
 
+struct EndTime : db::SimpleTag {
+  using type = double;
+  using option_tags =
+      tmpl::list<OptionTags::EndTime, OptionTags::BoundaryDataFilename>;
+
+  template <typename Metavariables>
+  static double create_from_options(double end_time,
+                                    const std::string& filename) {
+    if (end_time == std::numeric_limits<double>::infinity()) {
+      SpecWorldtubeH5BufferUpdater h5_boundary_updater{filename};
+      const auto& time_buffer = h5_boundary_updater.get_time_buffer();
+      end_time = time_buffer[time_buffer.size() - 1];
+    }
+    return end_time;
+  }
+};
+
 struct ScriOutputDensity : db::SimpleTag {
   using type = size_t;
   using option_tags = tmpl::list<OptionTags::ScriOutputDensity>;
@@ -211,6 +224,7 @@ struct ObservationLMax : db::SimpleTag {
   using type = size_t;
   using option_tags = tmpl::list<OptionTags::ObservationLMax>;
 
+  template <typename Metavariables>
   static size_t create_from_options(const size_t observation_l_max) noexcept {
     return observation_l_max;
   }
@@ -221,6 +235,7 @@ struct FilterLMax : db::SimpleTag {
   using option_tags = tmpl::list<OptionTags::FilterLMax>;
 
   static constexpr bool pass_metavariables = false;
+
   static size_t create_from_options(const size_t filter_l_max) noexcept {
     return filter_l_max;
   }

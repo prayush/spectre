@@ -164,7 +164,6 @@ SPECTRE_TEST_CASE(
   const size_t l_max = 8;
   const size_t scri_output_density = 5;
 
-
   const double start_time = value_dist(gen);
   const double end_time = start_time + 1.0;
   const double target_step_size = 0.01 * value_dist(gen);
@@ -173,7 +172,8 @@ SPECTRE_TEST_CASE(
   ActionTesting::MockRuntimeSystem<test_metavariables> runner{
       {l_max, number_of_radial_points,
        std::make_unique<::TimeSteppers::RungeKutta3>(), start_time,
-       Tags::EndTime::create_from_options(end_time, "unused"),
+       Tags::EndTime::create_from_options<test_metavariables>(end_time,
+                                                              "unused"),
        scri_output_density}};
 
   runner.set_phase(test_metavariables::Phase::Initialization);
