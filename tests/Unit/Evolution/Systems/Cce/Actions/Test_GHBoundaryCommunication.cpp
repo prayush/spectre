@@ -13,7 +13,6 @@
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
-#include "Evolution/Systems/Cce/Actions/BlockUntilBoundaryDataReceived.hpp"
 #include "Evolution/Systems/Cce/Actions/BoundaryComputeAndSendToEvolution.hpp"
 #include "Evolution/Systems/Cce/Actions/InitializeCharacteristicEvolution.hpp"
 #include "Evolution/Systems/Cce/Actions/InitializeWorldtubeBoundary.hpp"
@@ -96,7 +95,7 @@ struct mock_characteristic_evolution {
           tmpl::list<Actions::RequestBoundaryData<
                          GHWorldtubeBoundary<Metavariables>,
                          mock_characteristic_evolution<Metavariables>>,
-                     Actions::BlockUntilBoundaryDataReceived,
+                     Actions::ReceiveWorldtubeData<Metavariables>,
                      Actions::RequestNextBoundaryData<
                          GHWorldtubeBoundary<Metavariables>,
                          mock_characteristic_evolution<Metavariables>>>>>;
@@ -164,7 +163,7 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.GHBoundaryCommunication",
           Parallel::get_const_global_cache_tags<test_metavariables>>{
           l_max, extraction_radius,
           std::make_unique<::TimeSteppers::RungeKutta3>(),
-          number_of_radial_points, l_max - 2, 36.0, 32_st}};
+          number_of_radial_points}};
 
   MAKE_GENERATOR(gen);
   UniformCustomDistribution<double> value_dist{0.1, 0.5};
@@ -222,25 +221,19 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.GHBoundaryCommunication",
   TestHelpers::create_fake_time_varying_gh_nodal_data(
       make_not_null(&spacetime_metric), make_not_null(&phi), make_not_null(&pi),
       solution, extraction_radius, amplitude, frequency, target_time, l_max);
-  printf("first\n");
   ActionTesting::simple_action<
       worldtube_component,
       Actions::ReceiveGHWorldtubeData<evolution_component>>(
       make_not_null(&runner), 0, current_time, spacetime_metric, phi, pi);
-  printf("second\n");
 
   // the first response (`BoundaryComputeAndSendToEvolution`)
   ActionTesting::invoke_queued_simple_action<worldtube_component>(
       make_not_null(&runner), 0);
-  printf("third\n");
   ActionTesting::invoke_queued_simple_action<worldtube_component>(
       make_not_null(&runner), 0);
-  printf("fourth\n");
   // then `ReceiveWorldtubeBoundaryData` in the evolution
-  ActionTesting::invoke_queued_simple_action<evolution_component>(
-      make_not_null(&runner), 0);
-  printf("fifth\n");
   CHECK(ActionTesting::is_ready<evolution_component>(runner, 0));
+  ActionTesting::next_action<evolution_component>(make_not_null(&runner), 0);
 
   const size_t number_of_angular_points =
       Spectral::Swsh::number_of_swsh_collocation_points(l_max);
