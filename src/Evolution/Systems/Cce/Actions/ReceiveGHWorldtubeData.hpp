@@ -8,6 +8,7 @@
 
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/Variables.hpp"
+#include "Evolution/Systems/Cce/Actions/BoundaryComputeAndSendToEvolution.hpp"
 #include "Evolution/Systems/Cce/Actions/ReceiveWorldtubeData.hpp"
 #include "Evolution/Systems/Cce/ReadBoundaryDataH5.hpp"
 #include "Evolution/Systems/Cce/WorldtubeInterfaceManager.hpp"
@@ -21,6 +22,7 @@
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TypeTraits.hpp"
 
+#include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/KerrSchild.hpp"
 
 namespace Cce {
 namespace Actions {
@@ -45,15 +47,16 @@ namespace Actions {
  */
 template <typename EvolutionComponent>
 struct ReceiveGHWorldtubeData {
+  using const_global_cache_tags = tmpl::list<InitializationTags::LMax>;
   template <
       typename ParallelComponent, typename... DbTags, typename Metavariables,
       typename ArrayIndex,
       Requires<tmpl::list_contains_v<tmpl::list<DbTags...>,
-                                     Tags::GHInterfaceManager>>
-          Requires<tmpl2::flat_any_v<cpp17::is_same_v<
-              ::Tags::Variables<
-                  typename Metavariables::cce_boundary_communication_tags>,
-              DbTags>...>> = nullptr>
+                                     Tags::GHInterfaceManager> and
+               tmpl2::flat_any_v<cpp17::is_same_v<
+                   ::Tags::Variables<
+                       typename Metavariables::cce_boundary_communication_tags>,
+                   DbTags>...>> = nullptr>
   static void apply(
       db::DataBox<tmpl::list<DbTags...>>& box,
       Parallel::ConstGlobalCache<Metavariables>& cache,
@@ -65,6 +68,7 @@ struct ReceiveGHWorldtubeData {
       const tnsr::iaa<DataVector, 3>& dt_phi = tnsr::iaa<DataVector, 3>{},
       const tnsr::aa<DataVector, 3>& dt_pi =
           tnsr::aa<DataVector, 3>{}) noexcept {
+
     db::mutate<Tags::GHInterfaceManager>(
         make_not_null(&box),
         [
@@ -81,8 +85,8 @@ struct ReceiveGHWorldtubeData {
                 GHWorldtubeBoundary<Metavariables>, EvolutionComponent>>(
                 Parallel::get_parallel_component<
                     GHWorldtubeBoundary<Metavariables>>(cache),
-                get<1>(*gh_data), get<2>(*gh_data), get<3>(*gh_data),
-                get<0>(*gh_data));
+                get<0>(*gh_data), get<1>(*gh_data), get<2>(*gh_data),
+                get<3>(*gh_data));
           }
         });
   }

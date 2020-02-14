@@ -269,8 +269,8 @@ SPECTRE_TEST_CASE("Unit.NumericalAlgorithms.Interpolator.Integration",
       {{1.0, 1.0, 1.0}}, {{2.4, 2.4, 2.4}}, 15);
   intrp::OptionHolders::LineSegment<3> line_segment_opts_B(
       {{1.1, 1.1, 1.1}}, {{2.5, 2.5, 2.5}}, 17);
-  intrp::OptionHolders::KerrHorizon kerr_horizon_opts_C(10, {{0.0, 0.0, 0.0}},
-                                                        1.0, {{0.0, 0.0, 0.0}});
+  intrp::OptionHolders::KerrHorizon kerr_horizon_opts_C(
+      10, {{0.0, 0.0, 0.0}}, 1.0, {{0.0, 0.0, 0.0}}, true);
   const auto domain_creator =
       domain::creators::Shell(0.9, 4.9, 1, {{5, 5}}, false);
   tuples::TaggedTuple<

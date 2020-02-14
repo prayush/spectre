@@ -14,6 +14,7 @@
 #include "Parallel/ParallelComponentHelpers.hpp"
 #include "Parallel/PhaseDependentActionList.hpp"
 #include "Utilities/TMPL.hpp"
+#include "Utilities/TypeTraits.hpp"
 
 /// \cond
 namespace intrp {
@@ -141,9 +142,16 @@ struct InterpolationTarget {
                      Parallel::Actions::TerminatePhase>>,
       Parallel::PhaseActions<
           typename Metavariables::Phase, Metavariables::Phase::Register,
-          tmpl::list<::observers::Actions::RegisterSingletonWithObserverWriter<
-                         RegistrationHelper>,
-                     Parallel::Actions::TerminatePhase>>>;
+          tmpl::conditional_t<
+              cpp17::is_same_v<
+                  typename InterpolationTargetTag::post_interpolation_callback::
+                      observation_types,
+                  tmpl::list<>>,
+              tmpl::list<Parallel::Actions::TerminatePhase>,
+              tmpl::list<
+                  ::observers::Actions::RegisterSingletonWithObserverWriter<
+                      RegistrationHelper>,
+                  Parallel::Actions::TerminatePhase>>>>;
 
   using initialization_tags = Parallel::get_initialization_tags<
       Parallel::get_initialization_actions_list<phase_dependent_action_list>>;

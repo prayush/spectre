@@ -60,7 +60,7 @@ SPECTRE_TEST_CASE("Unit.NumericalAlgorithms.InterpolationTarget.KerrHorizon",
 
   // Options for KerrHorizon
   intrp::OptionHolders::KerrHorizon kerr_horizon_opts(l_max, center, mass,
-                                                      dimless_spin);
+                                                      dimless_spin, true);
 
   // Test creation of options
   const auto created_opts =

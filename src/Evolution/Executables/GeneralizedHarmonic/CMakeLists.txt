@@ -3,6 +3,7 @@
 
 set(LIBS_TO_LINK
     ApparentHorizons
+    Cce
     CoordinateMaps
     DiscontinuousGalerkin
     Domain
@@ -16,6 +17,7 @@ set(LIBS_TO_LINK
     Interpolation
     LinearOperators
     MathFunctions
+    Spectral
     Time
     Utilities
     ${SPECTRE_LIBRARIES}
