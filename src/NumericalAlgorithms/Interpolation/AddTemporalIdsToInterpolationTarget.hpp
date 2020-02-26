@@ -47,11 +47,12 @@ struct AddTemporalIdsToInterpolationTarget {
 
     db::mutate_apply<tmpl::list<Tags::TemporalIds<Metavariables>>,
                      tmpl::list<Tags::CompletedTemporalIds<Metavariables>>>(
-        [&temporal_ids](const gsl::not_null<
-                            db::item_type<Tags::TemporalIds<Metavariables>>*>
-                            ids,
-                        const db::const_item_type<Tags::CompletedTemporalIds<
-                            Metavariables>>& completed_ids) noexcept {
+        [
+          &temporal_ids, &new_temporal_ids
+        ](const gsl::not_null<db::item_type<Tags::TemporalIds<Metavariables>>*>
+              ids,
+          const db::const_item_type<Tags::CompletedTemporalIds<Metavariables>>&
+              completed_ids) noexcept {
           // We allow this Action to be called multiple times with the
           // same temporal_ids (e.g. from each node of a NodeGroup
           // ParallelComponent such as Interpolator). If multiple calls

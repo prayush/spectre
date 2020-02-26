@@ -88,9 +88,10 @@ struct FindApparentHorizon {
 
     // Before doing anything else, deal with the possibility that some
     // of the points might be outside of the Domain.
-    const auto num_invalid_pts =
-        db::get<Tags::IndicesOfInvalidInterpPoints>(*box).size();
-    if(num_invalid_pts > 0) {
+    const auto& indices_of_invalid_pts =
+        db::get<Tags::IndicesOfInvalidInterpPoints<Metavariables>>(*box);
+    if(indices_of_invalid_pts.find(temporal_id) != indices_of_invalid_pts.end()
+       and indices_of_invalid_pts.at(temporal_id).size() >0) {
       ERROR("FindApparentHorizon: Found points that are not in any block");
     }
 

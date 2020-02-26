@@ -34,6 +34,7 @@
 class DataVector;
 namespace intrp {
 namespace Tags {
+template <typename Metavariables>
 struct IndicesOfFilledInterpPoints;
 template <typename Metavariables>
 struct TemporalIds;
@@ -77,11 +78,14 @@ struct MockComputeTargetPoints {
     // Put something in IndicesOfFilledInterpPts so we can check later whether
     // this function was called.  This isn't the usual usage of
     // IndicesOfFilledInterpPoints.
-    db::mutate<::intrp::Tags::IndicesOfFilledInterpPoints>(
+    db::mutate<::intrp::Tags::IndicesOfFilledInterpPoints<Metavariables>>(
         make_not_null(&box),
-        [](const gsl::not_null<
-            db::item_type<::intrp::Tags::IndicesOfFilledInterpPoints>*>
-               indices) noexcept { indices->insert(indices->size() + 1); });
+        [&temporal_id](
+            const gsl::not_null<db::item_type<
+                ::intrp::Tags::IndicesOfFilledInterpPoints<Metavariables>>*>
+                indices) noexcept {
+          (*indices)[temporal_id].insert((*indices)[temporal_id].size() + 1);
+        });
   }
 };
 
@@ -147,8 +151,9 @@ SPECTRE_TEST_CASE("Unit.NumericalAlgorithms.InterpolationTarget.AddTemporalIds",
 
   // Check that MockComputeTargetPoints was called.
   CHECK(ActionTesting::get_databox_tag<
-            target_component, ::intrp::Tags::IndicesOfFilledInterpPoints>(
-            runner, 0)
+            target_component,
+            ::intrp::Tags::IndicesOfFilledInterpPoints<metavars>>(runner, 0)
+            .at(temporal_ids[0])
             .size() == 1);
 
   // Call again; it should not call MockComputeTargetPoints this time.

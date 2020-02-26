@@ -21,10 +21,6 @@ namespace Parallel {
 template <typename Metavariables>
 class ConstGlobalCache;
 }  // namespace Parallel
-namespace Tags {
-template <typename TagsList>
-struct Variables;
-}  // namespace Tags
 /// \endcond
 
 namespace intrp {
@@ -88,10 +84,11 @@ auto make_initial_box(
 ///
 /// DataBox changes:
 /// - Adds:
-///   - `Tags::IndicesOfFilledInterpPoints`
-///   - `Tags::IndicesOfInvalidInterpPoints`
+///   - `Tags::IndicesOfFilledInterpPoints<Metavariables>`
+///   - `Tags::IndicesOfInvalidInterpPoints<Metavariables>`
 ///   - `Tags::TemporalIds<Metavariables>`
 ///   - `Tags::CompletedTemporalIds<Metavariables>`
+///   - `Tags::InterpolatedVars<InterpolationTargetTag,Metavariables>`
 ///   - `::Tags::Variables<typename
 ///                   InterpolationTargetTag::vars_to_interpolate_to_target>`
 /// - Removes: nothing
@@ -101,9 +98,11 @@ auto make_initial_box(
 template <typename Metavariables, typename InterpolationTargetTag>
 struct InitializeInterpolationTarget {
   using return_tag_list_initial = tmpl::list<
-      Tags::IndicesOfFilledInterpPoints, Tags::IndicesOfInvalidInterpPoints,
+      Tags::IndicesOfFilledInterpPoints<Metavariables>,
+      Tags::IndicesOfInvalidInterpPoints<Metavariables>,
       Tags::TemporalIds<Metavariables>,
       Tags::CompletedTemporalIds<Metavariables>,
+      Tags::InterpolatedVars<InterpolationTargetTag, Metavariables>,
       ::Tags::Variables<
           typename InterpolationTargetTag::vars_to_interpolate_to_target>>;
   using return_tag_list =
@@ -114,7 +113,8 @@ struct InitializeInterpolationTarget {
   template <typename DbTagsList, typename... InboxTags, typename ArrayIndex,
             typename ActionList, typename ParallelComponent,
             Requires<not tmpl::list_contains_v<
-                DbTagsList, Tags::IndicesOfFilledInterpPoints>> = nullptr>
+                DbTagsList, Tags::IndicesOfFilledInterpPoints<Metavariables>>> =
+                nullptr>
   static auto apply(db::DataBox<DbTagsList>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
                     const Parallel::ConstGlobalCache<Metavariables>& cache,
@@ -125,10 +125,13 @@ struct InitializeInterpolationTarget {
         InterpolationTargetTag>(
         db::create_from<db::RemoveTags<>,
                         db::get_items<return_tag_list_initial>>(
-            std::move(box), db::item_type<Tags::IndicesOfFilledInterpPoints>{},
-            db::item_type<Tags::IndicesOfInvalidInterpPoints>{},
+            std::move(box),
+            db::item_type<Tags::IndicesOfFilledInterpPoints<Metavariables>>{},
+            db::item_type<Tags::IndicesOfInvalidInterpPoints<Metavariables>>{},
             db::item_type<Tags::TemporalIds<Metavariables>>{},
             db::item_type<Tags::CompletedTemporalIds<Metavariables>>{},
+            db::item_type<Tags::InterpolatedVars<InterpolationTargetTag,
+                                                 Metavariables>>{},
             db::item_type<
                 ::Tags::Variables<typename InterpolationTargetTag::
                                       vars_to_interpolate_to_target>>{}),
@@ -147,7 +150,8 @@ struct InitializeInterpolationTarget {
   template <typename DbTagsList, typename... InboxTags, typename ArrayIndex,
             typename ActionList, typename ParallelComponent,
             Requires<tmpl::list_contains_v<
-                DbTagsList, Tags::IndicesOfFilledInterpPoints>> = nullptr>
+                DbTagsList, Tags::IndicesOfFilledInterpPoints<Metavariables>>> =
+                nullptr>
   static std::tuple<db::DataBox<DbTagsList>&&> apply(
       db::DataBox<DbTagsList>& box,
       const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,

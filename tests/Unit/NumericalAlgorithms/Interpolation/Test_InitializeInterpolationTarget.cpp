@@ -74,7 +74,8 @@ SPECTRE_TEST_CASE("Unit.NumericalAlgorithms.InterpolationTarget.Initialize",
                            Metavariables::Phase::Testing);
 
   CHECK(ActionTesting::get_databox_tag<
-            component, ::intrp::Tags::IndicesOfFilledInterpPoints>(runner, 0)
+            component, ::intrp::Tags::IndicesOfFilledInterpPoints<metavars>>(
+            runner, 0)
             .empty());
   CHECK(ActionTesting::get_databox_tag<component,
                                        ::intrp::Tags::TemporalIds<metavars>>(
@@ -84,13 +85,10 @@ SPECTRE_TEST_CASE("Unit.NumericalAlgorithms.InterpolationTarget.Initialize",
   CHECK(Parallel::get<domain::Tags::Domain<3>>(runner.cache()) ==
         domain_creator.create_domain());
 
-  const auto test_vars = db::item_type<
-      ::Tags::Variables<tmpl::list<gr::Tags::Lapse<DataVector>>>>{};
-  CHECK(
-      ActionTesting::get_databox_tag<
-          component, ::Tags::Variables<typename metavars::InterpolationTargetA::
-                                           vars_to_interpolate_to_target>>(
-          runner, 0) == test_vars);
+  CHECK(ActionTesting::get_databox_tag<
+            component, ::intrp::Tags::InterpolatedVars<
+                           metavars::InterpolationTargetA, metavars>>(runner, 0)
+            .empty());
 }
 
 }  // namespace
