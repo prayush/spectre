@@ -42,8 +42,13 @@ struct AddTemporalIdsToInterpolationTarget {
                     const ArrayIndex& /*array_index*/,
                     std::vector<typename Metavariables::temporal_id::type>&&
                         temporal_ids) noexcept {
-    const bool begin_interpolation =
+    const bool temporal_id_added_for_the_first_time =
         db::get<Tags::TemporalIds<Metavariables>>(box).empty();
+
+    // Some of the temporal_ids may not be new;
+    // i.e. AddTemporalIdsToInterpolationTarget may have already be
+    // called for them.  So keep track of the new ones.
+    std::vector<typename Metavariables::temporal_id::type> new_temporal_ids{};
 
     db::mutate_apply<tmpl::list<Tags::TemporalIds<Metavariables>>,
                      tmpl::list<Tags::CompletedTemporalIds<Metavariables>>>(
@@ -71,23 +76,37 @@ struct AddTemporalIdsToInterpolationTarget {
                     completed_ids.end() and
                 std::find(ids->begin(), ids->end(), id) == ids->end()) {
               ids->push_back(id);
+              new_temporal_ids.push_back(id);
             }
           }
         },
         make_not_null(&box));
 
-    // Begin interpolation if it is not already in progress
-    // (i.e. waiting for data), and if there are temporal_ids to
-    // interpolate.  If there's an interpolation in progress, then a
-    // later interpolation will be started as soon as the earlier one
-    // finishes.
     const auto& ids = db::get<Tags::TemporalIds<Metavariables>>(box);
-    if (begin_interpolation and not ids.empty()) {
+    if (InterpolationTargetTag::compute_target_points::is_sequential::value) {
+      // InterpolationTarget is sequential.
+      // Begin a single interpolation if one is not already in progress
+      // (i.e. waiting for data), and if there are temporal_ids to
+      // interpolate.  If there's an interpolation in progress, then a
+      // later interpolation will be started as soon as the earlier one
+      // finishes (in InterpolationTargetReceiveVars).
+      if (temporal_id_added_for_the_first_time and not ids.empty()) {
+        auto& my_proxy =
+            Parallel::get_parallel_component<ParallelComponent>(cache);
+        Parallel::simple_action<
+            typename InterpolationTargetTag::compute_target_points>(
+            my_proxy, ids.front());
+      }
+    } else {
+      // InterpolationTarget is not sequential. So begin interpolation
+      // on every new temporal_id that has just been added.
       auto& my_proxy =
           Parallel::get_parallel_component<ParallelComponent>(cache);
-      Parallel::simple_action<
-          typename InterpolationTargetTag::compute_target_points>(my_proxy,
-                                                                  ids.front());
+      for (const auto& id : new_temporal_ids) {
+        Parallel::simple_action<
+            typename InterpolationTargetTag::compute_target_points>(my_proxy,
+                                                                    id);
+      }
     }
   }
 };
