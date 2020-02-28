@@ -48,25 +48,29 @@ void GHLockstepInterfaceManager::request_gh_data(
 boost::optional<std::tuple<TimeStepId, tnsr::aa<DataVector, 3>,
                            tnsr::iaa<DataVector, 3>, tnsr::aa<DataVector, 3>>>
 GHLockstepInterfaceManager::try_retrieve_first_ready_gh_data() noexcept {
-  if (provided_data_.empty() or data_requests_.empty()) {
+  // don't wait until a request to send.
+  if (provided_data_.empty()/* or data_requests_.empty()*/) {
     return boost::none;
   }
-  const auto lower_bound = std::lower_bound(
-      provided_data_.begin(), provided_data_.end(), data_requests_.front(),
-      [](const std::tuple<TimeStepId, tnsr::aa<DataVector, 3>,
-                          tnsr::iaa<DataVector, 3>, tnsr::aa<DataVector, 3>>&
-             data_entry,
-         const TimeStepId& time_id) noexcept {
-        return get<0>(data_entry) < time_id;
-      });
-  if (lower_bound != provided_data_.end() and
-      get<0>(*lower_bound) == data_requests_.front()) {
-    auto result = std::move(*lower_bound);
-    provided_data_.erase(lower_bound);
-    data_requests_.pop_front();
-    return result;
-  }
-  return boost::none;
+  const auto return_data = provided_data_.front();
+  provided_data_.pop_front();
+  return return_data;
+  // const auto lower_bound = std::lower_bound(
+      // provided_data_.begin(), provided_data_.end(), data_requests_.front(),
+      // [](const std::tuple<TimeStepId, tnsr::aa<DataVector, 3>,
+                          // tnsr::iaa<DataVector, 3>, tnsr::aa<DataVector, 3>>&
+             // data_entry,
+         // const TimeStepId& time_id) noexcept {
+        // return get<0>(data_entry) < time_id;
+      // });
+  // if (lower_bound != provided_data_.end() and
+      // get<0>(*lower_bound) == data_requests_.front()) {
+    // auto result = std::move(*lower_bound);
+    // provided_data_.erase(lower_bound);
+    // data_requests_.pop_front();
+    // return result;
+  // }
+  // return boost::none;
 }
 
 void GHLockstepInterfaceManager::pup(PUP::er& p) noexcept {
