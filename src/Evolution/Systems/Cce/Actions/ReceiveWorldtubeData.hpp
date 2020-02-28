@@ -69,6 +69,10 @@ struct ReceiveWorldtubeData {
               },
               db::get<::Tags::TimeStepId>(box));
         });
+    Parallel::printf("Cce at time: %f; size of inbox : %zu\n",
+                     db::get<::Tags::TimeStepId>(box).substep_time().value(),
+                     inbox.size());
+
     inbox.erase(db::get<::Tags::TimeStepId>(box));
     return std::forward_as_tuple(std::move(box));
   }
