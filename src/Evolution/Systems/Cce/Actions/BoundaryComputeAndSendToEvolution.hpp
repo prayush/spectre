@@ -172,7 +172,7 @@ struct SendToEvolution<GHWorldtubeBoundary<Metavariables>, EvolutionComponent> {
     create_bondi_boundary_data(
         make_not_null(&box), phi, pi, spacetime_metric,
         Parallel::get<InitializationTags::ExtractionRadius>(cache),
-        Parallel::get<Spectral::Swsh::Tags::LMax>(cache));
+        db::get<Tags::LMax>(box));
     Parallel::receive_data<Cce::ReceiveTags::BoundaryData<
       typename Metavariables::cce_boundary_communication_tags>>(
           Parallel::get_parallel_component<EvolutionComponent>(cache), time,

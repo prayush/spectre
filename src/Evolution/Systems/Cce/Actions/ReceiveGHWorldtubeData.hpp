@@ -47,16 +47,11 @@ namespace Actions {
  */
 template <typename EvolutionComponent>
 struct ReceiveGHWorldtubeData {
-  using const_global_cache_tags = tmpl::list<InitializationTags::LMax>;
-  template <
-      typename ParallelComponent, typename... DbTags, typename Metavariables,
-      typename ArrayIndex,
-      Requires<tmpl::list_contains_v<tmpl::list<DbTags...>,
-                                     Tags::GHInterfaceManager> and
-               tmpl2::flat_any_v<cpp17::is_same_v<
-                   ::Tags::Variables<
-                       typename Metavariables::cce_boundary_communication_tags>,
-                   DbTags>...>> = nullptr>
+  using const_global_cache_tags = tmpl::list<Tags::LMax>;
+  template <typename ParallelComponent, typename... DbTags,
+            typename Metavariables, typename ArrayIndex,
+            Requires<tmpl::list_contains_v<tmpl::list<DbTags...>,
+                                           Tags::GHInterfaceManager>> = nullptr>
   static void apply(
       db::DataBox<tmpl::list<DbTags...>>& box,
       Parallel::ConstGlobalCache<Metavariables>& cache,

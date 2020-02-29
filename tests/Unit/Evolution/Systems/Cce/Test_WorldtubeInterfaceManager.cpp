@@ -72,23 +72,24 @@ void test_gh_lockstep_interface_manager(
     interface_manager.request_gh_data(get<0>(expected_gh_data[2]));
     CHECK(interface_manager.number_of_pending_requests() == 2);
     CHECK(interface_manager.number_of_data_points() == 5);
+    // TODO simplify test associated with utility simplification
     auto retrieved_data = interface_manager.try_retrieve_first_ready_gh_data();
+    CHECK(retrieved_data);
+    CHECK(get<0>(*retrieved_data) == get<0>(expected_gh_data[0]));
+    CHECK(get<1>(*retrieved_data) == get<1>(expected_gh_data[0]));
+    CHECK(get<2>(*retrieved_data) == get<2>(expected_gh_data[0]));
+    CHECK(get<3>(*retrieved_data) == get<3>(expected_gh_data[0]));
+
+    CHECK(interface_manager.number_of_pending_requests() == 2);
+    CHECK(interface_manager.number_of_data_points() == 4);
+    retrieved_data = interface_manager.try_retrieve_first_ready_gh_data();
     CHECK(retrieved_data);
     CHECK(get<0>(*retrieved_data) == get<0>(expected_gh_data[1]));
     CHECK(get<1>(*retrieved_data) == get<1>(expected_gh_data[1]));
     CHECK(get<2>(*retrieved_data) == get<2>(expected_gh_data[1]));
     CHECK(get<3>(*retrieved_data) == get<3>(expected_gh_data[1]));
 
-    CHECK(interface_manager.number_of_pending_requests() == 1);
-    CHECK(interface_manager.number_of_data_points() == 4);
-    retrieved_data = interface_manager.try_retrieve_first_ready_gh_data();
-    CHECK(retrieved_data);
-    CHECK(get<0>(*retrieved_data) == get<0>(expected_gh_data[2]));
-    CHECK(get<1>(*retrieved_data) == get<1>(expected_gh_data[2]));
-    CHECK(get<2>(*retrieved_data) == get<2>(expected_gh_data[2]));
-    CHECK(get<3>(*retrieved_data) == get<3>(expected_gh_data[2]));
-
-    CHECK(interface_manager.number_of_pending_requests() == 0);
+    CHECK(interface_manager.number_of_pending_requests() == 2);
     CHECK(interface_manager.number_of_data_points() == 3);
   }
 
@@ -116,28 +117,23 @@ void test_gh_lockstep_interface_manager(
     fill_with_random_values(make_not_null(&pi), gen,
                             make_not_null(&value_dist));
     interface_manager.request_gh_data(time_id);
-    CHECK(interface_manager.number_of_pending_requests() == 1);
+    CHECK(interface_manager.number_of_pending_requests() == 3);
     CHECK(interface_manager.number_of_data_points() == 3);
-    printf("first\n");
     auto retrieved_data = interface_manager.try_retrieve_first_ready_gh_data();
-    printf("second\n");
-    CHECK_FALSE(retrieved_data);
-    printf("third\n");
-    CHECK(interface_manager.number_of_pending_requests() == 1);
-    printf("fourth\n");
-    CHECK(interface_manager.number_of_data_points() == 3);
+    CHECK(interface_manager.number_of_pending_requests() == 3);
+    CHECK(interface_manager.number_of_data_points() == 2);
     interface_manager.insert_gh_data(time_id, spacetime_metric, phi, pi);
 
-    CHECK(interface_manager.number_of_pending_requests() == 1);
-    CHECK(interface_manager.number_of_data_points() == 4);
+    CHECK(interface_manager.number_of_pending_requests() == 3);
+    CHECK(interface_manager.number_of_data_points() == 3);
     retrieved_data = interface_manager.try_retrieve_first_ready_gh_data();
     CHECK(retrieved_data);
-    CHECK(get<0>(*retrieved_data) == time_id);
-    CHECK(get<1>(*retrieved_data) == spacetime_metric);
-    CHECK(get<2>(*retrieved_data) == phi);
-    CHECK(get<3>(*retrieved_data) == pi);
-    CHECK(interface_manager.number_of_pending_requests() == 0);
-    CHECK(interface_manager.number_of_data_points() == 3);
+    CHECK(get<0>(*retrieved_data) == get<0>(expected_gh_data[3]));
+    CHECK(get<1>(*retrieved_data) == get<1>(expected_gh_data[3]));
+    CHECK(get<2>(*retrieved_data) == get<2>(expected_gh_data[3]));
+    CHECK(get<3>(*retrieved_data) == get<3>(expected_gh_data[3]));
+    CHECK(interface_manager.number_of_pending_requests() == 3);
+    CHECK(interface_manager.number_of_data_points() == 2);
   }
 
   {
@@ -148,22 +144,22 @@ void test_gh_lockstep_interface_manager(
     serialized_and_deserialized_interface_manager.request_gh_data(
         get<0>(expected_gh_data[3]));
     CHECK(serialized_and_deserialized_interface_manager
-              .number_of_pending_requests() == 1);
-    CHECK(
-        serialized_and_deserialized_interface_manager.number_of_data_points() ==
-        3);
-    const auto retrieved_data = serialized_and_deserialized_interface_manager
-                                    .try_retrieve_first_ready_gh_data();
-    CHECK(retrieved_data);
-    CHECK(get<0>(*retrieved_data) == get<0>(expected_gh_data[3]));
-    CHECK(get<1>(*retrieved_data) == get<1>(expected_gh_data[3]));
-    CHECK(get<2>(*retrieved_data) == get<2>(expected_gh_data[3]));
-    CHECK(get<3>(*retrieved_data) == get<3>(expected_gh_data[3]));
-    CHECK(serialized_and_deserialized_interface_manager
-              .number_of_pending_requests() == 0);
+              .number_of_pending_requests() == 4);
     CHECK(
         serialized_and_deserialized_interface_manager.number_of_data_points() ==
         2);
+    const auto retrieved_data = serialized_and_deserialized_interface_manager
+                                    .try_retrieve_first_ready_gh_data();
+    CHECK(retrieved_data);
+    CHECK(get<0>(*retrieved_data) == get<0>(expected_gh_data[4]));
+    CHECK(get<1>(*retrieved_data) == get<1>(expected_gh_data[4]));
+    CHECK(get<2>(*retrieved_data) == get<2>(expected_gh_data[4]));
+    CHECK(get<3>(*retrieved_data) == get<3>(expected_gh_data[4]));
+    CHECK(serialized_and_deserialized_interface_manager
+              .number_of_pending_requests() == 4);
+    CHECK(
+        serialized_and_deserialized_interface_manager.number_of_data_points() ==
+        1);
   }
 
   {
@@ -174,10 +170,10 @@ void test_gh_lockstep_interface_manager(
     const auto retrieved_data =
         cloned_interface_manager->try_retrieve_first_ready_gh_data();
     CHECK(retrieved_data);
-    CHECK(get<0>(*retrieved_data) == get<0>(expected_gh_data[3]));
-    CHECK(get<1>(*retrieved_data) == get<1>(expected_gh_data[3]));
-    CHECK(get<2>(*retrieved_data) == get<2>(expected_gh_data[3]));
-    CHECK(get<3>(*retrieved_data) == get<3>(expected_gh_data[3]));
+    CHECK(get<0>(*retrieved_data) == get<0>(expected_gh_data[4]));
+    CHECK(get<1>(*retrieved_data) == get<1>(expected_gh_data[4]));
+    CHECK(get<2>(*retrieved_data) == get<2>(expected_gh_data[4]));
+    CHECK(get<3>(*retrieved_data) == get<3>(expected_gh_data[4]));
   }
 }
 }  // namespace

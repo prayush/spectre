@@ -14,7 +14,9 @@
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "Evolution/Systems/Cce/Actions/BoundaryComputeAndSendToEvolution.hpp"
-#include "Evolution/Systems/Cce/Actions/InitializeCharacteristicEvolution.hpp"
+#include "Evolution/Systems/Cce/Actions/InitializeCharacteristicEvolutionScri.hpp"
+#include "Evolution/Systems/Cce/Actions/InitializeCharacteristicEvolutionTime.hpp"
+#include "Evolution/Systems/Cce/Actions/InitializeCharacteristicEvolutionVariables.hpp"
 #include "Evolution/Systems/Cce/Actions/InitializeWorldtubeBoundary.hpp"
 #include "Evolution/Systems/Cce/Actions/ReceiveGHWorldtubeData.hpp"
 #include "Evolution/Systems/Cce/Actions/ReceiveWorldtubeData.hpp"
@@ -77,7 +79,9 @@ struct mock_characteristic_evolution {
   using with_these_simple_actions = tmpl::list<>;
 
   using initialize_action_list =
-      tmpl::list<Actions::InitializeCharacteristicEvolution>;
+      tmpl::list<Actions::InitializeCharacteristicEvolutionVariables,
+                 Actions::InitializeCharacteristicEvolutionTime,
+                 Actions::InitializeCharacteristicEvolutionScri>;
   using initialization_tags =
       Parallel::get_initialization_tags<initialize_action_list>;
 
@@ -158,15 +162,21 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.GHBoundaryCommunication",
   const size_t number_of_radial_points = 10;
   const size_t l_max = 8;
   const double extraction_radius = 100.0;
-  ActionTesting::MockRuntimeSystem<test_metavariables> runner{
-      tuples::tagged_tuple_from_typelist<
-          Parallel::get_const_global_cache_tags<test_metavariables>>{
-          l_max, extraction_radius,
-          std::make_unique<::TimeSteppers::RungeKutta3>(),
-          number_of_radial_points}};
 
   MAKE_GENERATOR(gen);
   UniformCustomDistribution<double> value_dist{0.1, 0.5};
+  const double target_time = 50.0 * value_dist(gen);
+  const double start_time = target_time;
+  const double target_step_size = 0.01 * value_dist(gen);
+  const double end_time = target_time + 10.0 * target_step_size;
+
+  ActionTesting::MockRuntimeSystem<test_metavariables> runner{
+      tuples::tagged_tuple_from_typelist<
+          Parallel::get_const_global_cache_tags<test_metavariables>>{
+          l_max, extraction_radius, number_of_radial_points,
+          std::make_unique<::TimeSteppers::RungeKutta3>(), start_time,
+          end_time}};
+
   // first prepare the input for the modal version
   const double mass = value_dist(gen);
   const std::array<double, 3> spin{
@@ -177,28 +187,23 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.GHBoundaryCommunication",
 
   const double frequency = 0.1 * value_dist(gen);
   const double amplitude = 0.1 * value_dist(gen);
-  const double target_time = 50.0 * value_dist(gen);
 
   // create the test file, because on initialization the manager will need
   // to get basic data out of the file
-  const double start_time = target_time;
-  const double target_step_size = 0.01 * value_dist(gen);
-  const double end_time = target_time + 10.0 * target_step_size;
   const size_t buffer_size = 5;
   const size_t scri_plus_interpolation_order = 3;
 
   runner.set_phase(test_metavariables::Phase::Initialization);
   ActionTesting::emplace_component<evolution_component>(
-      &runner, 0, start_time,
-      InitializationTags::EndTime::create_from_options<test_metavariables>(
-          end_time, "unused"),
-      target_step_size, scri_plus_interpolation_order);
+      &runner, 0, target_step_size, scri_plus_interpolation_order);
   ActionTesting::emplace_component<worldtube_component>(
       &runner, 0,
-      InitializationTags::GHInterfaceManager::create_from_options<
-          test_metavariables>(std::make_unique<GHLockstepInterfaceManager>()));
+      InitializationTags::GHInterfaceManager::create_from_options(
+          std::make_unique<GHLockstepInterfaceManager>()));
 
   // this should run the initializations
+  ActionTesting::next_action<evolution_component>(make_not_null(&runner), 0);
+  ActionTesting::next_action<evolution_component>(make_not_null(&runner), 0);
   ActionTesting::next_action<evolution_component>(make_not_null(&runner), 0);
   ActionTesting::next_action<worldtube_component>(make_not_null(&runner), 0);
   runner.set_phase(test_metavariables::Phase::Evolve);

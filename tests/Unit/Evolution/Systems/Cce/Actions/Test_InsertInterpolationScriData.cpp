@@ -172,7 +172,7 @@ SPECTRE_TEST_CASE(
   ActionTesting::MockRuntimeSystem<test_metavariables> runner{
       {l_max, number_of_radial_points,
        std::make_unique<::TimeSteppers::RungeKutta3>(), start_time,
-       Tags::EndTime::create_from_options<test_metavariables>(end_time,
+       Tags::EndTime::create_from_options(end_time,
                                                               "unused"),
        scri_output_density}};
 

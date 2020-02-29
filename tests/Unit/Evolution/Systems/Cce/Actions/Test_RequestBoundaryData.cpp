@@ -177,8 +177,7 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.RequestBoundaryData",
   ActionTesting::MockRuntimeSystem<test_metavariables> runner{
       {l_max, number_of_radial_points,
        std::make_unique<::TimeSteppers::RungeKutta3>(), start_time,
-       Tags::EndTime::create_from_options<test_metavariables>(end_time,
-                                                              filename)}};
+       Tags::EndTime::create_from_options(end_time, filename)}};
 
   ActionTesting::set_phase(make_not_null(&runner),
                            test_metavariables::Phase::Initialization);
@@ -186,8 +185,7 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.RequestBoundaryData",
                                                         target_step_size);
   ActionTesting::emplace_component<worldtube_component>(
       &runner, 0,
-      InitializationTags::H5WorldtubeBoundaryDataManager::create_from_options<
-          test_metavariables>(
+      InitializationTags::H5WorldtubeBoundaryDataManager::create_from_options(
           l_max, filename, buffer_size,
           std::make_unique<intrp::BarycentricRationalSpanInterpolator>(3_st,
                                                                        4_st)));

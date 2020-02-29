@@ -82,8 +82,7 @@ void test_h5_initialization(const gsl::not_null<Generator*> gen) noexcept {
                           h5_metavariables::Phase::Initialization);
   ActionTesting::emplace_component<component>(
       &runner, 0,
-      InitializationTags::H5WorldtubeBoundaryDataManager::create_from_options<
-          h5_metavariables>(
+      InitializationTags::H5WorldtubeBoundaryDataManager::create_from_options(
           l_max, filename, buffer_size,
           std::make_unique<intrp::BarycentricRationalSpanInterpolator>(3u,
                                                                        4u)));
@@ -134,8 +133,8 @@ void test_gh_initialization() noexcept {
   runner.set_phase(gh_metavariables::Phase::Initialization);
   ActionTesting::emplace_component<component>(
       &runner, 0,
-      InitializationTags::GHInterfaceManager::create_from_options<
-          gh_metavariables>(std::make_unique<GHLockstepInterfaceManager>()));
+      InitializationTags::GHInterfaceManager::create_from_options(
+          std::make_unique<GHLockstepInterfaceManager>()));
 
   // this should run the initialization
   ActionTesting::next_action<component>(make_not_null(&runner), 0);

@@ -166,7 +166,7 @@ struct GHInterfaceManager : db::SimpleTag {
   using type = std::unique_ptr<GHWorldtubeInterfaceManager>;
   using option_tags = tmpl::list<OptionTags::GHInterfaceManager>;
 
-  template <typename Metavariables>
+  static constexpr bool pass_metavariables = false;
   static std::unique_ptr<::Cce::GHWorldtubeInterfaceManager>
   create_from_options(const std::unique_ptr<::Cce::GHWorldtubeInterfaceManager>&
                           interface_handler) noexcept {
@@ -200,7 +200,7 @@ struct EndTime : db::SimpleTag {
   using option_tags =
       tmpl::list<OptionTags::EndTime, OptionTags::BoundaryDataFilename>;
 
-  template <typename Metavariables>
+  static constexpr bool pass_metavariables = false;
   static double create_from_options(double end_time,
                                     const std::string& filename) {
     if (end_time == std::numeric_limits<double>::infinity()) {
@@ -216,7 +216,7 @@ struct ExtractionRadius : db::SimpleTag {
   using type = double;
   using option_tags = tmpl::list<OptionTags::ExtractionRadius>;
 
-  template <typename Metavariables>
+  static constexpr bool pass_metavariables = false;
   static double create_from_options(const double extraction_radius) noexcept {
     return extraction_radius;
   }

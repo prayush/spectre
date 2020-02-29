@@ -147,11 +147,11 @@ struct InitializeGHWorldtubeBoundary {
                 DbTags, InitializationTags::GHInterfaceManager>> = nullptr>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
-    const size_t l_max = Parallel::get<Spectral::Swsh::Tags::LMax>(cache);
+    const size_t l_max = db::get<Tags::LMax>(box);
     Variables<typename Metavariables::cce_boundary_communication_tags>
         boundary_variables{
             Spectral::Swsh::number_of_swsh_collocation_points(l_max)};

@@ -154,7 +154,7 @@ SPECTRE_TEST_CASE(
   ActionTesting::MockRuntimeSystem<metavariables> runner{
       {l_max, number_of_radial_points,
        std::make_unique<::TimeSteppers::RungeKutta3>(), start_time,
-       Tags::EndTime::create_from_options<metavariables>(end_time, filename)}};
+       Tags::EndTime::create_from_options(end_time, filename)}};
 
   ActionTesting::set_phase(make_not_null(&runner),
                            metavariables::Phase::Initialization);
