@@ -252,30 +252,6 @@ struct EvolutionMetavars {
         tmpl::list<StrahlkorperGr::Tags::AreaElement<Frame::Inertial>>;
   };
 
-  struct Horizon {
-    using tags_to_observe =
-        tmpl::list<StrahlkorperGr::Tags::SurfaceIntegral<Unity, frame>>;
-    using compute_items_on_source = tmpl::list<
-        gr::Tags::SpatialMetricCompute<volume_dim, frame, DataVector>,
-        ah::Tags::InverseSpatialMetricCompute<volume_dim, frame>,
-        ah::Tags::ExtrinsicCurvatureCompute<volume_dim, frame>,
-        ah::Tags::SpatialChristoffelSecondKindCompute<volume_dim, frame>>;
-    using vars_to_interpolate_to_target =
-        tmpl::list<gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
-                   gr::Tags::InverseSpatialMetric<volume_dim, frame>,
-                   gr::Tags::ExtrinsicCurvature<volume_dim, frame>,
-                   gr::Tags::SpatialChristoffelSecondKind<volume_dim, frame>>;
-    using compute_items_on_target = tmpl::append<
-        tmpl::list<StrahlkorperGr::Tags::AreaElement<frame>, Unity>,
-        tags_to_observe>;
-    using compute_target_points =
-        intrp::Actions::ApparentHorizon<Horizon, ::Frame::Inertial>;
-    using post_interpolation_callback =
-        intrp::callbacks::FindApparentHorizon<Horizon>;
-    using post_horizon_find_callback =
-        intrp::callbacks::ObserveTimeSeriesOnSurface<tags_to_observe, Horizon,
-                                                     Horizon>;
-  };
   struct CceWorldTubeTarget {
     using compute_items_on_source = tmpl::list<>;
     using compute_items_on_target = tmpl::list<>;
@@ -288,7 +264,7 @@ struct EvolutionMetavars {
                    GeneralizedHarmonic::Tags::Pi<volume_dim, frame>,
                    GeneralizedHarmonic::Tags::Phi<volume_dim, frame>>;
   };
-  using interpolation_target_tags = tmpl::list<Horizon, CceWorldTubeTarget>;
+  using interpolation_target_tags = tmpl::list<CceWorldTubeTarget>;
   using interpolator_source_vars =
       tmpl::list<gr::Tags::SpacetimeMetric<volume_dim, frame>,
                  GeneralizedHarmonic::Tags::Pi<volume_dim, frame>,
@@ -320,8 +296,7 @@ struct EvolutionMetavars {
   using element_observation_type = ObservationType;
 
   using observed_reduction_data_tags = observers::collect_reduction_data_tags<
-      tmpl::push_back<Event<observation_events>::creatable_classes,
-                      typename Horizon::post_horizon_find_callback>>;
+      Event<observation_events>::creatable_classes>;
 
   using step_actions = tmpl::flatten<tmpl::list<
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
@@ -401,7 +376,6 @@ struct EvolutionMetavars {
       observers::Observer<EvolutionMetavars>,
       observers::ObserverWriter<EvolutionMetavars>,
       intrp::Interpolator<EvolutionMetavars>,
-      intrp::InterpolationTarget<EvolutionMetavars, Horizon>,
       intrp::InterpolationTarget<EvolutionMetavars, CceWorldTubeTarget>,
       tmpl::conditional_t<is_numerical_initial_data_v<initial_data>,
                           importers::VolumeDataReader<EvolutionMetavars>,
