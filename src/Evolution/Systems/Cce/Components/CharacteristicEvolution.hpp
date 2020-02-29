@@ -158,7 +158,7 @@ struct CharacteristicEvolution {
                                  tmpl::bind<CalculateScriPlusValue, tmpl::_1>>>,
       tmpl::transform<
           typename metavariables::scri_values_to_observe,
-          tmpl::bind<Actions::EnqueueInterpolationScriData, tmpl::_1>>,
+          tmpl::bind<Actions::InsertInterpolationScriData, tmpl::_1>>,
       Actions::ScriObserveInterpolated<
           observers::ObserverWriter<Metavariables>>,
       ::Actions::RecordTimeStepperData<
