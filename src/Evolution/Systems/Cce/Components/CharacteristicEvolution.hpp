@@ -8,9 +8,11 @@
 #include "Evolution/Systems/Cce/Actions/BoundaryComputeAndSendToEvolution.hpp"
 #include "Evolution/Systems/Cce/Actions/CalculateScriInputs.hpp"
 #include "Evolution/Systems/Cce/Actions/CharacteristicEvolutionBondiCalculations.hpp"
-#include "Evolution/Systems/Cce/Actions/EnqueueInterpolationScriData.hpp"
 #include "Evolution/Systems/Cce/Actions/FilterSwshVolumeQuantity.hpp"
-#include "Evolution/Systems/Cce/Actions/InitializeCharacteristicEvolution.hpp"
+#include "Evolution/Systems/Cce/Actions/InitializeCharacteristicEvolutionScri.hpp"
+#include "Evolution/Systems/Cce/Actions/InitializeCharacteristicEvolutionTime.hpp"
+#include "Evolution/Systems/Cce/Actions/InitializeCharacteristicEvolutionVariables.hpp"
+#include "Evolution/Systems/Cce/Actions/InsertInterpolationScriData.hpp"
 #include "Evolution/Systems/Cce/Actions/RequestBoundaryData.hpp"
 #include "Evolution/Systems/Cce/Actions/ScriObserveInterpolated.hpp"
 #include "Evolution/Systems/Cce/Actions/TimeManagement.hpp"
@@ -91,7 +93,9 @@ struct CharacteristicEvolution {
   using metavariables = Metavariables;
 
   using initialize_action_list =
-      tmpl::list<Actions::InitializeCharacteristicEvolution,
+      tmpl::list<Actions::InitializeCharacteristicEvolutionVariables,
+                 Actions::InitializeCharacteristicEvolutionTime,
+                 Actions::InitializeCharacteristicEvolutionScri,
                  Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
   using initialization_tags =
