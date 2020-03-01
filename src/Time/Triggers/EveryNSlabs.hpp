@@ -79,8 +79,70 @@ class EveryNSlabs : public Trigger<TriggerRegistrars> {
   uint64_t offset_{0};
 };
 
+
+template <typename TriggerRegistrars>
+class EveryNSlabsAllSubsteps;
+
+namespace Registrars {
+using EveryNSlabsAllSubsteps =
+    Registration::Registrar<Triggers::EveryNSlabsAllSubsteps>;
+}  // namespace Registrars
+
+/// \ingroup EventsAndTriggersGroup
+/// \ingroup TimeGroup
+/// Trigger every N time slabs after a given offset, including all substeps.
+template <typename TriggerRegistrars =
+              tmpl::list<Registrars::EveryNSlabsAllSubsteps>>
+class EveryNSlabsAllSubsteps : public Trigger<TriggerRegistrars> {
+ public:
+  /// \cond
+  EveryNSlabsAllSubsteps() = default;
+  explicit EveryNSlabsAllSubsteps(CkMigrateMessage* /*unused*/) noexcept {}
+  using PUP::able::register_constructor;
+  WRAPPED_PUPable_decl_template(EveryNSlabsAllSubsteps);  // NOLINT
+  /// \endcond
+
+  struct N {
+    using type = uint64_t;
+    static constexpr OptionString help{"How frequently to trigger."};
+    static type lower_bound() noexcept { return 1; }
+  };
+  struct Offset {
+    using type = uint64_t;
+    static constexpr OptionString help{"First slab to trigger on."};
+    static type default_value() noexcept { return 0; }
+  };
+
+  using options = tmpl::list<N, Offset>;
+  static constexpr OptionString help{
+    "Trigger every N time slabs after a given offset."};
+
+  EveryNSlabsAllSubsteps(const uint64_t interval,
+                         const uint64_t offset) noexcept
+      : interval_(interval), offset_(offset) {}
+
+  using argument_tags = tmpl::list<Tags::TimeStepId>;
+
+  bool operator()(const TimeStepId& time_id) const noexcept {
+    const auto slab_number = static_cast<uint64_t>(time_id.slab_number());
+    return slab_number >= offset_ and (slab_number - offset_) % interval_ == 0;
+  }
+
+  // clang-tidy: google-runtime-references
+  void pup(PUP::er& p) noexcept {  // NOLINT
+    p | interval_;
+    p | offset_;
+  }
+
+ private:
+  uint64_t interval_{0};
+  uint64_t offset_{0};
+};
+
 /// \cond
 template <typename TriggerRegistrars>
 PUP::able::PUP_ID EveryNSlabs<TriggerRegistrars>::my_PUP_ID = 0;  // NOLINT
+template <typename TriggerRegistrars>
+PUP::able::PUP_ID EveryNSlabsAllSubsteps<TriggerRegistrars>::my_PUP_ID = 0;  // NOLINT
 /// \endcond
 }  // namespace Triggers

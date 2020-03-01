@@ -206,6 +206,7 @@ template <typename InterpolationTargetTag>
 struct WedgeSectionTorus {
   using const_global_cache_tags =
       tmpl::list<Tags::WedgeSectionTorus<InterpolationTargetTag>>;
+  using is_sequential = std::false_type;
   template <typename ParallelComponent, typename DbTags, typename Metavariables,
             typename ArrayIndex,
             Requires<tmpl::list_contains_v<

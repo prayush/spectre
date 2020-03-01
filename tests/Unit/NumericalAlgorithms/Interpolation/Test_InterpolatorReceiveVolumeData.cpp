@@ -117,7 +117,9 @@ struct MockInterpolationTargetReceiveVars {
       const std::vector<db::item_type<::Tags::Variables<
           typename InterpolationTargetTag::vars_to_interpolate_to_target>>>&
           vars_src,
-      const std::vector<std::vector<size_t>>& global_offsets) noexcept {
+      const std::vector<std::vector<size_t>>& global_offsets,
+      const typename Metavariables::temporal_id::
+          type& /*temporal_id*/) noexcept {
     size_t number_of_interpolated_points = 0;
     for (size_t i = 0; i < global_offsets.size(); ++i) {
       Scalar<DataVector> expected_vars{global_offsets[i].size()};
@@ -147,13 +149,13 @@ struct MockInterpolationTargetReceiveVars {
     // This is not the usual usage of Tags::TemporalIds; this is done just
     // for the test.
     Slab slab(0.0, 1.0);
-    TimeStepId temporal_id(true, 0, Time(slab, Rational(111, 135)));
+    TimeStepId strange_temporal_id(true, 0, Time(slab, Rational(111, 135)));
     db::mutate<intrp::Tags::TemporalIds<Metavariables>>(
-        make_not_null(&box), [&temporal_id](
+        make_not_null(&box), [&strange_temporal_id](
                                  const gsl::not_null<db::item_type<
                                      intrp::Tags::TemporalIds<Metavariables>>*>
                                      temporal_ids) noexcept {
-          temporal_ids->push_back(temporal_id);
+          temporal_ids->push_back(strange_temporal_id);
         });
   }
 };

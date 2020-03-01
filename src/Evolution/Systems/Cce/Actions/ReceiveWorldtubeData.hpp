@@ -10,6 +10,7 @@
 #include "Evolution/Systems/Cce/ReceiveTags.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
 #include "Parallel/Invoke.hpp"
+#include "Parallel/Printf.hpp"
 #include "Time/Tags.hpp"
 #include "Time/TimeStepId.hpp"
 #include "Utilities/Gsl.hpp"
@@ -69,6 +70,10 @@ struct ReceiveWorldtubeData {
               },
               db::get<::Tags::TimeStepId>(box));
         });
+    Parallel::printf("Cce at time: %f; size of inbox : %zu\n",
+                     db::get<::Tags::TimeStepId>(box).substep_time().value(),
+                     inbox.size());
+
     inbox.erase(db::get<::Tags::TimeStepId>(box));
     return std::forward_as_tuple(std::move(box));
   }

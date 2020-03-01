@@ -14,6 +14,7 @@
 #include "Parallel/ConstGlobalCache.hpp"
 #include "Parallel/Invoke.hpp"
 #include "Utilities/Gsl.hpp"
+#include "Utilities/Literals.hpp"
 #include "Utilities/Requires.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
@@ -31,6 +32,7 @@ template <typename InterpolationTargetTag>
 struct CleanUpInterpolator;
 }  // namespace Actions
 namespace Tags {
+template <typename Metavariables>
 struct IndicesOfFilledInterpPoints;
 template <typename Metavariables>
 struct CompletedTemporalIds;
@@ -90,42 +92,47 @@ constexpr bool has_fill_invalid_points_with_v =
     has_fill_invalid_points_with<T>::value;
 
 // Fills invalid points with some constant value.
-template <typename InterpolationTargetTag, typename DbTags,
+template <typename InterpolationTargetTag, typename Metavariables,
+          typename DbTags,
           Requires<not has_fill_invalid_points_with_v<InterpolationTargetTag>> =
               nullptr>
 void fill_invalid_points(
-    const gsl::not_null<db::DataBox<DbTags>*> /*box*/) noexcept {}
+    const gsl::not_null<db::DataBox<DbTags>*> /*box*/,
+    const typename Metavariables::temporal_id::type& /*temporal_id*/) noexcept {
+}
 
 template <
-    typename InterpolationTargetTag, typename DbTags,
+    typename InterpolationTargetTag, typename Metavariables, typename DbTags,
     Requires<has_fill_invalid_points_with_v<InterpolationTargetTag>> = nullptr>
 void fill_invalid_points(
-    const gsl::not_null<db::DataBox<DbTags>*> box) noexcept {
-  if (not db::get<Tags::IndicesOfInvalidInterpPoints>(*box).empty()) {
-    db::mutate<
-        Tags::IndicesOfInvalidInterpPoints,
-        ::Tags::Variables<
-            typename InterpolationTargetTag::vars_to_interpolate_to_target>>(
-        box, [](const gsl::not_null<
-                    db::item_type<Tags::IndicesOfInvalidInterpPoints>*>
+    const gsl::not_null<db::DataBox<DbTags>*> box,
+    const typename Metavariables::temporal_id::type& temporal_id) noexcept {
+  const auto& invalid_indices =
+      db::get<Tags::IndicesOfInvalidInterpPoints<Metavariables>>(*box);
+  if (invalid_indices.find(temporal_id) != invalid_indices.end() and
+      not invalid_indices.at(temporal_id).empty()) {
+    db::mutate<Tags::IndicesOfInvalidInterpPoints<Metavariables>,
+               Tags::InterpolatedVars<InterpolationTargetTag, Metavariables>>(
+        box, [&temporal_id](const gsl::not_null<db::item_type<
+                    Tags::IndicesOfInvalidInterpPoints<Metavariables>>*>
                     indices_of_invalid_points,
-                const gsl::not_null<db::item_type<
-                    ::Tags::Variables<typename InterpolationTargetTag::
-                                          vars_to_interpolate_to_target>>*>
-                    vars_dest) noexcept {
-          const size_t npts_dest = vars_dest->number_of_grid_points();
-          const size_t nvars = vars_dest->number_of_independent_components;
-          for (auto index : *indices_of_invalid_points) {
+                const gsl::not_null<db::item_type<Tags::InterpolatedVars<
+                    InterpolationTargetTag, Metavariables>>*>
+                    vars_dest_all_times) noexcept {
+          auto& vars_dest = vars_dest_all_times->at(temporal_id);
+          const size_t npts_dest = vars_dest.number_of_grid_points();
+          const size_t nvars = vars_dest.number_of_independent_components;
+          for (auto index : (*indices_of_invalid_points).at(temporal_id)) {
             for (size_t v = 0; v < nvars; ++v) {
               // clang-tidy: no pointer arithmetic
-              vars_dest->data()[index + v * npts_dest] =  // NOLINT
+              vars_dest.data()[index + v * npts_dest] =  // NOLINT
                   InterpolationTargetTag::post_interpolation_callback::
                       fill_invalid_points_with;
             }
           }
           // Further functions may test if there are invalid points.
           // Clear the invalid points now, since we have filled them.
-          indices_of_invalid_points->clear();
+          indices_of_invalid_points->erase(temporal_id);
         });
   }
 }
@@ -137,14 +144,31 @@ template <typename InterpolationTargetTag, typename DbTags,
           typename Metavariables>
 void callback_and_cleanup(
     const gsl::not_null<db::DataBox<DbTags>*> box,
-    const gsl::not_null<Parallel::ConstGlobalCache<Metavariables>*>
-        cache) noexcept {
-  const auto temporal_id =
-      db::get<Tags::TemporalIds<Metavariables>>(*box).front();
+    const gsl::not_null<Parallel::ConstGlobalCache<Metavariables>*> cache,
+    const typename Metavariables::temporal_id::type& temporal_id) noexcept {
 
   // Before doing anything else, deal with the possibility that some
   // of the points might be outside of the Domain.
-  fill_invalid_points<InterpolationTargetTag>(box);
+  fill_invalid_points<InterpolationTargetTag, Metavariables>(box, temporal_id);
+
+  // Fill ::Tags::Variables<typename
+  //      InterpolationTargetTag::vars_to_interpolate_to_target>
+  // with variables from correct temporal_id.
+  db::mutate_apply<
+      tmpl::list<::Tags::Variables<
+          typename InterpolationTargetTag::vars_to_interpolate_to_target>>,
+      tmpl::list<
+          Tags::InterpolatedVars<InterpolationTargetTag, Metavariables>>>(
+      [&temporal_id](
+          const gsl::not_null<db::item_type<::Tags::Variables<
+              typename InterpolationTargetTag::vars_to_interpolate_to_target>>*>
+              vars,
+          const db::const_item_type<
+              Tags::InterpolatedVars<InterpolationTargetTag, Metavariables>>&
+              vars_at_all_times) noexcept {
+        *vars = vars_at_all_times.at(temporal_id);
+      },
+      box);
 
   // apply_callback should return true if we are done with this
   // temporal_id.  It should return false only if the callback
@@ -176,8 +200,8 @@ void callback_and_cleanup(
         // completed_ids forever, but we probably don't want it to get too
         // large, so we limit its size.  We assume that
         // asynchronous calls to AddTemporalIdsToInterpolationTarget do not span
-        // more than 10 temporal_ids.
-        if (completed_ids->size() > 10) {
+        // more than 1000 temporal_ids.
+        if (completed_ids->size() > 1000) {
           completed_ids->pop_front();
         }
       });
@@ -189,15 +213,17 @@ void callback_and_cleanup(
   Parallel::simple_action<Actions::CleanUpInterpolator<InterpolationTargetTag>>(
       interpolator_proxy, temporal_id);
 
-  // If there are further temporal_ids, begin interpolation for
-  // the next one.
-  const auto& temporal_ids = db::get<Tags::TemporalIds<Metavariables>>(*box);
-  if (not temporal_ids.empty()) {
-    auto& my_proxy = Parallel::get_parallel_component<
-        InterpolationTarget<Metavariables, InterpolationTargetTag>>(*cache);
-    Parallel::simple_action<
-        typename InterpolationTargetTag::compute_target_points>(
-        my_proxy, temporal_ids.front());
+  // If we have a sequential target, and there are further
+  // temporal_ids, begin interpolation for the next one.
+  if (InterpolationTargetTag::compute_target_points::is_sequential::value) {
+    const auto& temporal_ids = db::get<Tags::TemporalIds<Metavariables>>(*box);
+    if (not temporal_ids.empty()) {
+      auto& my_proxy = Parallel::get_parallel_component<
+          InterpolationTarget<Metavariables, InterpolationTargetTag>>(*cache);
+      Parallel::simple_action<
+          typename InterpolationTargetTag::compute_target_points>(
+          my_proxy, temporal_ids.front());
+    }
   }
 }
 
@@ -220,9 +246,8 @@ namespace Actions {
 /// Uses:
 /// - DataBox:
 ///   - `Tags::TemporalIds<Metavariables>`
-///   - `Tags::IndicesOfFilledInterpPoints`
-///   - `::Tags::Variables<typename
-///                   InterpolationTargetTag::vars_to_interpolate_to_target>`
+///   - `Tags::IndicesOfFilledInterpPoints<Metavariables>`
+///   - `Tags::InterpolatedVars<InterpolationTargetTag,Metavariables>`
 ///
 /// DataBox changes:
 /// - Adds: nothing
@@ -230,7 +255,8 @@ namespace Actions {
 /// - Modifies:
 ///   - `Tags::TemporalIds<Metavariables>`
 ///   - `Tags::CompletedTemporalIds<Metavariables>`
-///   - `Tags::IndicesOfFilledInterpPoints`
+///   - `Tags::IndicesOfFilledInterpPoints<Metavariables>`
+///   - `Tags::InterpolatedVars<InterpolationTargetTag,Metavariables>`
 ///   - `::Tags::Variables<typename
 ///                   InterpolationTargetTag::vars_to_interpolate_to_target>`
 ///
@@ -249,21 +275,22 @@ struct InterpolationTargetReceiveVars {
       const std::vector<db::item_type<::Tags::Variables<
           typename InterpolationTargetTag::vars_to_interpolate_to_target>>>&
           vars_src,
-      const std::vector<std::vector<size_t>>& global_offsets) noexcept {
-    db::mutate<
-        Tags::IndicesOfFilledInterpPoints,
-        ::Tags::Variables<
-            typename InterpolationTargetTag::vars_to_interpolate_to_target>>(
+      const std::vector<std::vector<size_t>>& global_offsets,
+      const typename Metavariables::temporal_id::type& temporal_id) noexcept {
+    db::mutate<Tags::IndicesOfFilledInterpPoints<Metavariables>,
+               Tags::InterpolatedVars<InterpolationTargetTag, Metavariables>>(
         make_not_null(&box),
         [
-          &vars_src, &global_offsets
-        ](const gsl::not_null<db::item_type<Tags::IndicesOfFilledInterpPoints>*>
+          &temporal_id, &vars_src, &global_offsets
+        ](const gsl::not_null<
+              db::item_type<Tags::IndicesOfFilledInterpPoints<Metavariables>>*>
               indices_of_filled,
-          const gsl::not_null<db::item_type<::Tags::Variables<
-              typename InterpolationTargetTag::vars_to_interpolate_to_target>>*>
-              vars_dest) noexcept {
-          const size_t npts_dest = vars_dest->number_of_grid_points();
-          const size_t nvars = vars_dest->number_of_independent_components;
+          const gsl::not_null<db::item_type<
+              Tags::InterpolatedVars<InterpolationTargetTag, Metavariables>>*>
+              vars_dest_all_times) noexcept {
+          auto& vars_dest = (*vars_dest_all_times)[temporal_id];
+          const size_t npts_dest = vars_dest.number_of_grid_points();
+          const size_t nvars = vars_dest.number_of_independent_components;
           for (size_t j = 0; j < global_offsets.size(); ++j) {
             const size_t npts_src = global_offsets[j].size();
             for (size_t i = 0; i < npts_src; ++i) {
@@ -278,11 +305,13 @@ struct InterpolationTargetReceiveVars {
               // duplicated point, and we ignore subsequent
               // duplicated points.  The points are easy to keep track
               // of because global_offsets uniquely identifies them.
-              if (indices_of_filled->insert(global_offsets[j][i]).second) {
+              if ((*indices_of_filled)[temporal_id]
+                      .insert(global_offsets[j][i])
+                      .second) {
                 for (size_t v = 0; v < nvars; ++v) {
                   // clang-tidy: no pointer arithmetic
-                  vars_dest->data()[global_offsets[j][i] +   // NOLINT
-                                    v * npts_dest] =         // NOLINT
+                  vars_dest.data()[global_offsets[j][i] +    // NOLINT
+                                   v * npts_dest] =          // NOLINT
                       vars_src[j].data()[i + v * npts_src];  // NOLINT
                 }
               }
@@ -290,15 +319,28 @@ struct InterpolationTargetReceiveVars {
           }
         });
 
-    if (db::get<Tags::IndicesOfFilledInterpPoints>(box).size() +
-            db::get<Tags::IndicesOfInvalidInterpPoints>(box).size() ==
-        db::get<::Tags::Variables<
-            typename InterpolationTargetTag::vars_to_interpolate_to_target>>(
+    const size_t filled_size =
+        db::get<Tags::IndicesOfFilledInterpPoints<Metavariables>>(box)
+            .at(temporal_id)
+            .size();
+    const size_t invalid_size = [&box,&temporal_id]() noexcept {
+      const auto& invalid_indices =
+          db::get<Tags::IndicesOfInvalidInterpPoints<Metavariables>>(box);
+      if (invalid_indices.find(temporal_id) != invalid_indices.end()) {
+        return invalid_indices.at(temporal_id).size();
+      }
+      return 0_st;
+    }
+    ();
+    const size_t interp_size =
+        db::get<Tags::InterpolatedVars<InterpolationTargetTag, Metavariables>>(
             box)
-            .number_of_grid_points()) {
+            .at(temporal_id)
+            .number_of_grid_points();
+    if (invalid_size + filled_size == interp_size) {
       // All the valid points have been interpolated.
       InterpolationTarget_detail::callback_and_cleanup<InterpolationTargetTag>(
-          make_not_null(&box), make_not_null(&cache));
+          make_not_null(&box), make_not_null(&cache), temporal_id);
     }
   }
 };

@@ -47,6 +47,7 @@ class DataBox;
 }  // namespace db
 namespace intrp {
 namespace Tags {
+template <typename Metavariables>
 struct IndicesOfFilledInterpPoints;
 template <typename Metavariables>
 struct InterpolatedVarsHolders;
@@ -171,8 +172,8 @@ void test_interpolation_target(
 
   // This should not have changed.
   CHECK(ActionTesting::get_databox_tag<
-            target_component, ::intrp::Tags::IndicesOfFilledInterpPoints>(
-            runner, 0)
+            target_component,
+            ::intrp::Tags::IndicesOfFilledInterpPoints<metavars>>(runner, 0)
             .empty());
 
   // Should be no queued actions in mock_interpolation_target

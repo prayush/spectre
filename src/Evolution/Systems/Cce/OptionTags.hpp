@@ -7,14 +7,11 @@
 #include <limits>
 
 #include "Evolution/Systems/Cce/ReadBoundaryDataH5.hpp"
+#include "Evolution/Systems/Cce/WorldtubeInterfaceManager.hpp"
 #include "NumericalAlgorithms/Interpolation/SpanInterpolator.hpp"
 #include "Options/Options.hpp"
 
 namespace Cce {
-/// \cond
-class Interpolator;
-/// \endcond
-
 namespace OptionTags {
 
 /// %Option group
@@ -68,6 +65,12 @@ struct NumberOfRadialPoints {
   using group = Cce;
 };
 
+struct ExtractionRadius {
+  using type = double;
+  static constexpr OptionString help{"Extraction radius from the GH system."};
+  using group = Cce;
+};
+
 struct EndTime {
   using type = double;
   static constexpr OptionString help{"End time for the Cce Evolution."};
@@ -109,9 +112,16 @@ struct H5LookaheadTimes {
 };
 
 struct H5Interpolator {
-  using type = std::unique_ptr<Interpolator>;
+  using type = std::unique_ptr<intrp::SpanInterpolator>;
   static constexpr OptionString help{
       "The interpolator for imported h5 worldtube data."};
+  using group = Cce;
+};
+
+struct GHInterfaceManager {
+  using type = std::unique_ptr<GHWorldtubeInterfaceManager>;
+  static constexpr OptionString help{
+      "Class to manage worldtube data from a GH system."};
   using group = Cce;
 };
 
@@ -152,6 +162,18 @@ struct H5WorldtubeBoundaryDataManager : db::SimpleTag {
   }
 };
 
+struct GHInterfaceManager : db::SimpleTag {
+  using type = std::unique_ptr<GHWorldtubeInterfaceManager>;
+  using option_tags = tmpl::list<OptionTags::GHInterfaceManager>;
+
+  static constexpr bool pass_metavariables = false;
+  static std::unique_ptr<::Cce::GHWorldtubeInterfaceManager>
+  create_from_options(const std::unique_ptr<::Cce::GHWorldtubeInterfaceManager>&
+                          interface_handler) noexcept {
+    return interface_handler->get_clone();
+  }
+};
+
 struct ScriInterpolationOrder : db::SimpleTag {
   using type = size_t;
   using option_tags = tmpl::list<OptionTags::ScriInterpolationOrder>;
@@ -170,6 +192,33 @@ struct TargetStepSize : db::SimpleTag {
   static constexpr bool pass_metavariables = false;
   static double create_from_options(const double target_step_size) noexcept {
     return target_step_size;
+  }
+};
+
+struct EndTime : db::SimpleTag {
+  using type = double;
+  using option_tags =
+      tmpl::list<OptionTags::EndTime, OptionTags::BoundaryDataFilename>;
+
+  static constexpr bool pass_metavariables = false;
+  static double create_from_options(double end_time,
+                                    const std::string& filename) {
+    if (end_time == std::numeric_limits<double>::infinity()) {
+      SpecWorldtubeH5BufferUpdater h5_boundary_updater{filename};
+      const auto& time_buffer = h5_boundary_updater.get_time_buffer();
+      end_time = time_buffer[time_buffer.size() - 1];
+    }
+    return end_time;
+  }
+};
+
+struct ExtractionRadius : db::SimpleTag {
+  using type = double;
+  using option_tags = tmpl::list<OptionTags::ExtractionRadius>;
+
+  static constexpr bool pass_metavariables = false;
+  static double create_from_options(const double extraction_radius) noexcept {
+    return extraction_radius;
   }
 };
 
@@ -211,6 +260,7 @@ struct ObservationLMax : db::SimpleTag {
   using type = size_t;
   using option_tags = tmpl::list<OptionTags::ObservationLMax>;
 
+  static constexpr bool pass_metavariables = false;
   static size_t create_from_options(const size_t observation_l_max) noexcept {
     return observation_l_max;
   }
@@ -221,6 +271,7 @@ struct FilterLMax : db::SimpleTag {
   using option_tags = tmpl::list<OptionTags::FilterLMax>;
 
   static constexpr bool pass_metavariables = false;
+
   static size_t create_from_options(const size_t filter_l_max) noexcept {
     return filter_l_max;
   }

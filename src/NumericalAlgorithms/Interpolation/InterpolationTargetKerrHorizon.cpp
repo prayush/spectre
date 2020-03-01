@@ -14,11 +14,13 @@ namespace OptionHolders {
 KerrHorizon::KerrHorizon(size_t l_max_in, std::array<double, 3> center_in,
                          double mass_in,
                          std::array<double, 3> dimensionless_spin_in,
+                         bool theta_varies_fastest_in,
                          const OptionContext& context)
     : l_max(l_max_in),
       center(std::move(center_in)),  // NOLINT
       mass(mass_in),
-      dimensionless_spin(std::move(dimensionless_spin_in)) {  // NOLINT
+      dimensionless_spin(std::move(dimensionless_spin_in)),  // NOLINT
+      theta_varies_fastest(theta_varies_fastest_in) {
   // above NOLINTs for std::move of trivially copyable type.
   if (mass <= 0.0) {
     // Check here, rather than put a lower_bound on the Tag, because
@@ -36,6 +38,7 @@ void KerrHorizon::pup(PUP::er& p) noexcept {
   p | center;
   p | mass;
   p | dimensionless_spin;
+  p | theta_varies_fastest;
 }
 
 bool operator==(const KerrHorizon& lhs, const KerrHorizon& rhs) noexcept {

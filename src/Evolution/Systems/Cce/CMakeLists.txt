@@ -15,6 +15,7 @@ set(LIBRARY_SOURCES
   ReducedWorldtubeModeRecorder.cpp
   SpecBoundaryData.cpp
   ScriPlusValues.cpp
+  WorldtubeInterfaceManager.cpp
   )
 
 add_spectre_library(${LIBRARY} ${LIBRARY_SOURCES})

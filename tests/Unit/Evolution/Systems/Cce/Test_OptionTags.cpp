@@ -9,13 +9,19 @@
 
 #include "Evolution/Systems/Cce/OptionTags.hpp"
 #include "Evolution/Systems/Cce/ReadBoundaryDataH5.hpp"
+#include "Evolution/Systems/Cce/WorldtubeInterfaceManager.hpp"
 #include "NumericalAlgorithms/Interpolation/CubicSpanInterpolator.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/KerrSchild.hpp"
 #include "Utilities/FileSystem.hpp"
 #include "Utilities/Literals.hpp"
+#include "Utilities/TypeTraits.hpp"
 #include "tests/Unit/DataStructures/DataBox/TestHelpers.hpp"
 #include "tests/Unit/Evolution/Systems/Cce/BoundaryTestHelpers.hpp"
 #include "tests/Unit/TestCreation.hpp"
+
+namespace {
+struct empty_metavariables {};
+}  // namespace
 
 SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.OptionTags", "[Unit][Cce]") {
   TestHelpers::db::test_simple_tag<
@@ -40,6 +46,9 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.OptionTags", "[Unit][Cce]") {
   CHECK(
       TestHelpers::test_creation<size_t, Cce::OptionTags::NumberOfRadialPoints>(
           "3") == 3_st);
+  CHECK(TestHelpers::test_creation<double, Cce::OptionTags::ExtractionRadius>(
+            "100.0") == 100.0);
+
   CHECK(TestHelpers::test_creation<double, Cce::OptionTags::EndTime>("4.0") ==
         4.0);
   CHECK(TestHelpers::test_creation<double, Cce::OptionTags::StartTime>("2.0") ==
@@ -54,6 +63,12 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.OptionTags", "[Unit][Cce]") {
   CHECK(TestHelpers::test_creation<size_t,
                                    Cce::OptionTags::ScriInterpolationOrder>(
             "4") == 4_st);
+
+  auto option_created_lockstep_interface_manager = TestHelpers::test_creation<
+      std::unique_ptr<Cce::GHWorldtubeInterfaceManager>,
+      Cce::OptionTags::GHInterfaceManager>("GHLockstepInterfaceManager");
+  CHECK(cpp17::is_same_v<decltype(option_created_lockstep_interface_manager),
+                         std::unique_ptr<Cce::GHWorldtubeInterfaceManager>>);
 
   CHECK(TestHelpers::test_creation<size_t, Cce::OptionTags::ScriOutputDensity>(
             "6") == 6_st);
@@ -74,7 +89,6 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.OptionTags", "[Unit][Cce]") {
 
   CHECK(Cce::Tags::LMax::create_from_options(8u) == 8u);
   CHECK(Cce::Tags::NumberOfRadialPoints::create_from_options(6u) == 6u);
-
   CHECK(Cce::Tags::StartTime::create_from_options(
             -std::numeric_limits<double>::infinity(),
             "OptionTagsTestCceR0100.h5") == 2.5);
@@ -86,7 +100,10 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.OptionTags", "[Unit][Cce]") {
             "OptionTagsTestCceR0100.h5") == 5.4);
   CHECK(Cce::Tags::EndTime::create_from_options(
             2.2, "OptionTagsTestCceR0100.h5") == 2.2);
+
   CHECK(Cce::Tags::ObservationLMax::create_from_options(5_st) == 5_st);
+  CHECK(Cce::InitializationTags::TargetStepSize::create_from_options(0.2) ==
+        0.2);
 
   CHECK(Cce::InitializationTags::ScriInterpolationOrder::create_from_options(
             6_st) == 6_st);

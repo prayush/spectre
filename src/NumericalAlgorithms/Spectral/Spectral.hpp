@@ -98,7 +98,7 @@ constexpr size_t minimum_number_of_points =
  * \brief Maximum number of allowed collocation points.
  */
 template <Basis>
-constexpr size_t maximum_number_of_points = 12;
+constexpr size_t maximum_number_of_points = 32;
 
 /*!
  * \brief Compute the function values of the basis function \f$\Phi_k(x)\f$
