@@ -54,12 +54,12 @@ T set_bc_when_char_speed_is_negative(const T& rhs_char_dt_u,
                                      const T& desired_bc_dt_u,
                                      const DataType& char_speed_u) noexcept {
   auto bc_dt_u = rhs_char_dt_u;
-  auto it1 = bc_dt_u.begin();
-  auto it2 = desired_bc_dt_u.begin();
-  for (; it2 != desired_bc_dt_u.end(); ++it1, ++it2) {
-    for (size_t i = 0; i < it1->size(); ++i) {
+  auto it = bc_dt_u.begin();
+  auto it_desired = desired_bc_dt_u.begin();
+  for (; it_desired != desired_bc_dt_u.end(); ++it, ++it_desired) {
+    for (size_t i = 0; i < it->size(); ++i) {
       if (char_speed_u[i] < 0.) {
-        (*it1)[i] = (*it2)[i];
+        (*it)[i] = (*it_desired)[i];
       }
     }
   }
@@ -69,7 +69,8 @@ T set_bc_when_char_speed_is_negative(const T& rhs_char_dt_u,
 /// \ingroup ActionsGroup
 /// \brief Packages data on external boundaries for calculating numerical flux.
 /// Computes contributions on the interior side from the volume, and imposes
-/// Dirichlet boundary conditions on the exterior side.
+/// Dirichlet boundary conditions on the exterior side if / when the relevant
+/// characteristics are incoming, but does nothing if / when they are outgoing.
 ///
 /// With:
 /// - Boundary<Tag> =
