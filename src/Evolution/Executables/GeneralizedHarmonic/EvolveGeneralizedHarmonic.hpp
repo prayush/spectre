@@ -32,6 +32,7 @@
 #include "Evolution/Systems/Cce/WorldtubeInterfaceManager.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Equations.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Initialize.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/SemiAnalyticBoundaryConditions.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/System.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "IO/Importers/ElementActions.hpp"
@@ -147,9 +148,10 @@ struct EvolutionMetavars {
       Tags::NumericalFlux<GeneralizedHarmonic::UpwindFlux<volume_dim>>;
 
   using step_choosers_common =
-      tmpl::list<//StepChoosers::Registrars::Cfl<volume_dim, Frame::Inertial>,
-                 StepChoosers::Registrars::Constant,
-                 StepChoosers::Registrars::Increase>;
+      tmpl::list<  // StepChoosers::Registrars::Cfl<volume_dim,
+                   // Frame::Inertial>,
+          StepChoosers::Registrars::Constant,
+          StepChoosers::Registrars::Increase>;
   using step_choosers_for_step_only =
       tmpl::list<StepChoosers::Registrars::PreventRapidIncrease>;
   using step_choosers_for_slab_only =
@@ -305,7 +307,8 @@ struct EvolutionMetavars {
       Actions::ComputeTimeDerivative,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
           domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
-      dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
+      GeneralizedHarmonic::Actions::
+          ImposeDirichletBoundaryConditionsForIncoming<EvolutionMetavars>,
       dg::Actions::ReceiveDataForFluxes<EvolutionMetavars>,
       dg::Actions::ApplyFluxes, Actions::RecordTimeStepperData<>,
       Actions::UpdateU<>>>;
@@ -383,12 +386,13 @@ struct EvolutionMetavars {
       cce_boundary_component, Cce::CharacteristicEvolution<EvolutionMetavars>,
       DgElementArray<
           EvolutionMetavars,
-          tmpl::list<Parallel::PhaseActions<Phase, Phase::Initialization,
-                                            initialization_actions>,
+          tmpl::list<
+              Parallel::PhaseActions<Phase, Phase::Initialization,
+                                     initialization_actions>,
 
-                     Parallel::PhaseActions<
-                         Phase, Phase::InitializeTimeStepperHistory,
-                         SelfStart::self_start_procedure<step_actions>>,
+              Parallel::PhaseActions<
+                  Phase, Phase::InitializeTimeStepperHistory,
+                  SelfStart::self_start_procedure<step_actions>>,
 
               Parallel::PhaseActions<
                   Phase, Phase::Register,
