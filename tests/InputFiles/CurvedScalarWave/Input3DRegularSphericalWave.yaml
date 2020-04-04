@@ -1,0 +1,74 @@
+# Distributed under the MIT License.
+# See LICENSE.txt for details.
+
+# Executable: EvolveCurvedScalarWave3D
+# Check: parse;execute
+
+AnalyticSolution:
+  RegularSphWaveKerr:
+    BlackHoleMass: 1.
+    BlackHoleSpin: [0., 0., 0.]
+    BlackHoleCenter: [0., 0., 0.]
+    WaveProfile:
+      Gaussian:
+        Amplitude: 1.
+        Width: 10.
+        Center: 3.
+
+Evolution:
+  InitialTime: 0.0
+  InitialTimeStep: 0.001
+  TimeStepper:
+    AdamsBashforthN:
+      Order: 3
+  # StepController and StepChoosers are needed only for local time stepping
+  # StepController: BinaryFraction
+  # StepChoosers:
+  #   - Constant: 0.05
+  #   - Increase:
+  #       Factor: 2
+  #   - Cfl:
+  #       SafetyFactor: 0.2
+
+DomainCreator:
+    Shell:
+      InnerRadius: 1.9
+      OuterRadius: 300.0
+      InitialRefinement: 3
+      InitialGridPoints: [6, 6]
+      UseEquiangularMap: true
+      AspectRatio: 1.0
+      UseLogarithmicMap: true
+      RadialBlockLayers: 6
+
+#DomainCreator:
+#  Brick:
+#    LowerBound: [0.0, 0.0, 0.0]
+#    UpperBound: [6.283185307179586, 6.283185307179586, 6.283185307179586]
+#    IsPeriodicIn: [true, true, true]
+#    InitialRefinement: [1, 1, 1]
+#    InitialGridPoints: [5, 5, 5]
+
+NumericalFlux:
+  UpwindFlux:
+
+# If filtering is enabled in the executable the filter can be controlled using:
+# Filtering:
+#   ExpFilter0:
+#     Alpha: 12
+#     HalfPower: 32
+
+EventsAndTriggers:
+  ? EveryNSlabs:
+      N: 200
+      Offset: 0
+  : - ObserveFields
+  ? PastTime: 100.0
+  : - Completion
+#  ? SpecifiedSlabs:
+#      Slabs: [0, 100]
+#  : - ObserveErrorNorms
+
+Observers:
+  VolumeFileName: "CurvedScalarWave3DRegSphWaveVolume"
+  ReductionFileName: "CurvedScalarWave3DRegSphWaveReductions"
