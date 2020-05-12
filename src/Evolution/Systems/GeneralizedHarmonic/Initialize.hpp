@@ -56,19 +56,29 @@ struct InitializeConstraints {
                     const ParallelComponent* const /*meta*/) noexcept {
     using compute_tags = tmpl::flatten<db::AddComputeTags<
         GeneralizedHarmonic::Tags::GaugeConstraintCompute<Dim, frame>,
+        // GeneralizedHarmonic::Tags::ThreeIndexConstraintCompute<Dim, frame>,
+        GeneralizedHarmonic::Tags::FConstraintCompute<Dim, frame>,
+        GeneralizedHarmonic::Tags::TwoIndexConstraintCompute<Dim, frame>,
         // following tags added to observe constraints
         ::Tags::PointwiseL2NormCompute<
             GeneralizedHarmonic::Tags::GaugeConstraint<Dim, frame>>,
+        ::Tags::PointwiseL2NormCompute<
+            GeneralizedHarmonic::Tags::FConstraint<Dim, frame>>,
+        ::Tags::PointwiseL2NormCompute<
+            GeneralizedHarmonic::Tags::TwoIndexConstraint<Dim, frame>>,
         ::Tags::PointwiseL2NormCompute<
             GeneralizedHarmonic::Tags::ThreeIndexConstraint<Dim, frame>>,
         // The 4-index constraint is only implemented in 3d
         tmpl::conditional_t<
             Dim == 3,
-            tmpl::list<GeneralizedHarmonic::Tags::FourIndexConstraintCompute<
-                           Dim, frame>,
-                       ::Tags::PointwiseL2NormCompute<
-                           GeneralizedHarmonic::Tags::FourIndexConstraint<
-                               Dim, frame>>>,
+            tmpl::list<
+                GeneralizedHarmonic::Tags::FourIndexConstraintCompute<Dim,
+                                                                      frame>,
+                GeneralizedHarmonic::Tags::ConstraintEnergyCompute<Dim, frame>,
+                ::Tags::PointwiseL2NormCompute<
+                    GeneralizedHarmonic::Tags::FourIndexConstraint<Dim, frame>>,
+                ::Tags::PointwiseL2NormCompute<
+                    GeneralizedHarmonic::Tags::ConstraintEnergy<Dim, frame>>>,
             tmpl::list<>>>>;
 
     return std::make_tuple(
@@ -205,6 +215,8 @@ struct InitializeDampedHarmonicRollonGauge {
     using compute_tags = db::AddComputeTags<
         GeneralizedHarmonic::gauges::DampedHarmonicHCompute<Dim, frame>,
         GeneralizedHarmonic::gauges::SpacetimeDerivDampedHarmonicHCompute<
+            Dim, frame>,
+        GeneralizedHarmonic::Tags::DerivGaugeHFromSpacetimeDerivGaugeHCompute<
             Dim, frame>>;
 
     // Finally, insert gauge related quantities to the box
