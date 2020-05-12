@@ -112,8 +112,7 @@ class Variables<tmpl::list<Tags...>> {
   using const_pointer = const value_type*;
   using allocator_type = std::allocator<value_type>;
   using pointer_type =
-      PointerVector<value_type, blaze_unaligned, blaze_unpadded,
-                    transpose_flag,
+      PointerVector<value_type, blaze_unaligned, blaze_unpadded, transpose_flag,
                     blaze::DynamicVector<value_type, transpose_flag>>;
 
   static_assert(
@@ -437,7 +436,7 @@ class Variables<tmpl::list<Tags...>> {
 
 // The above Variables implementation doesn't work for an empty parameter pack,
 // so specialize here.
-template<>
+template <>
 class Variables<tmpl::list<>> {
  public:
   Variables() noexcept = default;
@@ -1026,5 +1025,10 @@ using Tempabb = TempTensor<N, tnsr::abb<DataType, SpatialDim, Fr>>;
 template <size_t N, size_t SpatialDim, typename Fr = Frame::Inertial,
           typename DataType = DataVector>
 using TempabC = TempTensor<N, tnsr::abC<DataType, SpatialDim, Fr>>;
+
+// Rank 4
+template <size_t N, size_t SpatialDim, typename Fr = Frame::Inertial,
+          typename DataType = DataVector>
+using Tempijaa = TempTensor<N, tnsr::ijaa<DataType, SpatialDim, Fr>>;
 // @}
 }  // namespace Tags
