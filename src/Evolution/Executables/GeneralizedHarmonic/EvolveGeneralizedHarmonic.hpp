@@ -78,6 +78,8 @@
 #include "ParallelAlgorithms/DiscontinuousGalerkin/InitializeMortars.hpp"
 #include "ParallelAlgorithms/Events/ObserveErrorNorms.hpp"
 #include "ParallelAlgorithms/Events/ObserveFields.hpp"
+#include "ParallelAlgorithms/Events/ObserveNorms.hpp"
+#include "ParallelAlgorithms/Events/ObserveVolumeIntegrals.hpp"
 #include "ParallelAlgorithms/EventsAndTriggers/Actions/RunEventsAndTriggers.hpp"
 #include "ParallelAlgorithms/EventsAndTriggers/Event.hpp"
 #include "ParallelAlgorithms/EventsAndTriggers/EventsAndTriggers.hpp"
@@ -197,6 +199,25 @@ struct EvolutionMetavars {
               ::Tags::PointwiseL2Norm<GeneralizedHarmonic::Tags::
                                           ConstraintEnergy<volume_dim, frame>>>,
           tmpl::list<>>>;
+  using constraint_fields = tmpl::append<
+      tmpl::list<
+          ::Tags::PointwiseL2Norm<
+              GeneralizedHarmonic::Tags::GaugeConstraint<volume_dim, frame>>,
+          ::Tags::PointwiseL2Norm<
+              GeneralizedHarmonic::Tags::TwoIndexConstraint<volume_dim, frame>>,
+          ::Tags::PointwiseL2Norm<
+              GeneralizedHarmonic::Tags::FConstraint<volume_dim, frame>>,
+          ::Tags::PointwiseL2Norm<GeneralizedHarmonic::Tags::
+                                      ThreeIndexConstraint<volume_dim, frame>>>,
+      tmpl::conditional_t<
+          volume_dim == 3,
+          tmpl::list<
+              ::Tags::PointwiseL2Norm<
+                  GeneralizedHarmonic::Tags::FourIndexConstraint<volume_dim,
+                                                                 frame>>,
+              ::Tags::PointwiseL2Norm<GeneralizedHarmonic::Tags::
+                                          ConstraintEnergy<volume_dim, frame>>>,
+          tmpl::list<>>>;
 
   // HACK until we merge in a compute tag StrahlkorperGr::AreaCompute.
   // For now, simply do a surface integral of unity on the horizon to get the
@@ -243,6 +264,7 @@ struct EvolutionMetavars {
   using observation_events = tmpl::list<
       dg::Events::Registrars::ObserveErrorNorms<Tags::Time,
                                                 analytic_solution_fields>,
+      //   dg::Events::Registrars::ObserveNorms<Tags::Time, constraint_fields>,
       dg::Events::Registrars::ObserveFields<
           volume_dim, Tags::Time, observe_fields, analytic_solution_fields>,
       Events::Registrars::ChangeSlabSize<slab_choosers>>;
