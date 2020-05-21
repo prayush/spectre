@@ -3,7 +3,7 @@
 
 # Executable: EvolveGeneralizedHarmonic
 # Check: parse;execute
-# Timeout: 12
+# Timeout: 30
 # ExpectedOutput:
 #   GhKerrSchildReductionData.h5
 #   GhKerrSchildVolumeData0.h5
