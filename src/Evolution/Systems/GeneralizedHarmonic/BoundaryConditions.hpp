@@ -205,57 +205,6 @@ struct ImposeBjorhusBoundaryConditions {
             make_not_null(&buffer), box, direction, dimension, mesh, vars,
             dt_vars, unit_normal_one_form, char_speeds);
 
-        // FIXME: Are there incoming char speeds on the inner boundary?
-        if (true) {  // {{{
-          const auto& x =
-              get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(
-                  buffer);
-          // If radius of surface is less than 10, then assume we are on an
-          // inner boundary. FIXME
-          const auto& min_r_squared =
-              min(square(get<0>(x)) + square(get<1>(x)) + square(get<2>(x)));
-          const auto min_inertial_r_squared =
-              min(square(get<0>(inertial_coords)) +
-                  square(get<1>(inertial_coords)) +
-                  square(get<2>(inertial_coords)));
-          if (min_r_squared < 2. * 2. or min_inertial_r_squared < 2. * 2.) {
-            const auto& min_speed =
-                BoundaryConditions_detail::min_characteristic_speed<VolumeDim>(
-                    char_speeds);
-            if (min_speed <= 0.0) {
-              Parallel::printf(
-                  "\nWARNING: Incoming char speeds on INNER boundary at t=%f\n",
-                  db::get<::Tags::Time>(box));
-              Parallel::printf(
-                  "  Min speed %f at min (inertial) radius %f (%f)\n\n",
-                  min_speed, sqrt(min_r_squared), sqrt(min_inertial_r_squared));
-              // Is the face normal outward facing, really?
-              for (size_t i = 0; i < 5; ++i) {
-                Parallel::printf(
-                    " >> (random pt (%f, %f, %f)) unnormalized_normal_{x,y,z}: "
-                    "(%f, %f, "
-                    "%f)\n",
-                    get<0>(x)[i], get<1>(x)[i], get<2>(x)[i],
-                    get<0>(unit_normal_one_form)[i],
-                    get<1>(unit_normal_one_form)[i],
-                    get<2>(unit_normal_one_form)[i]);
-                Parallel::printf(
-                    "     (same random pt) r dot normal (should be NEGative): "
-                    "%f\n",
-                    get<0>(x)[i] * get<0>(unit_normal_one_form)[i] +
-                        get<1>(x)[i] * get<1>(unit_normal_one_form)[i] +
-                        get<2>(x)[i] * get<2>(unit_normal_one_form)[i]);
-                Parallel::printf(
-                    "     (same random pt) char speeds (psi, 0, +, -): %f, %f, "
-                    "%f, %f\n",
-                    char_speeds.at(0)[i], char_speeds.at(1)[i],
-                    char_speeds.at(2)[i], char_speeds.at(3)[i]);
-              }
-              //   Parallel::abort("Aborting for above reason...");
-            }
-          }
-        }  // }}}
-
         db::mutate<dt_variables_tag>(
             make_not_null(&box),
             // Function that applies bdry conditions to dt<variables>
@@ -401,8 +350,8 @@ struct ImposeBjorhusBoundaryConditions {
                       // BC choice for U_+
                       VPlusBcMethod::Freezing,
                       // BC choice for U_-
-                      VMinusBcMethod::ConstraintPreservingPhysicalBjorhus,
-                      DbTags, ArrayIndex, ActionList, ParallelComponent,
+                      VMinusBcMethod::ConstraintPreservingBjorhus, DbTags,
+                      ArrayIndex, ActionList, ParallelComponent,
                       InboxTags...>::function_impl(box, inboxes, cache,
                                                    array_index, action_list,
                                                    parallel_component);
