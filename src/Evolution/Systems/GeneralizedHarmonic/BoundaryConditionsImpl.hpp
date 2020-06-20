@@ -58,16 +58,9 @@ namespace BoundaryConditions_detail {
 enum class VSpacetimeMetricBcMethod {
   Freezing,
   ConstraintPreservingBjorhus,
-  ConstraintPreservingDirichlet,
   Unknown
 };
-enum class VZeroBcMethod {
-  Freezing,
-  ConstraintPreservingBjorhus,
-  ConstraintPreservingDirichlet,
-  ConstraintPreservingRealDirichlet,
-  Unknown
-};
+enum class VZeroBcMethod { Freezing, ConstraintPreservingBjorhus, Unknown };
 enum class VPlusBcMethod { Freezing, Unknown };
 enum class VMinusBcMethod {
   Freezing,
@@ -401,7 +394,7 @@ struct set_dt_u_psi {
   template <typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
   static ReturnType apply(const VSpacetimeMetricBcMethod Method,
                           TempBuffer<TagsList>& buffer,
-                          const Variables<VarsTagsList>& vars,
+                          const Variables<VarsTagsList>& /* vars */,
                           const Variables<DtVarsTagsList>& /* dt_vars */,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
                           /* unit_normal_one_form */) noexcept {
@@ -414,15 +407,6 @@ struct set_dt_u_psi {
     const tnsr::A<DataVector, VolumeDim,
                   Frame::Inertial>& unit_interface_normal_vector =
         get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    const typename gr::Tags::Lapse<DataVector>::type& lapse =
-        get<::Tags::TempScalar<19, DataVector>>(buffer);
-    const typename gr::Tags::Shift<VolumeDim, Frame::Inertial,
-                                   DataVector>::type& shift =
-        get<::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    const typename Tags::Pi<VolumeDim, Frame::Inertial>::type& pi =
-        get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars);
-    const typename Tags::Phi<VolumeDim, Frame::Inertial>::type& phi =
-        get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars);
     const typename Tags::VSpacetimeMetric<VolumeDim, Frame::Inertial>::type&
         char_projected_rhs_dt_u_psi =
             get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>>(
@@ -445,9 +429,6 @@ struct set_dt_u_psi {
         return apply_bjorhus_constraint_preserving(
             make_not_null(&bc_dt_u_psi), unit_interface_normal_vector,
             three_index_constraint, char_projected_rhs_dt_u_psi, char_speeds);
-      case VSpacetimeMetricBcMethod::ConstraintPreservingDirichlet:
-        return apply_dirichlet_constraint_preserving(
-            make_not_null(&bc_dt_u_psi), lapse, shift, pi, phi);
       case VSpacetimeMetricBcMethod::Unknown:
       default:
         ASSERT(false,
@@ -467,11 +448,6 @@ struct set_dt_u_psi {
       const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
           char_projected_rhs_dt_u_psi,
       const std::array<DataVector, 4>& char_speeds) noexcept;
-  static ReturnType apply_dirichlet_constraint_preserving(
-      gsl::not_null<ReturnType*> bc_dt_u_psi, const Scalar<DataVector>& lapse,
-      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
-      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi) noexcept;
 };
 
 template <typename ReturnType, size_t VolumeDim>
@@ -501,37 +477,16 @@ set_dt_u_psi<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
   return *bc_dt_u_psi;
 }
 
-template <typename ReturnType, size_t VolumeDim>
-ReturnType
-set_dt_u_psi<ReturnType, VolumeDim>::apply_dirichlet_constraint_preserving(
-    const gsl::not_null<ReturnType*> bc_dt_u_psi,
-    const Scalar<DataVector>& lapse,
-    const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
-    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
-    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi) noexcept {
-  ASSERT(get_size(get<0, 0>(*bc_dt_u_psi)) == get_size(get(lapse)),
-         "Size of input variables and temporary memory do not match.");
-  for (size_t a = 0; a <= VolumeDim; ++a) {
-    for (size_t b = a; b <= VolumeDim; ++b) {
-      bc_dt_u_psi->get(a, b) -= get(lapse) * pi.get(a, b);
-      for (size_t i = 0; i < VolumeDim; ++i) {
-        bc_dt_u_psi->get(a, b) += shift.get(i) * phi.get(i, a, b);
-      }
-    }
-  }
-  return *bc_dt_u_psi;
-}
-
 // \brief This struct sets boundary condition on dt<VZero>
 template <typename ReturnType, size_t VolumeDim>
 struct set_dt_u_zero {
   template <typename TagsList, typename VarsTagsList, typename DtVarsTagsList>
   static ReturnType apply(const VZeroBcMethod Method,
                           TempBuffer<TagsList>& buffer,
-                          const Variables<VarsTagsList>& vars,
+                          const Variables<VarsTagsList>& /* vars */,
                           const Variables<DtVarsTagsList>& /* dt_vars */,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-                              unit_normal_one_form) noexcept {
+                          /* unit_normal_one_form */) noexcept {
     // Not using auto below to enforce a loose test on the quantity being
     // fetched from the buffer
     const tnsr::A<DataVector, VolumeDim,
@@ -551,31 +506,6 @@ struct set_dt_u_zero {
                      get(get<::Tags::TempScalar<14, DataVector>>(buffer)),
                      get(get<::Tags::TempScalar<15, DataVector>>(buffer))}};
 
-    // spacetime unit vector t^a
-    const auto& spacetime_unit_normal_vector =
-        get<::Tags::TempA<7, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    const typename gr::Tags::Lapse<DataVector>::type& lapse =
-        get<::Tags::TempScalar<19, DataVector>>(buffer);
-    const typename gr::Tags::Shift<VolumeDim, Frame::Inertial,
-                                   DataVector>::type& shift =
-        get<::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    const auto& inverse_spatial_metric =
-        get<::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-
-    const typename Tags::Pi<VolumeDim, Frame::Inertial>::type& pi =
-        get<Tags::Pi<VolumeDim, Frame::Inertial>>(vars);
-    const typename Tags::Phi<VolumeDim, Frame::Inertial>::type& phi =
-        get<Tags::Phi<VolumeDim, Frame::Inertial>>(vars);
-    const auto& d_spacetime_metric =
-        get<::Tags::Tempiaa<31, VolumeDim, Frame::Inertial, DataVector>>(
-            buffer);
-    const auto& d_pi =
-        get<::Tags::Tempiaa<32, VolumeDim, Frame::Inertial, DataVector>>(
-            buffer);
-    const auto& d_phi =
-        get<::Tags::Tempijaa<33, VolumeDim, Frame::Inertial, DataVector>>(
-            buffer);
-
     // Memory allocated for return type
     ReturnType& bc_dt_u_zero =
         get<::Tags::Tempiaa<28, VolumeDim, Frame::Inertial, DataVector>>(
@@ -589,16 +519,6 @@ struct set_dt_u_zero {
         return apply_bjorhus_constraint_preserving(
             make_not_null(&bc_dt_u_zero), unit_interface_normal_vector,
             four_index_constraint, char_projected_rhs_dt_u_zero, char_speeds);
-      case VZeroBcMethod::ConstraintPreservingDirichlet:
-        return apply_dirichlet_constraint_preserving(
-            make_not_null(&bc_dt_u_zero), unit_interface_normal_vector,
-            unit_normal_one_form, spacetime_unit_normal_vector, lapse, shift,
-            inverse_spatial_metric, pi, phi, d_spacetime_metric, d_pi, d_phi);
-      case VZeroBcMethod::ConstraintPreservingRealDirichlet:
-        return apply_real_dirichlet_constraint_preserving(
-            make_not_null(&bc_dt_u_zero), unit_interface_normal_vector,
-            unit_normal_one_form, spacetime_unit_normal_vector, lapse, shift,
-            inverse_spatial_metric, pi, phi, d_pi, d_phi);
       case VZeroBcMethod::Unknown:
       default:
         ASSERT(false, "Requested BC method fo VZero not implemented!");
@@ -617,39 +537,6 @@ struct set_dt_u_zero {
       const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
           char_projected_rhs_dt_u_zero,
       const std::array<DataVector, 4>& char_speeds) noexcept;
-  static ReturnType apply_dirichlet_constraint_preserving(
-      gsl::not_null<ReturnType*> bc_dt_u_zero,
-      const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
-          unit_interface_normal_vector,
-      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-          unit_interface_normal_one_form,
-      const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
-          spacetime_unit_normal_vector,
-      const Scalar<DataVector>& lapse,
-      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
-      const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
-          inverse_spatial_metric,
-      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_psi,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_pi,
-      const tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>& d_phi) noexcept;
-  static ReturnType apply_real_dirichlet_constraint_preserving(
-      gsl::not_null<ReturnType*> bc_dt_u_zero,
-      const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
-          unit_interface_normal_vector,
-      const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-          unit_interface_normal_one_form,
-      const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
-          spacetime_unit_normal_vector,
-      const Scalar<DataVector>& lapse,
-      const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
-      const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
-          inverse_spatial_metric,
-      const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
-      const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_pi,
-      const tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>& d_phi) noexcept;
 };
 
 template <typename ReturnType, size_t VolumeDim>
@@ -689,140 +576,6 @@ set_dt_u_zero<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
             it.sign() * char_speeds.at(1) *
             unit_interface_normal_vector.get(it[2] + 1) *
             four_index_constraint.get(it[1], a, b);
-      }
-    }
-  }
-  return *bc_dt_u_zero;
-}
-
-template <typename ReturnType, size_t VolumeDim>
-ReturnType
-set_dt_u_zero<ReturnType, VolumeDim>::apply_dirichlet_constraint_preserving(
-    const gsl::not_null<ReturnType*> bc_dt_u_zero,
-    const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
-        unit_interface_normal_vector,
-    const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-        unit_interface_normal_one_form,
-    const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
-        spacetime_unit_normal_vector,
-    const Scalar<DataVector>& lapse,
-    const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
-    const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
-        inverse_spatial_metric,
-    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
-    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
-    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_psi,
-    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_pi,
-    const tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>& d_phi) noexcept {
-  ASSERT(get_size(get<0, 0, 0>(*bc_dt_u_zero)) == get_size(get(lapse)),
-         "Size of input variables and temporary memory do not match.");
-  for (size_t a = 0; a <= VolumeDim; ++a) {
-    for (size_t b = 0; b <= VolumeDim; ++b) {
-      // For a chosen (a, b):
-      //  tmp_i = -N \partial_i \Pi_{ab} (T1)
-      //        + 0.5 N * t^c t^d \partial_i \psi_{cd} Pi_{ab} (T2)
-      //        + N^j \partial_i \Phi_{jab} (T3)
-      //        + N t^e g^{mj} \partial_i \psi_{ej} \Phi_{mab} (T4)
-      // and,
-      //  bc_dt_u_zero_{iab} = tmp_i - n_i n^k tmp_k (for a chosen (a, b))
-      tnsr::i<DataVector, VolumeDim, Frame::Inertial> tmp(get_size(get(lapse)));
-      for (size_t i = 0; i < VolumeDim; ++i) {
-        tmp.get(i) = -get(lapse) * d_pi.get(i, a, b);  // T1
-        // (subtract dLapse*Pi)
-        for (size_t c = 0; c <= VolumeDim; ++c) {
-          for (size_t d = 0; d <= VolumeDim; ++d) {
-            tmp.get(i) += 0.5 * get(lapse) *  // T2
-                          spacetime_unit_normal_vector.get(c) *
-                          spacetime_unit_normal_vector.get(d) *
-                          d_psi.get(i, c, d) * pi.get(a, b);
-          }
-        }
-        for (size_t j = 0; j < VolumeDim; ++j) {
-          tmp.get(i) += shift.get(j) * d_phi.get(i, j, a, b);  // T3
-          // (add d_k Shift^j \Phi_{jab})
-          for (size_t k = 0; k < VolumeDim; ++k) {
-            for (size_t e = 0; e <= VolumeDim; ++e) {
-              tmp.get(i) += get(lapse) * spacetime_unit_normal_vector.get(e) *
-                            inverse_spatial_metric.get(j, k) *
-                            d_psi.get(i, e, k + 1) * phi.get(j, a, b);  // T4
-            }
-          }
-        }
-      }
-      DataVector normal_dot_tmp(get_size(get(lapse)), 0.);
-      for (size_t i = 0; i < VolumeDim; ++i) {
-        normal_dot_tmp += unit_interface_normal_vector.get(i + 1) * tmp.get(i);
-      }
-      for (size_t i = 0; i < VolumeDim; ++i) {
-        bc_dt_u_zero->get(i, a, b) +=
-            tmp.get(i) - unit_interface_normal_one_form.get(i) * normal_dot_tmp;
-      }
-    }
-  }
-  return *bc_dt_u_zero;
-}
-
-template <typename ReturnType, size_t VolumeDim>
-ReturnType set_dt_u_zero<ReturnType, VolumeDim>::
-    apply_real_dirichlet_constraint_preserving(
-        const gsl::not_null<ReturnType*> bc_dt_u_zero,
-        const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
-            unit_interface_normal_vector,
-        const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
-            unit_interface_normal_one_form,
-        const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
-            spacetime_unit_normal_vector,
-        const Scalar<DataVector>& lapse,
-        const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& shift,
-        const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
-            inverse_spatial_metric,
-        const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& pi,
-        const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
-        const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_pi,
-        const tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>&
-            d_phi) noexcept {
-  ASSERT(get_size(get<0, 0, 0>(*bc_dt_u_zero)) == get_size(get(lapse)),
-         "Size of input variables and temporary memory do not match.");
-  for (size_t a = 0; a <= VolumeDim; ++a) {
-    for (size_t b = 0; b <= VolumeDim; ++b) {
-      // For a chosen (a, b):
-      //  tmp_i = -N \partial_i \Pi_{ab} (T1)
-      //        + 0.5 N * t^c t^d \phi_{icd} Pi_{ab} (T2)
-      //        + N^j \partial_i \Phi_{jab} (T3)
-      //        + N t^e g^{jk} \psi_{iek} \Phi_{jab} (T4)
-      // and,
-      //  bc_dt_u_zero_{iab} = tmp_i - n_i n^k tmp_k (for a chosen (a, b))
-      tnsr::i<DataVector, VolumeDim, Frame::Inertial> tmp(get_size(get(lapse)));
-      for (size_t i = 0; i < VolumeDim; ++i) {
-        tmp.get(i) = -get(lapse) * d_pi.get(i, a, b);  // T1
-        // (subtract dLapse*Pi)
-        for (size_t c = 0; c <= VolumeDim; ++c) {
-          for (size_t d = 0; d <= VolumeDim; ++d) {
-            tmp.get(i) += 0.5 * get(lapse) *  // T2
-                          spacetime_unit_normal_vector.get(c) *
-                          spacetime_unit_normal_vector.get(d) *
-                          phi.get(i, c, d) * pi.get(a, b);
-          }
-        }
-        for (size_t j = 0; j < VolumeDim; ++j) {
-          tmp.get(i) += shift.get(j) * d_phi.get(i, j, a, b);  // T3
-          // (add d_k Shift^j \Phi_{jab})
-          for (size_t k = 0; k < VolumeDim; ++k) {
-            for (size_t e = 0; e <= VolumeDim; ++e) {
-              tmp.get(i) += get(lapse) * spacetime_unit_normal_vector.get(e) *
-                            inverse_spatial_metric.get(j, k) *
-                            phi.get(i, e, k + 1) * phi.get(j, a, b);  // T4
-            }
-          }
-        }
-      }
-      DataVector normal_dot_tmp(get_size(get(lapse)), 0.);
-      for (size_t i = 0; i < VolumeDim; ++i) {
-        normal_dot_tmp += unit_interface_normal_vector.get(i + 1) * tmp.get(i);
-      }
-      for (size_t i = 0; i < VolumeDim; ++i) {
-        bc_dt_u_zero->get(i, a, b) +=
-            tmp.get(i) - unit_interface_normal_one_form.get(i) * normal_dot_tmp;
       }
     }
   }
