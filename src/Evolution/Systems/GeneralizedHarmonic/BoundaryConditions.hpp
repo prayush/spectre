@@ -105,12 +105,6 @@ struct ImposeBjorhusBoundaryConditions {
                  typename Metavariables::boundary_condition_tag>;
 
  private:
-  /* ------------------------------------------------------------------------
-   * ------------------------------------------------------------------------
-   * ---------------- APPLY BJORHUS BOUNDARY CONDITIONS  --------------------
-   * ------------------------------------------------------------------------
-   * ------------------------------------------------------------------------
-   */
   template <size_t VolumeDim, VSpacetimeMetricBcMethod VSpacetimeMetricMethod,
             VZeroBcMethod VZeroMethod, VPlusBcMethod VPlusMethod,
             VMinusBcMethod VMinusMethod, typename DbTags, typename ArrayIndex,
@@ -123,7 +117,6 @@ struct ImposeBjorhusBoundaryConditions {
         Parallel::ConstGlobalCache<Metavariables>& cache,
         const ArrayIndex& /*array_index*/, const ActionList /*meta*/,
         const ParallelComponent* const /*meta*/) noexcept {
-      // ------------------------------- (1)
       // Get information about system:
       // tags for evolved variables and their time derivatives
       using system = typename Metavariables::system;
@@ -141,9 +134,6 @@ struct ImposeBjorhusBoundaryConditions {
           domain::Tags::BoundaryDirectionsInterior<VolumeDim>,
           ::Tags::Normalized<domain::Tags::UnnormalizedFaceNormal<
               VolumeDim, Frame::Inertial>>>>(box);
-      // const auto& external_bdry_vars = db::get<domain::Tags::Interface<
-      // domain::Tags::BoundaryDirectionsInterior<VolumeDim>,
-      // variables_tag>>(box);
       const auto& volume_all_vars = db::get<variables_tag>(box);
       const auto& volume_all_dt_vars = db::get<dt_variables_tag>(box);
       const auto& external_bdry_char_speeds = db::get<domain::Tags::Interface<
@@ -154,8 +144,7 @@ struct ImposeBjorhusBoundaryConditions {
               domain::Tags::BoundaryDirectionsInterior<VolumeDim>,
               domain::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(box);
 
-      // ------------------------------- (2)
-      // Apply the boundary condition
+      // Apply boundary condition:
       // Loop over external boundaries and set dt_volume_vars on them
       for (auto& external_direction_and_normals : unit_normal_one_forms) {
         const auto& direction = external_direction_and_normals.first;
@@ -189,18 +178,11 @@ struct ImposeBjorhusBoundaryConditions {
         const auto& inertial_coords =
             external_bdry_inertial_coords.at(direction);
 
-        // ------------------------------- (2)
         // Create a TempTensor that stores all temporaries computed
         // here and elsewhere
         TempBuffer<BoundaryConditions_detail::all_local_vars<VolumeDim>> buffer(
             slice_grid_points);
-        // ------------------------------- (2.2)
-        // Compute local variables, including:
-        // (A) unit normal form to interface
-        // (B) 4metric, inv4metric, lapse, shift on this slice
-        // (C) dampign parameter ConstraintGamma2 on this slice
-        // (D) Compute projection operator on this slice
-        // (E) dt<U> on this slice from `volume_all_dt_vars`
+        // Compute local variables
         BoundaryConditions_detail::local_variables(
             make_not_null(&buffer), box, direction, dimension, mesh, vars,
             dt_vars, unit_normal_one_form, char_speeds);
@@ -216,21 +198,15 @@ struct ImposeBjorhusBoundaryConditions {
                   volume_dt_vars,
               const double /* time */, const auto& /* boundary_condition */
               ) noexcept {
-              // ------------------------------- (1)
               // Preliminaries
               ASSERT(
                   volume_dt_vars->number_of_grid_points() == volume_grid_points,
                   "volume_dt_vars has wrong number of grid points.  Expected "
                       << volume_grid_points << ", got "
                       << volume_dt_vars->number_of_grid_points());
-              // ------------------------------- (2)
-              // Compute desired values of dt_volume_vars
-              //
-              // ------------------------------- (2.1)
-              // Get desired values of CharProjection<dt<U>>
-              //
-              // At all points on the interface where the char speed of any
-              // (given) characteristic field is +ve, we "do nothing", and
+              // Compute desired values of dt_volume_vars and set it.
+              // At all points on the interface where the char speed of
+              // given characteristic field is +ve, we "do nothing", and
               // when its -ve, we apply Bjorhus BCs. This is achieved through
               // `set_bc_when_char_speed_is_negative`.
               const auto bc_dt_u_psi =
@@ -283,8 +259,8 @@ struct ImposeBjorhusBoundaryConditions {
                       bc_dt_u_psi, bc_dt_u_zero, bc_dt_u_plus, bc_dt_u_minus,
                       unit_normal_one_form);
               // Now store final values of dt<U> in suitable data structure
-              // FIXME: How can I extract this list of dt<U> tags directly
-              // from `dt_variables_tag`?
+              // FIXME: Can I extract this list of dt<U> tags directly from
+              // `dt_variables_tag`?
               const tuples::TaggedTuple<
                   db::add_tag_prefix<
                       Metavariables::temporal_id::template step_prefix,
@@ -307,7 +283,6 @@ struct ImposeBjorhusBoundaryConditions {
               const auto slice_data_ = variables_from_tagged_tuple(bc_dt_tuple);
               const auto* slice_data = slice_data_.data();
 
-              // ------------------------------- (2.4)
               // Assign BC values of dt_volume_vars on external boundary
               // slices of volume variables
               auto* const volume_dt_data = volume_dt_vars->data();
@@ -340,8 +315,9 @@ struct ImposeBjorhusBoundaryConditions {
       Parallel::ConstGlobalCache<Metavariables>& cache,
       const ArrayIndex& array_index, const ActionList action_list,
       const ParallelComponent* const parallel_component) noexcept {
-    // Here be user logic that determines / selects from various options for
-    // setting BCs on individual characteristic variables
+    // One can insert logic here that determines / selects from various options
+    // for setting BCs on individual characteristic variables.
+    // `ConstraintPreservingBjorhus` are hardcoded for now.
     return apply_impl<Metavariables::system::volume_dim,
                       // BC choice for U_\Psi
                       VSpacetimeMetricBcMethod::ConstraintPreservingBjorhus,
