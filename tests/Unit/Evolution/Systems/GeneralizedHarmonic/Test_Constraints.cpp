@@ -158,7 +158,7 @@ template <size_t SpatialDim, typename Frame, typename DataType>
 void test_two_index_constraint_random(const DataType& used_for_size) noexcept {
   pypp::check_with_random_values<1>(
       static_cast<tnsr::ia<DataType, SpatialDim, Frame> (*)(
-          const tnsr::ia<DataType, SpatialDim, Frame>&,
+          const tnsr::ab<DataType, SpatialDim, Frame>&,
           const tnsr::a<DataType, SpatialDim, Frame>&,
           const tnsr::A<DataType, SpatialDim, Frame>&,
           const tnsr::II<DataType, SpatialDim, Frame>&,
@@ -273,6 +273,18 @@ void test_two_index_constraint_analytic(
   const auto& d_gauge_function =
       get<Tags::deriv<GaugeH, tmpl::size_t<3>, Frame::Inertial>>(gh_derivs);
 
+  // Populate spacetime derivative of gauge function
+  const auto d4_gauge_function = [&x, &d_gauge_function]() {
+    auto tmp =
+        make_with_value<tnsr::ab<DataVector, 3, Frame::Inertial>>(x, 0.0);
+    for (size_t i = 0; i < 3; ++i) {
+      for (size_t a = 0; a < 4; ++a) {
+        tmp.get(i + 1, a) = d_gauge_function.get(i, a);
+      }
+    }
+    return tmp;
+  }();
+
   // Compute the three-index constraint
   const auto three_index_constraint =
       GeneralizedHarmonic::three_index_constraint(d_spacetime_metric, phi);
@@ -282,7 +294,7 @@ void test_two_index_constraint_analytic(
       make_with_value<tnsr::ia<DataVector, 3, Frame::Inertial>>(
           x, std::numeric_limits<double>::signaling_NaN());
   GeneralizedHarmonic::two_index_constraint(
-      make_not_null(&two_index_constraint), d_gauge_function, normal_one_form,
+      make_not_null(&two_index_constraint), d4_gauge_function, normal_one_form,
       normal_vector, inverse_spatial_metric, inverse_spacetime_metric, pi, phi,
       d_pi, d_phi, gamma2, three_index_constraint);
 
@@ -670,7 +682,7 @@ void test_constraint_energy_analytic(const Solution& solution,
   const auto four_index_constraint =
       GeneralizedHarmonic::four_index_constraint(d_phi);
   const auto two_index_constraint = GeneralizedHarmonic::two_index_constraint(
-      d_gauge_function, normal_one_form, normal_vector, inverse_spatial_metric,
+      d4_gauge_function, normal_one_form, normal_vector, inverse_spatial_metric,
       inverse_spacetime_metric, pi, phi, d_pi, d_phi, gamma2,
       three_index_constraint);
   const auto f_constraint = GeneralizedHarmonic::f_constraint(
@@ -939,9 +951,9 @@ void test_constraint_compute_items(
   const auto three_index_constraint =
       GeneralizedHarmonic::three_index_constraint(deriv_spacetime_metric, phi);
   const auto two_index_constraint = GeneralizedHarmonic::two_index_constraint(
-      deriv_gauge_source, spacetime_normal_one_form, spacetime_normal_vector,
-      inverse_spatial_metric, inverse_spacetime_metric, pi, phi, deriv_pi,
-      deriv_phi, gamma2, three_index_constraint);
+      derivatives_of_gauge_source, spacetime_normal_one_form,
+      spacetime_normal_vector, inverse_spatial_metric, inverse_spacetime_metric,
+      pi, phi, deriv_pi, deriv_phi, gamma2, three_index_constraint);
   const auto gauge_constraint = GeneralizedHarmonic::gauge_constraint(
       gauge_source, spacetime_normal_one_form, spacetime_normal_vector,
       inverse_spatial_metric, inverse_spacetime_metric, pi, phi);

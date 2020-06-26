@@ -1074,7 +1074,7 @@ template <size_t SpatialDim, typename Frame>
 struct TwoIndexConstraintCompute : TwoIndexConstraint<SpatialDim, Frame>,
                                    db::ComputeTag {
   using argument_tags = tmpl::list<
-      ::Tags::deriv<GaugeH<SpatialDim, Frame>, tmpl::size_t<SpatialDim>, Frame>,
+      SpacetimeDerivGaugeH<SpatialDim, Frame>,
       gr::Tags::SpacetimeNormalOneForm<SpatialDim, Frame, DataVector>,
       gr::Tags::SpacetimeNormalVector<SpatialDim, Frame, DataVector>,
       gr::Tags::InverseSpatialMetric<SpatialDim, Frame, DataVector>,
@@ -1088,7 +1088,7 @@ struct TwoIndexConstraintCompute : TwoIndexConstraint<SpatialDim, Frame>,
 
   static constexpr auto function = static_cast<void (*)(
       gsl::not_null<tnsr::ia<DataVector, SpatialDim, Frame>*>,
-      const tnsr::ia<DataVector, SpatialDim, Frame>&,
+      const tnsr::ab<DataVector, SpatialDim, Frame>&,
       const tnsr::a<DataVector, SpatialDim, Frame>&,
       const tnsr::A<DataVector, SpatialDim, Frame>&,
       const tnsr::II<DataVector, SpatialDim, Frame>&,

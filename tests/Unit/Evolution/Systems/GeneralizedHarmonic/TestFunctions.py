@@ -58,7 +58,7 @@ def two_index_constraint_term_4_of_11(spacetime_normal_one_form,
 
 
 def two_index_constraint_term_5_of_11(d_gauge_function):
-    return d_gauge_function
+    return d_gauge_function[1:, :]
 
 
 def two_index_constraint_term_6_of_11(spacetime_normal_vector,

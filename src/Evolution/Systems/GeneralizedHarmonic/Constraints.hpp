@@ -115,7 +115,7 @@ void gauge_constraint(
  */
 template <size_t SpatialDim, typename Frame, typename DataType>
 tnsr::ia<DataType, SpatialDim, Frame> two_index_constraint(
-    const tnsr::ia<DataType, SpatialDim, Frame>& d_gauge_function,
+    const tnsr::ab<DataType, SpatialDim, Frame>& d_gauge_function,
     const tnsr::a<DataType, SpatialDim, Frame>& spacetime_normal_one_form,
     const tnsr::A<DataType, SpatialDim, Frame>& spacetime_normal_vector,
     const tnsr::II<DataType, SpatialDim, Frame>& inverse_spatial_metric,
@@ -131,7 +131,7 @@ tnsr::ia<DataType, SpatialDim, Frame> two_index_constraint(
 template <size_t SpatialDim, typename Frame, typename DataType>
 void two_index_constraint(
     gsl::not_null<tnsr::ia<DataType, SpatialDim, Frame>*> constraint,
-    const tnsr::ia<DataType, SpatialDim, Frame>& d_gauge_function,
+    const tnsr::ab<DataType, SpatialDim, Frame>& d_gauge_function,
     const tnsr::a<DataType, SpatialDim, Frame>& spacetime_normal_one_form,
     const tnsr::A<DataType, SpatialDim, Frame>& spacetime_normal_vector,
     const tnsr::II<DataType, SpatialDim, Frame>& inverse_spatial_metric,
