@@ -56,7 +56,6 @@ struct InitializeConstraints {
                     const ParallelComponent* const /*meta*/) noexcept {
     using compute_tags = tmpl::flatten<db::AddComputeTags<
         GeneralizedHarmonic::Tags::GaugeConstraintCompute<Dim, frame>,
-        // GeneralizedHarmonic::Tags::ThreeIndexConstraintCompute<Dim, frame>,
         GeneralizedHarmonic::Tags::FConstraintCompute<Dim, frame>,
         GeneralizedHarmonic::Tags::TwoIndexConstraintCompute<Dim, frame>,
         // following tags added to observe constraints
@@ -215,8 +214,6 @@ struct InitializeDampedHarmonicRollonGauge {
     using compute_tags = db::AddComputeTags<
         GeneralizedHarmonic::gauges::DampedHarmonicHCompute<Dim, frame>,
         GeneralizedHarmonic::gauges::SpacetimeDerivDampedHarmonicHCompute<
-            Dim, frame>,
-        GeneralizedHarmonic::Tags::DerivGaugeHFromSpacetimeDerivGaugeHCompute<
             Dim, frame>>;
 
     // Finally, insert gauge related quantities to the box

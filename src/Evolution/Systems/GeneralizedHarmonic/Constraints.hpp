@@ -238,7 +238,7 @@ void four_index_constraint(
 template <size_t SpatialDim, typename Frame, typename DataType>
 tnsr::a<DataType, SpatialDim, Frame> f_constraint(
     const tnsr::a<DataType, SpatialDim, Frame>& gauge_function,
-    const tnsr::ia<DataType, SpatialDim, Frame>& d_gauge_function,
+    const tnsr::ab<DataType, SpatialDim, Frame>& d_gauge_function,
     const tnsr::a<DataType, SpatialDim, Frame>& spacetime_normal_one_form,
     const tnsr::A<DataType, SpatialDim, Frame>& spacetime_normal_vector,
     const tnsr::II<DataType, SpatialDim, Frame>& inverse_spatial_metric,
@@ -255,7 +255,7 @@ template <size_t SpatialDim, typename Frame, typename DataType>
 void f_constraint(
     gsl::not_null<tnsr::a<DataType, SpatialDim, Frame>*> constraint,
     const tnsr::a<DataType, SpatialDim, Frame>& gauge_function,
-    const tnsr::ia<DataType, SpatialDim, Frame>& d_gauge_function,
+    const tnsr::ab<DataType, SpatialDim, Frame>& d_gauge_function,
     const tnsr::a<DataType, SpatialDim, Frame>& spacetime_normal_one_form,
     const tnsr::A<DataType, SpatialDim, Frame>& spacetime_normal_vector,
     const tnsr::II<DataType, SpatialDim, Frame>& inverse_spatial_metric,
