@@ -52,8 +52,7 @@ namespace Actions {
 namespace BoundaryConditions_detail {
 template <size_t VolumeDim>
 double min_characteristic_speed(
-    const typename GeneralizedHarmonic::Tags::CharacteristicSpeeds<
-        VolumeDim, Frame::Inertial>::type& char_speeds) noexcept {
+    const std::array<DataVector, 4>& char_speeds) noexcept {
   std::array<double, 4> min_speeds{
       {min(char_speeds.at(0)), min(char_speeds.at(1)), min(char_speeds.at(2)),
        min(char_speeds.at(3))}};
