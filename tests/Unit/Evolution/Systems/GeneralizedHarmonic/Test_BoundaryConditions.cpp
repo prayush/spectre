@@ -28,7 +28,7 @@
 #include "Domain/Mesh.hpp"
 #include "Domain/Side.hpp"
 #include "Domain/Tags.hpp"
-#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/Bjorhus.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Constraints.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/GaugeSourceFunctions/DampedHarmonic.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/System.hpp"

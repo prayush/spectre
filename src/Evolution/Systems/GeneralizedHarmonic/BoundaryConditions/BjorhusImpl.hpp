@@ -22,7 +22,7 @@
 #include "Domain/IndexToSliceAt.hpp"
 #include "Domain/Tags.hpp"
 #include "ErrorHandling/Assert.hpp"
-#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditionsHelpers.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/BjorhusHelpers.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Constraints.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
@@ -158,19 +158,13 @@ void local_variables(
       gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>,
       gr::Tags::InverseSpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>,
       gr::Tags::ExtrinsicCurvature<VolumeDim, Frame::Inertial, DataVector>,
-      // ---- derivs of Psi, Pi, and Phi.
       ::Tags::deriv<gr::Tags::SpacetimeMetric<VolumeDim, Frame::Inertial>,
                     tmpl::size_t<VolumeDim>, Frame::Inertial>,
       ::Tags::deriv<Tags::Pi<VolumeDim, Frame::Inertial>,
                     tmpl::size_t<VolumeDim>, Frame::Inertial>,
       ::Tags::deriv<Tags::Phi<VolumeDim, Frame::Inertial>,
                     tmpl::size_t<VolumeDim>, Frame::Inertial>,
-      // ---- constraint damping parameters
-      // Tags::ConstraintGamma0,
-      // Tags::ConstraintGamma1,
       Tags::ConstraintGamma2,
-      // Characteristics
-      // Constraints
       Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>,
       Tags::ThreeIndexConstraint<VolumeDim, Frame::Inertial>,
       Tags::FourIndexConstraint<VolumeDim, Frame::Inertial>,
@@ -202,10 +196,7 @@ void local_variables(
   const auto& inverse_spacetime_metric = get<
       gr::Tags::InverseSpacetimeMetric<VolumeDim, Frame::Inertial, DataVector>>(
       vars_on_this_slice);
-  /*const auto& gamma0 =
-      get<Tags::ConstraintGamma0>(vars_on_this_slice);
-  const auto& gamma1 =
-      get<Tags::ConstraintGamma1>(vars_on_this_slice);*/
+
   const auto& gamma2 = get<Tags::ConstraintGamma2>(vars_on_this_slice);
   const auto& two_index_constraint =
       get<Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>>(

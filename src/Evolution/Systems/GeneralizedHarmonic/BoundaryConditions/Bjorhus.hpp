@@ -22,7 +22,7 @@
 #include "Domain/Tags.hpp"
 #include "ErrorHandling/Assert.hpp"
 #include "ErrorHandling/Error.hpp"
-#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditionsImpl.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/BjorhusImpl.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/ImposeBoundaryConditions.hpp"
@@ -206,9 +206,9 @@ struct ImposeBjorhusBoundaryConditions {
                       << volume_dt_vars->number_of_grid_points());
               // Compute desired values of dt_volume_vars and set it.
               // At all points on the interface where the char speed of
-              // given characteristic field is +ve, we "do nothing", and
-              // when its -ve, we apply Bjorhus BCs. This is achieved through
-              // `set_bc_when_char_speed_is_negative`.
+              // given characteristic field is positive, we "do nothing", and
+              // when its negative, we apply Bjorhus BCs. This is achieved
+              // through `set_bc_when_char_speed_is_negative`.
               const auto bc_dt_u_psi =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
                       get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial,
@@ -324,6 +324,8 @@ struct ImposeBjorhusBoundaryConditions {
                       // BC choice for U_0
                       VZeroBcMethod::ConstraintPreservingBjorhus,
                       // BC choice for U_+
+                      // (This field is never incoming, which is why we use
+                      // Freezing)
                       VPlusBcMethod::Freezing,
                       // BC choice for U_-
                       VMinusBcMethod::ConstraintPreservingBjorhus, DbTags,
