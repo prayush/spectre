@@ -14,7 +14,6 @@
 #include "DataStructures/DataBox/DataOnSlice.hpp"
 #include "DataStructures/LeviCivitaIterator.hpp"
 #include "DataStructures/SliceVariables.hpp"
-#include "DataStructures/TempBuffer.hpp"
 #include "DataStructures/Tensor/EagerMath/DeterminantAndInverse.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"

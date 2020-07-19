@@ -13,7 +13,6 @@
 #include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "DataStructures/DataBox/DataOnSlice.hpp"
 #include "DataStructures/SliceVariables.hpp"
-#include "DataStructures/TempBuffer.hpp"
 #include "DataStructures/Tensor/EagerMath/Magnitude.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
@@ -178,22 +177,19 @@ struct ImposeBjorhusBoundaryConditions {
         const auto& inertial_coords =
             external_bdry_inertial_coords.at(direction);
 
-        // Create a TempTensor that stores all temporaries computed
-        // here and elsewhere
-        TempBuffer<BoundaryConditions_detail::all_local_vars<VolumeDim>> buffer(
+        // Create and store all temporaries needed here and elsewhere
+        BoundaryConditions_detail::BjorhusIntermediatesComputer intermediates(
             slice_grid_points);
-        // Compute local variables
-        BoundaryConditions_detail::local_variables(
-            make_not_null(&buffer), box, direction, dimension, mesh, vars,
-            dt_vars, unit_normal_one_form, char_speeds);
+        intermediates.compute_vars(box, direction, dimension, mesh, vars,
+                                   dt_vars, unit_normal_one_form, char_speeds);
 
         db::mutate<dt_variables_tag>(
             make_not_null(&box),
             // Function that applies bdry conditions to dt<variables>
             [
               &volume_grid_points, &slice_grid_points, &mesh, &dimension,
-              &direction, &buffer, &vars, &dt_vars, &unit_normal_one_form,
-              &inertial_coords, &char_speeds
+              &direction, &intermediates, &vars, &dt_vars,
+              &unit_normal_one_form, &inertial_coords, &char_speeds
             ](const gsl::not_null<db::item_type<dt_variables_tag>*>
                   volume_dt_vars,
               const double /* time */, const auto& /* boundary_condition */
@@ -211,55 +207,56 @@ struct ImposeBjorhusBoundaryConditions {
               // through `set_bc_when_char_speed_is_negative`.
               const auto bc_dt_u_psi =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
-                      get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial,
-                                         DataVector>>(buffer),
+                      intermediates.get_var(
+                          Tags::VSpacetimeMetric<VolumeDim, Frame::Inertial>{}),
                       BoundaryConditions_detail::set_dt_u_psi<
                           typename Tags::VSpacetimeMetric<
                               VolumeDim, Frame::Inertial>::type,
-                          VolumeDim>::apply(VSpacetimeMetricMethod, buffer,
-                                            vars, dt_vars,
+                          VolumeDim>::apply(VSpacetimeMetricMethod,
+                                            intermediates, vars, dt_vars,
                                             unit_normal_one_form),
                       char_speeds.at(0));
               const auto bc_dt_u_zero =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
-                      get<::Tags::Tempiaa<23, VolumeDim, Frame::Inertial,
-                                          DataVector>>(buffer),
+                      intermediates.get_var(
+                          Tags::VZero<VolumeDim, Frame::Inertial>{}),
                       BoundaryConditions_detail::set_dt_u_zero<
                           typename Tags::VZero<VolumeDim,
                                                Frame::Inertial>::type,
-                          VolumeDim>::apply(VZeroMethod, buffer, vars, dt_vars,
+                          VolumeDim>::apply(VZeroMethod, intermediates,
+                                            vars, dt_vars,
                                             unit_normal_one_form),
                       char_speeds.at(1));
               const auto bc_dt_u_plus =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
-                      get<::Tags::Tempaa<24, VolumeDim, Frame::Inertial,
-                                         DataVector>>(buffer),
+                      intermediates.get_var(
+                          Tags::VPlus<VolumeDim, Frame::Inertial>{}),
                       BoundaryConditions_detail::set_dt_u_plus<
                           typename Tags::VPlus<VolumeDim,
                                                Frame::Inertial>::type,
-                          VolumeDim>::apply(VPlusMethod, buffer, vars, dt_vars,
+                          VolumeDim>::apply(VPlusMethod, intermediates,
+                                            vars, dt_vars,
                                             unit_normal_one_form),
                       char_speeds.at(2));
               const auto bc_dt_u_minus =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
-                      get<::Tags::Tempaa<25, VolumeDim, Frame::Inertial,
-                                         DataVector>>(buffer),
+                      intermediates.get_var(
+                          Tags::VMinus<VolumeDim, Frame::Inertial>{}),
                       BoundaryConditions_detail::set_dt_u_minus<
                           typename Tags::VMinus<VolumeDim,
                                                 Frame::Inertial>::type,
-                          VolumeDim>::apply(VMinusMethod, buffer, vars, dt_vars,
-                                            inertial_coords,
+                          VolumeDim>::apply(VMinusMethod, intermediates,
+                                            vars, dt_vars, inertial_coords,
                                             unit_normal_one_form),
                       char_speeds.at(3));
               // Convert them to desired values on dt<U>
               const auto bc_dt_all_u =
                   evolved_fields_from_characteristic_fields(
-                      get<::Tags::TempScalar<26, DataVector>>(
-                          buffer),  // Gamma2
+                      intermediates.get_var(Tags::ConstraintGamma2{}),
                       bc_dt_u_psi, bc_dt_u_zero, bc_dt_u_plus, bc_dt_u_minus,
                       unit_normal_one_form);
               // Now store final values of dt<U> in suitable data structure
-              // FIXME: Can I extract this list of dt<U> tags directly from
+              // FIXME: Can we extract this list of dt<U> tags directly from
               // `dt_variables_tag`?
               const tuples::TaggedTuple<
                   db::add_tag_prefix<
