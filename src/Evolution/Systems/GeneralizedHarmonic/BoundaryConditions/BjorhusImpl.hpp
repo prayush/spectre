@@ -488,7 +488,7 @@ class BjorhusIntermediatesComputer {
 
 // \brief This struct sets boundary condition on dt<VSpacetimeMetric>
 template <typename ReturnType, size_t VolumeDim>
-struct set_dt_u_psi {
+struct set_dt_v_psi {
   template <typename VarsTagsList, typename DtVarsTagsList>
   static ReturnType apply(const VSpacetimeMetricBcMethod Method,
                           BjorhusIntermediatesComputer& intermediates,
@@ -555,7 +555,7 @@ struct set_dt_u_psi {
 
 template <typename ReturnType, size_t VolumeDim>
 ReturnType
-set_dt_u_psi<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
+set_dt_v_psi<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
     const gsl::not_null<ReturnType*> bc_dt_u_psi,
     const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
         unit_interface_normal_vector,
@@ -584,7 +584,7 @@ set_dt_u_psi<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
 
 // \brief This struct sets boundary condition on dt<VZero>
 template <typename ReturnType, size_t VolumeDim>
-struct set_dt_u_zero {
+struct set_dt_v_zero {
   template <typename VarsTagsList, typename DtVarsTagsList>
   static ReturnType apply(const VZeroBcMethod Method,
                           BjorhusIntermediatesComputer& intermediates,
@@ -650,7 +650,7 @@ struct set_dt_u_zero {
 
 template <typename ReturnType, size_t VolumeDim>
 ReturnType
-set_dt_u_zero<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
+set_dt_v_zero<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
     const gsl::not_null<ReturnType*> bc_dt_u_zero,
     const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
         unit_interface_normal_vector,
@@ -695,7 +695,7 @@ set_dt_u_zero<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
 
 // \brief This struct sets boundary condition on dt<VPlus>
 template <typename ReturnType, size_t VolumeDim>
-struct set_dt_u_plus {
+struct set_dt_v_plus {
   template <typename VarsTagsList, typename DtVarsTagsList>
   static ReturnType apply(const VPlusBcMethod Method,
                           BjorhusIntermediatesComputer& intermediates,
@@ -725,7 +725,7 @@ struct set_dt_u_plus {
 
 // \brief This struct sets boundary condition on dt<VMinus>
 template <typename ReturnType, size_t VolumeDim>
-struct set_dt_u_minus {
+struct set_dt_v_minus {
   template <typename VarsTagsList, typename DtVarsTagsList>
   static ReturnType apply(
       const VMinusBcMethod Method, BjorhusIntermediatesComputer& intermediates,
@@ -942,7 +942,7 @@ struct set_dt_u_minus {
 
 template <typename ReturnType, size_t VolumeDim>
 ReturnType
-set_dt_u_minus<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
+set_dt_v_minus<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
     const gsl::not_null<ReturnType*> bc_dt_u_minus,
     const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
         incoming_null_one_form,
@@ -1004,7 +1004,7 @@ set_dt_u_minus<ReturnType, VolumeDim>::apply_bjorhus_constraint_preserving(
 }
 
 template <typename ReturnType, size_t VolumeDim>
-ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
+ReturnType set_dt_v_minus<ReturnType, VolumeDim>::
     apply_bjorhus_constraint_preserving_physical(
         const gsl::not_null<ReturnType*> bc_dt_u_minus,
         const Scalar<DataVector>& gamma2,
@@ -1264,7 +1264,7 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
 }
 
 template <typename ReturnType, size_t VolumeDim>
-ReturnType set_dt_u_minus<ReturnType, VolumeDim>::apply_gauge_sommerfeld(
+ReturnType set_dt_v_minus<ReturnType, VolumeDim>::apply_gauge_sommerfeld(
     const gsl::not_null<ReturnType*> bc_dt_u_minus,
     const Scalar<DataVector>& gamma2,
     const typename domain::Tags::Coordinates<VolumeDim, Frame::Inertial>::type&

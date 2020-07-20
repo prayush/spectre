@@ -194,7 +194,7 @@ void test_constraint_preserving_bjorhus_u_psi<
 
   // Compute return value from Action
   auto local_bc_dt_u_psi =
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_u_psi<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_psi<
           typename GeneralizedHarmonic::Tags::VSpacetimeMetric<VolumeDim,
                                                                frame>::type,
           VolumeDim>::
@@ -238,7 +238,7 @@ void test_constraint_preserving_bjorhus_u_psi<
   }
   // Compute return value from Action
   local_bc_dt_u_psi =
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_u_psi<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_psi<
           typename GeneralizedHarmonic::Tags::VSpacetimeMetric<VolumeDim,
                                                                frame>::type,
           VolumeDim>::
@@ -413,7 +413,7 @@ void test_constraint_preserving_bjorhus_u_zero<
   }
   // Compute return value from Action
   auto local_bc_dt_u_zero =
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_u_zero<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_zero<
           typename GeneralizedHarmonic::Tags::VZero<VolumeDim, frame>::type,
           VolumeDim>::
           apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
@@ -478,7 +478,7 @@ void test_constraint_preserving_bjorhus_u_zero<
   }
   // Compute return value from Action
   local_bc_dt_u_zero =
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_u_zero<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_zero<
           typename GeneralizedHarmonic::Tags::VZero<VolumeDim, frame>::type,
           VolumeDim>::
           apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
@@ -753,7 +753,7 @@ void test_constraint_preserving_bjorhus_u_minus<
 
   // Compute return value from Action
   auto local_bc_dt_u_minus =
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_u_minus<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_minus<
           typename GeneralizedHarmonic::Tags::VMinus<VolumeDim, frame>::type,
           VolumeDim>::
           apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
@@ -1287,7 +1287,7 @@ void test_constraint_preserving_bjorhus_u_minus<
 
   // Compute return value from Action
   auto local_bc_dt_u_minus =
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_u_minus<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_minus<
           typename GeneralizedHarmonic::Tags::VMinus<VolumeDim, frame>::type,
           VolumeDim>::
           apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
@@ -2061,7 +2061,7 @@ void test_constraint_preserving_bjorhus_u_minus<
 
   // Compute return value from Action
   auto local_bc_dt_u_minus =
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_u_minus<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_minus<
           typename GeneralizedHarmonic::Tags::VMinus<VolumeDim, frame>::type,
           VolumeDim>::
           apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::

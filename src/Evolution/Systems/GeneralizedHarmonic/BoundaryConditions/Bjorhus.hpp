@@ -209,7 +209,7 @@ struct ImposeBjorhusBoundaryConditions {
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
                       intermediates.get_var(
                           Tags::VSpacetimeMetric<VolumeDim, Frame::Inertial>{}),
-                      BoundaryConditions_detail::set_dt_u_psi<
+                      BoundaryConditions_detail::set_dt_v_psi<
                           typename Tags::VSpacetimeMetric<
                               VolumeDim, Frame::Inertial>::type,
                           VolumeDim>::apply(VSpacetimeMetricMethod,
@@ -220,7 +220,7 @@ struct ImposeBjorhusBoundaryConditions {
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
                       intermediates.get_var(
                           Tags::VZero<VolumeDim, Frame::Inertial>{}),
-                      BoundaryConditions_detail::set_dt_u_zero<
+                      BoundaryConditions_detail::set_dt_v_zero<
                           typename Tags::VZero<VolumeDim,
                                                Frame::Inertial>::type,
                           VolumeDim>::apply(VZeroMethod, intermediates,
@@ -231,7 +231,7 @@ struct ImposeBjorhusBoundaryConditions {
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
                       intermediates.get_var(
                           Tags::VPlus<VolumeDim, Frame::Inertial>{}),
-                      BoundaryConditions_detail::set_dt_u_plus<
+                      BoundaryConditions_detail::set_dt_v_plus<
                           typename Tags::VPlus<VolumeDim,
                                                Frame::Inertial>::type,
                           VolumeDim>::apply(VPlusMethod, intermediates,
@@ -242,7 +242,7 @@ struct ImposeBjorhusBoundaryConditions {
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
                       intermediates.get_var(
                           Tags::VMinus<VolumeDim, Frame::Inertial>{}),
-                      BoundaryConditions_detail::set_dt_u_minus<
+                      BoundaryConditions_detail::set_dt_v_minus<
                           typename Tags::VMinus<VolumeDim,
                                                 Frame::Inertial>::type,
                           VolumeDim>::apply(VMinusMethod, intermediates,
