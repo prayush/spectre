@@ -14,6 +14,7 @@
 #include "DataStructures/DataBox/DataOnSlice.hpp"
 #include "DataStructures/LeviCivitaIterator.hpp"
 #include "DataStructures/SliceVariables.hpp"
+#include "DataStructures/TempBuffer.hpp"
 #include "DataStructures/Tensor/EagerMath/DeterminantAndInverse.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
@@ -80,128 +81,108 @@ T set_bc_when_char_speed_is_negative(const T& rhs_char_dt_u,
 // Eq. (2.20) of Kidder, Scheel & Teukolsky (KST) [gr-qc/0105031v1]
 // Compute R_{ij} from D_(k,i,j) = (1/2) \partial_k g_(ij)
 template <size_t VolumeDim, typename Frame, typename DataType>
-tnsr::ii<DataType, VolumeDim, Frame> spatial_ricci_tensor_from_KST_vars(
-    const tnsr::ijj<DataType, VolumeDim, Frame>& kst_var_D,
-    const tnsr::ijkk<DataType, VolumeDim, Frame>& d_kst_var_D,
+tnsr::ii<DataType, VolumeDim, Frame> ricci_tensor(
+    const tnsr::iaa<DataType, VolumeDim, Frame>& phi,
+    const tnsr::ijaa<DataType, VolumeDim, Frame>& deriv_phi,
     const tnsr::II<DataType, VolumeDim, Frame>&
         inverse_spatial_metric) noexcept {
   auto ricci = make_with_value<tnsr::ii<DataType, VolumeDim, Frame>>(
       inverse_spatial_metric, 0.);
 
-  // New variable to avoid recomputing in nested loops
-  tnsr::ijj<DataType, VolumeDim, Frame> Dudd(
-      get_size(get<0, 0>(inverse_spatial_metric)));
+  TempBuffer<tmpl::list<::Tags::TempIjj<0, VolumeDim, Frame, DataType>,
+                        ::Tags::Tempijk<0, VolumeDim, Frame, DataType>,
+                        ::Tags::Tempi<0, VolumeDim, Frame, DataType>,
+                        ::Tags::Tempi<1, VolumeDim, Frame, DataType>,
+                        ::Tags::TempI<0, VolumeDim, Frame, DataType>,
+                        ::Tags::TempI<1, VolumeDim, Frame, DataType>>>
+      local_buffer(get_size(get<0, 0>(inverse_spatial_metric)));
 
+  // New variable to avoid recomputing in nested loops
+  auto& phi_uplolo =
+      get<::Tags::TempIjj<0, VolumeDim, Frame, DataType>>(local_buffer);
   for (size_t k = 0; k < VolumeDim; ++k) {
     for (size_t i = 0; i < VolumeDim; ++i) {
       for (size_t j = i; j < VolumeDim; ++j) {  // Symmetry
-        Dudd.get(k, i, j) = 0.;
+        phi_uplolo.get(k, i, j) = 0.;
         for (size_t l = 0; l < VolumeDim; ++l) {
-          Dudd.get(k, i, j) +=
-              inverse_spatial_metric.get(k, l) * kst_var_D.get(l, i, j);
+          phi_uplolo.get(k, i, j) +=
+              0.5 * inverse_spatial_metric.get(k, l) * phi.get(l, 1 + i, 1 + j);
         }
       }
     }
   }
 
   // New variable to avoid recomputing in nested loops
-  tnsr::ijk<DataType, VolumeDim, Frame> Dddu(
-      get_size(get<0, 0>(inverse_spatial_metric)));
+  auto& phi_loloup =
+      get<::Tags::Tempijk<0, VolumeDim, Frame, DataType>>(local_buffer);
   for (size_t k = 0; k < VolumeDim; ++k) {
     for (size_t i = 0; i < VolumeDim; ++i) {
       for (size_t j = 0; j < VolumeDim; ++j) {
-        Dddu.get(i, j, k) = 0.;
+        phi_loloup.get(i, j, k) = 0.;
         for (size_t l = 0; l < VolumeDim; ++l) {
-          Dddu.get(i, j, k) +=
-              inverse_spatial_metric.get(k, l) * kst_var_D.get(i, j, l);
+          phi_loloup.get(i, j, k) +=
+              0.5 * inverse_spatial_metric.get(k, l) * phi.get(i, 1 + j, 1 + l);
         }
       }
     }
   }
 
   // New variable to avoid recomputing in nested loops
-  tnsr::i<DataType, VolumeDim, Frame> Dtr1(
-      get_size(get<0, 0>(inverse_spatial_metric)));
-  //  kst_var_D.get(i,m,n)*inverse_spatial_metric.get(m,n)
+  auto& phi_trace1 =
+      get<::Tags::Tempi<0, VolumeDim, Frame, DataType>>(local_buffer);
   for (size_t i = 0; i < VolumeDim; ++i) {
-    Dtr1.get(i) = 0.;
+    phi_trace1.get(i) = 0.;
     for (size_t j = 0; j < VolumeDim; ++j) {
-      Dtr1.get(i) += Dddu.get(i, j, j);
+      phi_trace1.get(i) += phi_loloup.get(i, j, j);
     }
   }
-  //   kst_var_D.get(m,n,i)*inverse_spatial_metric.get(m,n)
-  tnsr::i<DataType, VolumeDim, Frame> Dtr2(
-      get_size(get<0, 0>(inverse_spatial_metric)));
+  auto& phi_trace2 =
+      get<::Tags::Tempi<1, VolumeDim, Frame, DataType>>(local_buffer);
   for (size_t i = 0; i < VolumeDim; ++i) {
-    Dtr2.get(i) = 0.;
+    phi_trace2.get(i) = 0.;
     for (size_t j = 0; j < VolumeDim; ++j) {
-      Dtr2.get(i) += Dudd.get(j, j, i);
+      phi_trace2.get(i) += phi_uplolo.get(j, j, i);
     }
   }
 
-  const auto Dtr1up = raise_or_lower_index(Dtr1, inverse_spatial_metric);
-  const auto Dtr2up = raise_or_lower_index(Dtr2, inverse_spatial_metric);
+  auto& phi_trace1_up =
+      get<::Tags::TempI<0, VolumeDim, Frame, DataType>>(local_buffer);
+  auto& phi_trace2_up =
+      get<::Tags::TempI<1, VolumeDim, Frame, DataType>>(local_buffer);
+
+  raise_or_lower_index(make_not_null(&phi_trace1_up), phi_trace1,
+                       inverse_spatial_metric);
+  raise_or_lower_index(make_not_null(&phi_trace2_up), phi_trace2,
+                       inverse_spatial_metric);
 
   for (size_t i = 0; i < VolumeDim; ++i) {
     for (size_t j = i; j < VolumeDim; ++j) {  // Symmetry
       ricci.get(i, j) = 0.;
       for (size_t p = 0; p < VolumeDim; ++p) {
-        ricci.get(i, j) += (kst_var_D.get(p, i, j) - kst_var_D.get(i, j, p) -
-                            kst_var_D.get(j, i, p)) *
-                           (2.0 * Dtr2up.get(p) - Dtr1up.get(p));
+        ricci.get(i, j) +=
+            0.5 *
+            (phi.get(p, 1 + i, 1 + j) - phi.get(i, 1 + j, 1 + p) -
+             phi.get(j, 1 + i, 1 + p)) *
+            (2.0 * phi_trace2_up.get(p) - phi_trace1_up.get(p));
         for (size_t q = 0; q < VolumeDim; ++q) {
           ricci.get(i, j) +=
-              0.5 * inverse_spatial_metric.get(p, q) *
-                  (d_kst_var_D.get(j, q, p, i) + d_kst_var_D.get(i, q, p, j) -
-                   d_kst_var_D.get(j, i, p, q) - d_kst_var_D.get(i, j, p, q) +
-                   d_kst_var_D.get(p, i, q, j) + d_kst_var_D.get(p, j, q, i) -
-                   2.0 * d_kst_var_D.get(q, p, i, j)) +
-              Dddu.get(i, p, q) * Dddu.get(j, q, p) +
-              2.0 * Dudd.get(p, i, q) * Dddu.get(p, j, q) -
-              2.0 * Dudd.get(p, q, i) * Dudd.get(q, p, j);
+              0.25 * inverse_spatial_metric.get(p, q) *
+                  (deriv_phi.get(j, q, 1 + p, 1 + i) +
+                   deriv_phi.get(i, q, 1 + p, 1 + j) -
+                   deriv_phi.get(j, i, 1 + p, 1 + q) -
+                   deriv_phi.get(i, j, 1 + p, 1 + q) +
+                   deriv_phi.get(p, i, 1 + q, 1 + j) +
+                   deriv_phi.get(p, j, 1 + q, 1 + i) -
+                   2.0 * deriv_phi.get(q, p, 1 + i, 1 + j)) +
+              phi_loloup.get(i, p, q) * phi_loloup.get(j, q, p) +
+              2.0 * phi_uplolo.get(p, i, q) * phi_loloup.get(p, j, q) -
+              2.0 * phi_uplolo.get(p, q, i) * phi_uplolo.get(q, p, j);
         }
       }
     }
   }
 
   return ricci;
-}
-
-// Eq. (2.19) of Kidder, Scheel & Teukolsky (KST) [gr-qc/0105031v1]
-// Compute \Gamma^k_{ij} from D_(k,i,j) = (1/2) \partial_k g_(ij)
-template <size_t VolumeDim, typename Frame, typename DataType>
-tnsr::Ijj<DataType, VolumeDim, Frame>
-spatial_christoffel_second_kind_from_KST_vars(
-    const tnsr::ijj<DataType, VolumeDim, Frame>& kst_var_D,
-    const tnsr::II<DataType, VolumeDim, Frame>&
-        inverse_spatial_metric) noexcept {
-  tnsr::ijj<DataType, VolumeDim, Frame> christoffel_first_kind{
-      get_size(get<0, 0>(inverse_spatial_metric))};
-  for (size_t k = 0; k < VolumeDim; ++k) {
-    for (size_t i = 0; i < VolumeDim; ++i) {
-      for (size_t j = i; j < VolumeDim; ++j) {  // Symmetry
-        christoffel_first_kind.get(k, i, j) = kst_var_D.get(i, j, k) +
-                                              kst_var_D.get(j, i, k) -
-                                              kst_var_D.get(k, i, j);
-      }
-    }
-  }
-  auto christoffel_second_kind =
-      make_with_value<tnsr::Ijj<DataType, VolumeDim, Frame>>(
-          inverse_spatial_metric, 0.);
-  // raise first index
-  for (size_t k = 0; k < VolumeDim; ++k) {
-    for (size_t i = 0; i < VolumeDim; ++i) {
-      for (size_t j = i; j < VolumeDim; ++j) {
-        for (size_t l = 0; l < VolumeDim; ++l) {
-          christoffel_second_kind.get(k, i, j) +=
-              inverse_spatial_metric.get(k, l) *
-              christoffel_first_kind.get(l, i, j);
-        }
-      }
-    }
-  }
-  return christoffel_second_kind;
 }
 
 // Spatial projection tensors

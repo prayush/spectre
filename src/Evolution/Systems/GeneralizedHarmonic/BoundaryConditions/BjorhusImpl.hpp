@@ -32,6 +32,7 @@
 #include "Parallel/ConstGlobalCache.hpp"
 #include "Parallel/Invoke.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/Tags.hpp"
+#include "PointwiseFunctions/GeneralRelativity/Christoffel.hpp"
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "Time/Tags.hpp"
@@ -1051,49 +1052,46 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
       unit_interface_normal_vector, 0.);
   {
     // D_(k,i,j) = (1/2) \partial_k g_(ij) and its derivative
-    tnsr::ijj<DataVector, VolumeDim, Frame::Inertial> kst_D(
-        get_size(get(gamma2)));
-    tnsr::ijkk<DataVector, VolumeDim, Frame::Inertial> d_kst_D(
+    tnsr::ijj<DataVector, VolumeDim, Frame::Inertial> spatial_phi(
         get_size(get(gamma2)));
     for (size_t i = 0; i < VolumeDim; ++i) {
       for (size_t j = i; j < VolumeDim; ++j) {
         for (size_t k = 0; k < VolumeDim; ++k) {
-          kst_D.get(k, i, j) = 0.5 * phi.get(k, i + 1, j + 1);
-          for (size_t l = 0; l < VolumeDim; ++l) {
-            d_kst_D.get(l, k, i, j) = 0.5 * d_phi.get(l, k, i + 1, j + 1);
-          }
+          spatial_phi.get(k, i, j) = phi.get(k, i + 1, j + 1);
         }
       }
     }
 
-    // ComputeRicciFromD(kst_D, d_kst_D, Invg, Ricci3);
-    auto ricci_3 = GeneralizedHarmonic::spatial_ricci_tensor_from_KST_vars(
-        kst_D, d_kst_D, inverse_spatial_metric);
+    // Compute spatial Ricci tensor
+    auto ricci_3 =
+        GeneralizedHarmonic::ricci_tensor(phi, d_phi, inverse_spatial_metric);
     tnsr::ijj<DataVector, VolumeDim, Frame::Inertial> CdK(
         get_size(get(gamma2)));
     {
-      const auto christoffel_second_kind =
-          GeneralizedHarmonic::spatial_christoffel_second_kind_from_KST_vars(
-              kst_D, inverse_spatial_metric);
+      const auto christoffel_first_kind =
+          gr::christoffel_first_kind(spatial_phi);
+      const auto christoffel_second_kind = raise_or_lower_first_index(
+          christoffel_first_kind, inverse_spatial_metric);
+
       // Ordinary derivative first
       for (size_t i = 0; i < VolumeDim; ++i) {
         for (size_t j = i; j < VolumeDim; ++j) {
           for (size_t k = 0; k < VolumeDim; ++k) {
             CdK.get(k, i, j) = 0.5 * d_pi.get(k, i + 1, j + 1);
-            for (size_t mu = 0; mu <= VolumeDim; ++mu) {
+            for (size_t a = 0; a <= VolumeDim; ++a) {
               CdK.get(k, i, j) +=
                   0.5 *
-                  (d_phi.get(k, i, j + 1, mu) + d_phi.get(k, j, i + 1, mu)) *
-                  spacetime_unit_normal_vector.get(mu);
-              for (size_t nu = 0; nu <= VolumeDim; ++nu) {
-                for (size_t a = 0; a <= VolumeDim; ++a) {
+                  (d_phi.get(k, i, j + 1, a) + d_phi.get(k, j, i + 1, a)) *
+                  spacetime_unit_normal_vector.get(a);
+              for (size_t b = 0; b <= VolumeDim; ++b) {
+                for (size_t c = 0; c <= VolumeDim; ++c) {
                   CdK.get(k, i, j) -=
-                      0.5 * (phi.get(i, j + 1, mu) + phi.get(j, i + 1, mu)) *
-                      spacetime_unit_normal_vector.get(nu) *
-                      (inverse_spacetime_metric.get(a, mu) +
-                       0.5 * spacetime_unit_normal_vector.get(a) *
-                           spacetime_unit_normal_vector.get(mu)) *
-                      phi.get(k, a, nu);
+                      0.5 * (phi.get(i, j + 1, a) + phi.get(j, i + 1, a)) *
+                      spacetime_unit_normal_vector.get(b) *
+                      (inverse_spacetime_metric.get(c, a) +
+                       0.5 * spacetime_unit_normal_vector.get(c) *
+                           spacetime_unit_normal_vector.get(a)) *
+                      phi.get(k, c, b);
                 }
               }
             }
@@ -1127,10 +1125,11 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
         for (size_t j = i; j < VolumeDim; ++j) {
           for (size_t k = 0; k < VolumeDim; ++k) {
             for (size_t l = 0; l < VolumeDim; ++l) {
-              ricci_3.get(i, j) +=
-                  0.5 * inverse_spatial_metric.get(k, l) *
-                  (d_kst_D.get(i, k, l, j) - d_kst_D.get(k, i, l, j) +
-                   d_kst_D.get(j, k, l, i) - d_kst_D.get(k, j, l, i));
+              ricci_3.get(i, j) += 0.25 * inverse_spatial_metric.get(k, l) *
+                                   (d_phi.get(i, k, 1 + l, 1 + j) -
+                                    d_phi.get(k, i, 1 + l, 1 + j) +
+                                    d_phi.get(j, k, 1 + l, 1 + i) -
+                                    d_phi.get(k, j, 1 + l, 1 + i));
             }
           }
         }
@@ -1209,14 +1208,14 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
       unit_interface_normal_vector, 0.);
   auto U3m = make_with_value<tnsr::aa<DataVector, VolumeDim, Frame::Inertial>>(
       unit_interface_normal_vector, 0.);
-  for (size_t mu = 0; mu <= VolumeDim; ++mu) {
-    for (size_t nu = mu; nu <= VolumeDim; ++nu) {
+  for (size_t a = 0; a <= VolumeDim; ++a) {
+    for (size_t b = a; b <= VolumeDim; ++b) {
       for (size_t i = 0; i < VolumeDim; ++i) {
         for (size_t j = 0; j < VolumeDim; ++j) {
-          U3p.get(mu, nu) += 2.0 * projection_Ab.get(i + 1, mu) *
-                             projection_Ab.get(j + 1, nu) * U8p.get(i, j);
-          U3m.get(mu, nu) += 2.0 * projection_Ab.get(i + 1, mu) *
-                             projection_Ab.get(j + 1, nu) * U8m.get(i, j);
+          U3p.get(a, b) += 2.0 * projection_Ab.get(i + 1, a) *
+                           projection_Ab.get(j + 1, b) * U8p.get(i, j);
+          U3m.get(a, b) += 2.0 * projection_Ab.get(i + 1, a) *
+                           projection_Ab.get(j + 1, b) * U8m.get(i, j);
         }
       }
     }
@@ -1225,8 +1224,8 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
   // Impose physical boundary condition
   if (mGamma2InPhysBc) {
     DataVector tmp(get_size(get<0>(unit_interface_normal_vector)));
-    for (size_t mu = 0; mu <= VolumeDim; ++mu) {
-      for (size_t nu = mu; nu <= VolumeDim; ++nu) {
+    for (size_t c = 0; c <= VolumeDim; ++c) {
+      for (size_t d = c; d <= VolumeDim; ++d) {
         for (size_t a = 0; a <= VolumeDim; ++a) {
           for (size_t b = 0; b <= VolumeDim; ++b) {
             tmp = 0.;
@@ -1235,9 +1234,9 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
                      three_index_constraint.get(i, a, b);
             }
             tmp *= get(gamma2);
-            bc_dt_u_minus->get(mu, nu) +=
-                (projection_Ab.get(a, mu) * projection_Ab.get(b, nu) -
-                 0.5 * projection_ab.get(mu, nu) * projection_AB.get(a, b)) *
+            bc_dt_u_minus->get(c, d) +=
+                (projection_Ab.get(a, c) * projection_Ab.get(b, d) -
+                 0.5 * projection_ab.get(c, d) * projection_AB.get(a, b)) *
                 (char_projected_rhs_dt_u_minus.get(a, b) +
                  char_speeds.at(3) *
                      (U3m.get(a, b) - tmp - mMuPhys * U3p.get(a, b)));
@@ -1246,13 +1245,13 @@ ReturnType set_dt_u_minus<ReturnType, VolumeDim>::
       }
     }
   } else {
-    for (size_t mu = 0; mu <= VolumeDim; ++mu) {
-      for (size_t nu = mu; nu <= VolumeDim; ++nu) {
+    for (size_t c = 0; c <= VolumeDim; ++c) {
+      for (size_t d = c; d <= VolumeDim; ++d) {
         for (size_t a = 0; a <= VolumeDim; ++a) {
           for (size_t b = 0; b <= VolumeDim; ++b) {
-            bc_dt_u_minus->get(mu, nu) +=
-                (projection_Ab.get(a, mu) * projection_Ab.get(b, nu) -
-                 0.5 * projection_ab.get(mu, nu) * projection_AB.get(a, b)) *
+            bc_dt_u_minus->get(c, d) +=
+                (projection_Ab.get(a, c) * projection_Ab.get(b, d) -
+                 0.5 * projection_ab.get(c, d) * projection_AB.get(a, b)) *
                 (char_projected_rhs_dt_u_minus.get(a, b) +
                  char_speeds.at(3) * (U3m.get(a, b) - mMuPhys * U3p.get(a, b)));
           }

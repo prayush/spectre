@@ -2228,11 +2228,10 @@ void test_constraint_preserving_bjorhus_u_minus<
 
 // Test helper functions needed to set dt<VMinus>
 namespace {
-// Test GeneralizedHarmonic::spatial_ricci_tensor_from_KST_vars
-void test_spatial_ricci_tensor_from_KST_vars(
-    const size_t grid_size_each_dimension,
-    const std::array<double, 3>& lower_bound,
-    const std::array<double, 3>& upper_bound) noexcept {
+// Test GeneralizedHarmonic::ricci_tensor
+void test_ricci_tensor(const size_t grid_size_each_dimension,
+                       const std::array<double, 3>& lower_bound,
+                       const std::array<double, 3>& upper_bound) noexcept {
   // Setup grid
   Mesh<VolumeDim> mesh{grid_size_each_dimension, Spectral::Basis::Legendre,
                        Spectral::Quadrature::GaussLobatto};
@@ -2317,26 +2316,9 @@ void test_spatial_ricci_tensor_from_KST_vars(
     }
   }
 
-  // D_(k,i,j) = (1/2) \partial_k g_(ij) and its derivative
-  tnsr::ijj<DataVector, VolumeDim, Frame::Inertial> local_kst_D(
-      get_size(get<0, 0, 0>(local_phi)));
-  tnsr::ijkk<DataVector, VolumeDim, Frame::Inertial> local_d_kst_D(
-      get_size(get<0, 0, 0>(local_phi)));
-  for (size_t i = 0; i < VolumeDim; ++i) {
-    for (size_t j = i; j < VolumeDim; ++j) {
-      for (size_t k = 0; k < VolumeDim; ++k) {
-        local_kst_D.get(k, i, j) = 0.5 * local_phi.get(k, i + 1, j + 1);
-        for (size_t l = 0; l < VolumeDim; ++l) {
-          local_d_kst_D.get(l, k, i, j) =
-              0.5 * local_d_phi.get(l, k, i + 1, j + 1);
-        }
-      }
-    }
-  }
-
   // Call tested function
-  auto local_ricci_3 = GeneralizedHarmonic::spatial_ricci_tensor_from_KST_vars(
-      local_kst_D, local_d_kst_D, local_inverse_spatial_metric);
+  auto local_ricci_3 = GeneralizedHarmonic::ricci_tensor(
+      local_phi, local_d_phi, local_inverse_spatial_metric);
 
   // Initialize with values from SpEC
   auto spec_ricci_3 = local_ricci_3;
@@ -2350,112 +2332,6 @@ void test_spatial_ricci_tensor_from_KST_vars(
 
   // Compare values returned by BC action vs those from SpEC
   CHECK_ITERABLE_APPROX(local_ricci_3, spec_ricci_3);
-}
-
-// Test GeneralizedHarmonic::spatial_christoffel_second_kind_from_KST_vars
-void test_spatial_christoffel_second_kind_from_KST_vars(
-    const size_t grid_size_each_dimension,
-    const std::array<double, 3>& lower_bound,
-    const std::array<double, 3>& upper_bound) noexcept {
-  // Setup grid
-  Mesh<VolumeDim> mesh{grid_size_each_dimension, Spectral::Basis::Legendre,
-                       Spectral::Quadrature::GaussLobatto};
-  const auto coord_map =
-      domain::make_coordinate_map<Frame::Logical, Frame::Inertial>(Affine3D{
-          Affine{-1., 1., lower_bound[0], upper_bound[0]},
-          Affine{-1., 1., lower_bound[1], upper_bound[1]},
-          Affine{-1., 1., lower_bound[2], upper_bound[2]},
-      });
-
-  // Setup coordinates
-  const auto x_logical = logical_coordinates(mesh);
-  const auto x = coord_map(x_logical);
-  const Direction<VolumeDim> direction(1, Side::Upper);  // +y direction
-  const size_t slice_grid_points =
-      mesh.extents().slice_away(direction.dimension()).product();
-  const auto inertial_coords = [&slice_grid_points, &lower_bound]() {
-    tnsr::I<DataVector, VolumeDim, frame> tmp(slice_grid_points, 0.);
-    // +y direction
-    get<1>(tmp) = 0.5;
-    for (size_t i = 0; i < VolumeDim; ++i) {
-      for (size_t j = 0; j < VolumeDim; ++j) {
-        get<0>(tmp)[i * VolumeDim + j] =
-            lower_bound[0] + 0.5 * static_cast<double>(i);
-        get<2>(tmp)[i * VolumeDim + j] =
-            lower_bound[2] + 0.5 * static_cast<double>(j);
-      }
-    }
-    return tmp;
-  }();
-
-  auto local_inverse_spatial_metric =
-      make_with_value<tnsr::II<DataVector, VolumeDim, Frame::Inertial>>(
-          inertial_coords, 0.);
-  auto local_phi =
-      make_with_value<tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>>(
-          inertial_coords, 0.);
-  auto local_d_pi =
-      make_with_value<tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>>(
-          inertial_coords, 0.);
-  auto local_d_phi =
-      make_with_value<tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>>(
-          inertial_coords, 0.);
-
-  // Setting inverse_spatial_metric
-  for (size_t i = 0; i < get<0>(inertial_coords).size(); ++i) {
-    for (size_t j = 0; j < VolumeDim; ++j) {
-      local_inverse_spatial_metric.get(0, j)[i] = 41.;
-      local_inverse_spatial_metric.get(1, j)[i] = 43.;
-      local_inverse_spatial_metric.get(2, j)[i] = 47.;
-    }
-  }
-  // Setting pi AND phi
-  for (size_t i = 0; i < get<0>(inertial_coords).size(); ++i) {
-    for (size_t a = 0; a <= VolumeDim; ++a) {
-      for (size_t b = 0; b <= VolumeDim; ++b) {
-        // local_pi.get(a, b)[i] = 1.;
-        local_phi.get(0, a, b)[i] = 3.;
-        local_phi.get(1, a, b)[i] = 5.;
-        local_phi.get(2, a, b)[i] = 7.;
-      }
-    }
-  }
-
-  // D_(k,i,j) = (1/2) \partial_k g_(ij) and its derivative
-  tnsr::ijj<DataVector, VolumeDim, Frame::Inertial> local_kst_D(
-      get_size(get<0, 0, 0>(local_phi)));
-  for (size_t i = 0; i < VolumeDim; ++i) {
-    for (size_t j = i; j < VolumeDim; ++j) {
-      for (size_t k = 0; k < VolumeDim; ++k) {
-        local_kst_D.get(k, i, j) = 0.5 * local_phi.get(k, i + 1, j + 1);
-      }
-    }
-  }
-
-  // Call tested function
-  auto local_spatial_christoffel_second_kind =
-      GeneralizedHarmonic::spatial_christoffel_second_kind_from_KST_vars(
-          local_kst_D, local_inverse_spatial_metric);
-
-  // Initialize with values from SpEC
-  auto spec_spatial_christoffel_second_kind =
-      local_spatial_christoffel_second_kind;
-  const std::array<double, 27> spec_vals = {
-      {61.5, 184.5, 307.5, 184.5, 307.5, 430.5, 307.5, 430.5, 553.5,
-       61.5, 188.5, 315.5, 188.5, 315.5, 442.5, 315.5, 442.5, 569.5,
-       59.5, 190.5, 321.5, 190.5, 321.5, 452.5, 321.5, 452.5, 583.5}};
-  for (size_t i = 0; i < VolumeDim; ++i) {
-    for (size_t j = 0; j < VolumeDim; ++j) {
-      for (size_t k = j; k < VolumeDim; ++k) {
-        spec_spatial_christoffel_second_kind.get(i, j, k) =
-            gsl::at(spec_vals, i * VolumeDim * VolumeDim + j * VolumeDim + k);
-      }
-    }
-  }
-
-  // Compare values returned by BC action vs those from SpEC
-  CHECK_ITERABLE_APPROX(local_spatial_christoffel_second_kind,
-                        spec_spatial_christoffel_second_kind);
 }
 
 // Test GeneralizedHarmonic::spatial_projection_tensor (3 OVERLOADS)
@@ -2860,9 +2736,7 @@ SPECTRE_TEST_CASE(
   const std::array<double, 3> lower_bound{{299., -0.5, -0.5}};
   const std::array<double, 3> upper_bound{{300., 0.5, 0.5}};
 
-  test_spatial_ricci_tensor_from_KST_vars(grid_size, lower_bound, upper_bound);
-  test_spatial_christoffel_second_kind_from_KST_vars(grid_size, lower_bound,
-                                                     upper_bound);
+  test_ricci_tensor(grid_size, lower_bound, upper_bound);
   test_spatial_projection_tensors(grid_size, lower_bound, upper_bound);
   test_weyl_propagating(grid_size, lower_bound, upper_bound);
 }
