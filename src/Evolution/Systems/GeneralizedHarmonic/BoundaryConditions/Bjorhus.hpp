@@ -13,7 +13,6 @@
 #include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "DataStructures/DataBox/DataOnSlice.hpp"
 #include "DataStructures/SliceVariables.hpp"
-#include "DataStructures/TempBuffer.hpp"
 #include "DataStructures/Tensor/EagerMath/Magnitude.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
@@ -22,7 +21,7 @@
 #include "Domain/Tags.hpp"
 #include "ErrorHandling/Assert.hpp"
 #include "ErrorHandling/Error.hpp"
-#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditionsImpl.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/BjorhusImpl.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/ImposeBoundaryConditions.hpp"
@@ -105,12 +104,6 @@ struct ImposeBjorhusBoundaryConditions {
                  typename Metavariables::boundary_condition_tag>;
 
  private:
-  /* ------------------------------------------------------------------------
-   * ------------------------------------------------------------------------
-   * ---------------- APPLY BJORHUS BOUNDARY CONDITIONS  --------------------
-   * ------------------------------------------------------------------------
-   * ------------------------------------------------------------------------
-   */
   template <size_t VolumeDim, VSpacetimeMetricBcMethod VSpacetimeMetricMethod,
             VZeroBcMethod VZeroMethod, VPlusBcMethod VPlusMethod,
             VMinusBcMethod VMinusMethod, typename DbTags, typename ArrayIndex,
@@ -123,7 +116,6 @@ struct ImposeBjorhusBoundaryConditions {
         Parallel::ConstGlobalCache<Metavariables>& cache,
         const ArrayIndex& /*array_index*/, const ActionList /*meta*/,
         const ParallelComponent* const /*meta*/) noexcept {
-      // ------------------------------- (1)
       // Get information about system:
       // tags for evolved variables and their time derivatives
       using system = typename Metavariables::system;
@@ -141,9 +133,6 @@ struct ImposeBjorhusBoundaryConditions {
           domain::Tags::BoundaryDirectionsInterior<VolumeDim>,
           ::Tags::Normalized<domain::Tags::UnnormalizedFaceNormal<
               VolumeDim, Frame::Inertial>>>>(box);
-      // const auto& external_bdry_vars = db::get<domain::Tags::Interface<
-      // domain::Tags::BoundaryDirectionsInterior<VolumeDim>,
-      // variables_tag>>(box);
       const auto& volume_all_vars = db::get<variables_tag>(box);
       const auto& volume_all_dt_vars = db::get<dt_variables_tag>(box);
       const auto& external_bdry_char_speeds = db::get<domain::Tags::Interface<
@@ -154,8 +143,7 @@ struct ImposeBjorhusBoundaryConditions {
               domain::Tags::BoundaryDirectionsInterior<VolumeDim>,
               domain::Tags::Coordinates<VolumeDim, Frame::Inertial>>>(box);
 
-      // ------------------------------- (2)
-      // Apply the boundary condition
+      // Apply boundary condition:
       // Loop over external boundaries and set dt_volume_vars on them
       for (auto& external_direction_and_normals : unit_normal_one_forms) {
         const auto& direction = external_direction_and_normals.first;
@@ -189,153 +177,87 @@ struct ImposeBjorhusBoundaryConditions {
         const auto& inertial_coords =
             external_bdry_inertial_coords.at(direction);
 
-        // ------------------------------- (2)
-        // Create a TempTensor that stores all temporaries computed
-        // here and elsewhere
-        TempBuffer<BoundaryConditions_detail::all_local_vars<VolumeDim>> buffer(
+        // Create and store all temporaries needed here and elsewhere
+        BoundaryConditions_detail::BjorhusIntermediatesComputer intermediates(
             slice_grid_points);
-        // ------------------------------- (2.2)
-        // Compute local variables, including:
-        // (A) unit normal form to interface
-        // (B) 4metric, inv4metric, lapse, shift on this slice
-        // (C) dampign parameter ConstraintGamma2 on this slice
-        // (D) Compute projection operator on this slice
-        // (E) dt<U> on this slice from `volume_all_dt_vars`
-        BoundaryConditions_detail::local_variables(
-            make_not_null(&buffer), box, direction, dimension, mesh, vars,
-            dt_vars, unit_normal_one_form, char_speeds);
-
-        // FIXME: Are there incoming char speeds on the inner boundary?
-        if (true) {  // {{{
-          const auto& x =
-              get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(
-                  buffer);
-          // If radius of surface is less than 10, then assume we are on an
-          // inner boundary. FIXME
-          const auto& min_r_squared =
-              min(square(get<0>(x)) + square(get<1>(x)) + square(get<2>(x)));
-          const auto min_inertial_r_squared =
-              min(square(get<0>(inertial_coords)) +
-                  square(get<1>(inertial_coords)) +
-                  square(get<2>(inertial_coords)));
-          if (min_r_squared < 2. * 2. or min_inertial_r_squared < 2. * 2.) {
-            const auto& min_speed =
-                BoundaryConditions_detail::min_characteristic_speed<VolumeDim>(
-                    char_speeds);
-            if (min_speed <= 0.0) {
-              Parallel::printf(
-                  "\nWARNING: Incoming char speeds on INNER boundary at t=%f\n",
-                  db::get<::Tags::Time>(box));
-              Parallel::printf(
-                  "  Min speed %f at min (inertial) radius %f (%f)\n\n",
-                  min_speed, sqrt(min_r_squared), sqrt(min_inertial_r_squared));
-              // Is the face normal outward facing, really?
-              for (size_t i = 0; i < 5; ++i) {
-                Parallel::printf(
-                    " >> (random pt (%f, %f, %f)) unnormalized_normal_{x,y,z}: "
-                    "(%f, %f, "
-                    "%f)\n",
-                    get<0>(x)[i], get<1>(x)[i], get<2>(x)[i],
-                    get<0>(unit_normal_one_form)[i],
-                    get<1>(unit_normal_one_form)[i],
-                    get<2>(unit_normal_one_form)[i]);
-                Parallel::printf(
-                    "     (same random pt) r dot normal (should be NEGative): "
-                    "%f\n",
-                    get<0>(x)[i] * get<0>(unit_normal_one_form)[i] +
-                        get<1>(x)[i] * get<1>(unit_normal_one_form)[i] +
-                        get<2>(x)[i] * get<2>(unit_normal_one_form)[i]);
-                Parallel::printf(
-                    "     (same random pt) char speeds (psi, 0, +, -): %f, %f, "
-                    "%f, %f\n",
-                    char_speeds.at(0)[i], char_speeds.at(1)[i],
-                    char_speeds.at(2)[i], char_speeds.at(3)[i]);
-              }
-              //   Parallel::abort("Aborting for above reason...");
-            }
-          }
-        }  // }}}
+        intermediates.compute_vars(box, direction, dimension, mesh, vars,
+                                   dt_vars, unit_normal_one_form, char_speeds);
 
         db::mutate<dt_variables_tag>(
             make_not_null(&box),
             // Function that applies bdry conditions to dt<variables>
             [
               &volume_grid_points, &slice_grid_points, &mesh, &dimension,
-              &direction, &buffer, &vars, &dt_vars, &unit_normal_one_form,
-              &inertial_coords, &char_speeds
+              &direction, &intermediates, &vars, &dt_vars,
+              &unit_normal_one_form, &inertial_coords, &char_speeds
             ](const gsl::not_null<db::item_type<dt_variables_tag>*>
                   volume_dt_vars,
               const double /* time */, const auto& /* boundary_condition */
               ) noexcept {
-              // ------------------------------- (1)
               // Preliminaries
               ASSERT(
                   volume_dt_vars->number_of_grid_points() == volume_grid_points,
                   "volume_dt_vars has wrong number of grid points.  Expected "
                       << volume_grid_points << ", got "
                       << volume_dt_vars->number_of_grid_points());
-              // ------------------------------- (2)
-              // Compute desired values of dt_volume_vars
-              //
-              // ------------------------------- (2.1)
-              // Get desired values of CharProjection<dt<U>>
-              //
-              // At all points on the interface where the char speed of any
-              // (given) characteristic field is +ve, we "do nothing", and
-              // when its -ve, we apply Bjorhus BCs. This is achieved through
-              // `set_bc_when_char_speed_is_negative`.
+              // Compute desired values of dt_volume_vars and set it.
+              // At all points on the interface where the char speed of
+              // given characteristic field is positive, we "do nothing", and
+              // when its negative, we apply Bjorhus BCs. This is achieved
+              // through `set_bc_when_char_speed_is_negative`.
               const auto bc_dt_u_psi =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
-                      get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial,
-                                         DataVector>>(buffer),
-                      BoundaryConditions_detail::set_dt_u_psi<
+                      intermediates.get_var(
+                          Tags::VSpacetimeMetric<VolumeDim, Frame::Inertial>{}),
+                      BoundaryConditions_detail::set_dt_v_psi<
                           typename Tags::VSpacetimeMetric<
                               VolumeDim, Frame::Inertial>::type,
-                          VolumeDim>::apply(VSpacetimeMetricMethod, buffer,
-                                            vars, dt_vars,
+                          VolumeDim>::apply(VSpacetimeMetricMethod,
+                                            intermediates, vars, dt_vars,
                                             unit_normal_one_form),
                       char_speeds.at(0));
               const auto bc_dt_u_zero =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
-                      get<::Tags::Tempiaa<23, VolumeDim, Frame::Inertial,
-                                          DataVector>>(buffer),
-                      BoundaryConditions_detail::set_dt_u_zero<
+                      intermediates.get_var(
+                          Tags::VZero<VolumeDim, Frame::Inertial>{}),
+                      BoundaryConditions_detail::set_dt_v_zero<
                           typename Tags::VZero<VolumeDim,
                                                Frame::Inertial>::type,
-                          VolumeDim>::apply(VZeroMethod, buffer, vars, dt_vars,
+                          VolumeDim>::apply(VZeroMethod, intermediates,
+                                            vars, dt_vars,
                                             unit_normal_one_form),
                       char_speeds.at(1));
               const auto bc_dt_u_plus =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
-                      get<::Tags::Tempaa<24, VolumeDim, Frame::Inertial,
-                                         DataVector>>(buffer),
-                      BoundaryConditions_detail::set_dt_u_plus<
+                      intermediates.get_var(
+                          Tags::VPlus<VolumeDim, Frame::Inertial>{}),
+                      BoundaryConditions_detail::set_dt_v_plus<
                           typename Tags::VPlus<VolumeDim,
                                                Frame::Inertial>::type,
-                          VolumeDim>::apply(VPlusMethod, buffer, vars, dt_vars,
+                          VolumeDim>::apply(VPlusMethod, intermediates,
+                                            vars, dt_vars,
                                             unit_normal_one_form),
                       char_speeds.at(2));
               const auto bc_dt_u_minus =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
-                      get<::Tags::Tempaa<25, VolumeDim, Frame::Inertial,
-                                         DataVector>>(buffer),
-                      BoundaryConditions_detail::set_dt_u_minus<
+                      intermediates.get_var(
+                          Tags::VMinus<VolumeDim, Frame::Inertial>{}),
+                      BoundaryConditions_detail::set_dt_v_minus<
                           typename Tags::VMinus<VolumeDim,
                                                 Frame::Inertial>::type,
-                          VolumeDim>::apply(VMinusMethod, buffer, vars, dt_vars,
-                                            inertial_coords,
+                          VolumeDim>::apply(VMinusMethod, intermediates,
+                                            vars, dt_vars, inertial_coords,
                                             unit_normal_one_form),
                       char_speeds.at(3));
               // Convert them to desired values on dt<U>
               const auto bc_dt_all_u =
                   evolved_fields_from_characteristic_fields(
-                      get<::Tags::TempScalar<26, DataVector>>(
-                          buffer),  // Gamma2
+                      intermediates.get_var(Tags::ConstraintGamma2{}),
                       bc_dt_u_psi, bc_dt_u_zero, bc_dt_u_plus, bc_dt_u_minus,
                       unit_normal_one_form);
               // Now store final values of dt<U> in suitable data structure
-              // FIXME: How can I extract this list of dt<U> tags directly
-              // from `dt_variables_tag`?
+              // FIXME: Can we extract this list of dt<U> tags directly from
+              // `dt_variables_tag`?
               const tuples::TaggedTuple<
                   db::add_tag_prefix<
                       Metavariables::temporal_id::template step_prefix,
@@ -358,7 +280,6 @@ struct ImposeBjorhusBoundaryConditions {
               const auto slice_data_ = variables_from_tagged_tuple(bc_dt_tuple);
               const auto* slice_data = slice_data_.data();
 
-              // ------------------------------- (2.4)
               // Assign BC values of dt_volume_vars on external boundary
               // slices of volume variables
               auto* const volume_dt_data = volume_dt_vars->data();
@@ -391,18 +312,21 @@ struct ImposeBjorhusBoundaryConditions {
       Parallel::ConstGlobalCache<Metavariables>& cache,
       const ArrayIndex& array_index, const ActionList action_list,
       const ParallelComponent* const parallel_component) noexcept {
-    // Here be user logic that determines / selects from various options for
-    // setting BCs on individual characteristic variables
+    // One can insert logic here that determines / selects from various options
+    // for setting BCs on individual characteristic variables.
+    // `ConstraintPreservingBjorhus` are hardcoded for now.
     return apply_impl<Metavariables::system::volume_dim,
                       // BC choice for U_\Psi
                       VSpacetimeMetricBcMethod::ConstraintPreservingBjorhus,
                       // BC choice for U_0
                       VZeroBcMethod::ConstraintPreservingBjorhus,
                       // BC choice for U_+
+                      // (This field is never incoming, which is why we use
+                      // Freezing)
                       VPlusBcMethod::Freezing,
                       // BC choice for U_-
-                      VMinusBcMethod::ConstraintPreservingPhysicalBjorhus,
-                      DbTags, ArrayIndex, ActionList, ParallelComponent,
+                      VMinusBcMethod::ConstraintPreservingBjorhus, DbTags,
+                      ArrayIndex, ActionList, ParallelComponent,
                       InboxTags...>::function_impl(box, inboxes, cache,
                                                    array_index, action_list,
                                                    parallel_component);

@@ -70,7 +70,6 @@ struct InitializeConstraints {
                     const ParallelComponent* const /*meta*/) noexcept {
     using compute_tags = tmpl::flatten<db::AddComputeTags<
         GeneralizedHarmonic::Tags::GaugeConstraintCompute<Dim, frame>,
-        // GeneralizedHarmonic::Tags::ThreeIndexConstraintCompute<Dim, frame>,
         GeneralizedHarmonic::Tags::FConstraintCompute<Dim, frame>,
         GeneralizedHarmonic::Tags::TwoIndexConstraintCompute<Dim, frame>,
         // following tags added to observe constraints

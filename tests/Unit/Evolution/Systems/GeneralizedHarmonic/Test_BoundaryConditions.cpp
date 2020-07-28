@@ -3,6 +3,9 @@
 
 #include "Framework/TestingFramework.hpp"
 
+// DELME
+#include <iostream>
+
 #include <array>
 #include <cstddef>
 #include <limits>
@@ -28,7 +31,7 @@
 #include "Domain/Mesh.hpp"
 #include "Domain/Side.hpp"
 #include "Domain/Tags.hpp"
-#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/Bjorhus.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Constraints.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/GaugeSourceFunctions/DampedHarmonic.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/System.hpp"
@@ -86,12 +89,10 @@ void test_constraint_preserving_bjorhus_u_psi<
   const Direction<VolumeDim> direction(1, Side::Upper);  // +y direction
   const size_t slice_grid_points =
       mesh.extents().slice_away(direction.dimension()).product();
-  //
-  // Create a TempTensor that stores all temporaries computed
-  // here and elsewhere
-  TempBuffer<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
-                 all_local_vars<VolumeDim>>
-      buffer(slice_grid_points);
+  // Storage for intermediate vars
+  GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+      BjorhusIntermediatesComputer intermediate_vars(slice_grid_points);
+  auto& buffer = intermediate_vars.get_buffer();
   // Also create local variables and their time derivatives, both of which we
   // will populate as needed
   db::item_type<GeneralizedHarmonic::System<VolumeDim>::variables_tag>
@@ -106,13 +107,16 @@ void test_constraint_preserving_bjorhus_u_psi<
     // POPULATE various tensors needed to compute BcDtVSpacetimeMetric
     // EXACTLY as done in SpEC
     auto& local_three_index_constraint =
-        get<::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>>(
+        get<GeneralizedHarmonic::Tags::ThreeIndexConstraint<VolumeDim,
+                                                            Frame::Inertial>>(
             buffer);
     auto& local_unit_interface_normal_vector =
-        get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    auto& local_lapse = get<::Tags::TempScalar<19, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    interface_normal_vector<VolumeDim, DataVector>>(buffer);
+    auto& local_lapse = get<gr::Tags::Lapse<DataVector>>(buffer);
     auto& local_shift =
-        get<::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<gr::Tags::Shift<VolumeDim, Frame::Inertial, DataVector>>(buffer);
 
     auto& local_pi =
         get<GeneralizedHarmonic::Tags::Pi<VolumeDim, frame>>(local_vars);
@@ -120,9 +124,17 @@ void test_constraint_preserving_bjorhus_u_psi<
         get<GeneralizedHarmonic::Tags::Phi<VolumeDim, frame>>(local_vars);
 
     auto& local_char_projected_rhs_dt_u_psi =
-        get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    auto& local_char_speeds_0 = get<::Tags::TempScalar<12, DataVector>>(buffer);
-    auto& local_char_speeds_1 = get<::Tags::TempScalar<13, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Tags::VSpacetimeMetric<VolumeDim,
+                                                        Frame::Inertial>>(
+            buffer);
+    auto& local_char_speeds_0 =
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::char_speed_vpsi<
+                    DataVector>>(buffer);
+    auto& local_char_speeds_1 =
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::char_speed_vzero<
+                    DataVector>>(buffer);
 
     // Setting 3idxConstraint
     for (size_t i = 0; i < slice_grid_points; ++i) {
@@ -179,15 +191,18 @@ void test_constraint_preserving_bjorhus_u_psi<
     // Setting unit normal one_form
     get<1>(local_unit_normal_one_form) = 1.;
   }
+
   // Compute return value from Action
   auto local_bc_dt_u_psi =
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_u_psi<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_psi<
           typename GeneralizedHarmonic::Tags::VSpacetimeMetric<VolumeDim,
                                                                frame>::type,
           VolumeDim>::
           apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
                     VSpacetimeMetricBcMethod::ConstraintPreservingBjorhus,
-                buffer, local_vars, local_dt_vars, local_unit_normal_one_form);
+                intermediate_vars, local_vars, local_dt_vars,
+                local_unit_normal_one_form);
+  std::cout << "Compute return value from Action\n" << std::flush;
 
   // Initialize with values from SpEC
   auto spec_bd_dt_u_psi = local_bc_dt_u_psi;
@@ -210,7 +225,9 @@ void test_constraint_preserving_bjorhus_u_psi<
   // Test for another set of values
   {
     auto& local_unit_interface_normal_vector =
-        get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    interface_normal_vector<VolumeDim, DataVector>>(buffer);
     // Setting unit_interface_normal_Vector
     for (size_t i = 0; i < slice_grid_points; ++i) {
       local_unit_interface_normal_vector.get(0)[i] = 1.e300;
@@ -221,13 +238,14 @@ void test_constraint_preserving_bjorhus_u_psi<
   }
   // Compute return value from Action
   local_bc_dt_u_psi =
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_u_psi<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_psi<
           typename GeneralizedHarmonic::Tags::VSpacetimeMetric<VolumeDim,
                                                                frame>::type,
           VolumeDim>::
           apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
                     VSpacetimeMetricBcMethod::ConstraintPreservingBjorhus,
-                buffer, local_vars, local_dt_vars, local_unit_normal_one_form);
+                intermediate_vars, local_vars, local_dt_vars,
+                local_unit_normal_one_form);
   // Initialize with values from SpEC
   for (size_t i = 0; i < slice_grid_points; ++i) {
     get<0, 0>(spec_bd_dt_u_psi)[i] = 20.;
@@ -276,12 +294,10 @@ void test_constraint_preserving_bjorhus_u_zero<
   const Direction<VolumeDim> direction(1, Side::Upper);  // +y direction
   const size_t slice_grid_points =
       mesh.extents().slice_away(direction.dimension()).product();
-  //
-  // Create a TempTensor that stores all temporaries computed
-  // here and elsewhere
-  TempBuffer<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
-                 all_local_vars<VolumeDim>>
-      buffer(slice_grid_points);
+  // Storage for intermediate vars
+  GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+      BjorhusIntermediatesComputer intermediate_vars(slice_grid_points);
+  auto& buffer = intermediate_vars.get_buffer();
   // Also create local variables and their time derivatives, both of which we
   // will populate as needed
   db::item_type<GeneralizedHarmonic::System<VolumeDim>::variables_tag>
@@ -296,13 +312,16 @@ void test_constraint_preserving_bjorhus_u_zero<
     // POPULATE various tensors needed to compute BcDtVSpacetimeMetric
     // EXACTLY as done in SpEC
     auto& local_four_index_constraint =
-        get<::Tags::Tempiaa<18, VolumeDim, Frame::Inertial, DataVector>>(
+        get<GeneralizedHarmonic::Tags::FourIndexConstraint<VolumeDim,
+                                                           Frame::Inertial>>(
             buffer);
     auto& local_unit_interface_normal_vector =
-        get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    auto& local_lapse = get<::Tags::TempScalar<19, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    interface_normal_vector<VolumeDim, DataVector>>(buffer);
+    auto& local_lapse = get<gr::Tags::Lapse<DataVector>>(buffer);
     auto& local_shift =
-        get<::Tags::TempI<20, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<gr::Tags::Shift<VolumeDim, Frame::Inertial, DataVector>>(buffer);
 
     auto& local_pi =
         get<GeneralizedHarmonic::Tags::Pi<VolumeDim, frame>>(local_vars);
@@ -310,10 +329,16 @@ void test_constraint_preserving_bjorhus_u_zero<
         get<GeneralizedHarmonic::Tags::Phi<VolumeDim, frame>>(local_vars);
 
     auto& local_char_projected_rhs_dt_u_zero =
-        get<::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>>(
+        get<GeneralizedHarmonic::Tags::VZero<VolumeDim, Frame::Inertial>>(
             buffer);
-    auto& local_char_speeds_0 = get<::Tags::TempScalar<12, DataVector>>(buffer);
-    auto& local_char_speeds_1 = get<::Tags::TempScalar<13, DataVector>>(buffer);
+    auto& local_char_speeds_0 =
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::char_speed_vpsi<
+                    DataVector>>(buffer);
+    auto& local_char_speeds_1 =
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::char_speed_vzero<
+                    DataVector>>(buffer);
 
     // Setting 4idxConstraint:
     // initialize dPhi (with same values as for SpEC) and compute C4 from it
@@ -388,12 +413,13 @@ void test_constraint_preserving_bjorhus_u_zero<
   }
   // Compute return value from Action
   auto local_bc_dt_u_zero =
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_u_zero<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_zero<
           typename GeneralizedHarmonic::Tags::VZero<VolumeDim, frame>::type,
           VolumeDim>::
           apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
                     VZeroBcMethod::ConstraintPreservingBjorhus,
-                buffer, local_vars, local_dt_vars, local_unit_normal_one_form);
+                intermediate_vars, local_vars, local_dt_vars,
+                local_unit_normal_one_form);
 
   // Initialize with values from SpEC
   auto spec_bc_dt_u_zero = local_bc_dt_u_zero;
@@ -439,7 +465,9 @@ void test_constraint_preserving_bjorhus_u_zero<
   // Test for another set of values
   {
     auto& local_unit_interface_normal_vector =
-        get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    interface_normal_vector<VolumeDim, DataVector>>(buffer);
     // Setting unit_interface_normal_Vector
     for (size_t i = 0; i < slice_grid_points; ++i) {
       local_unit_interface_normal_vector.get(0)[i] = 1.e300;
@@ -450,12 +478,13 @@ void test_constraint_preserving_bjorhus_u_zero<
   }
   // Compute return value from Action
   local_bc_dt_u_zero =
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_u_zero<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_zero<
           typename GeneralizedHarmonic::Tags::VZero<VolumeDim, frame>::type,
           VolumeDim>::
           apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
                     VZeroBcMethod::ConstraintPreservingBjorhus,
-                buffer, local_vars, local_dt_vars, local_unit_normal_one_form);
+                intermediate_vars, local_vars, local_dt_vars,
+                local_unit_normal_one_form);
 
   // Initialize with values from SpEC
   for (size_t i = 0; i < slice_grid_points; ++i) {
@@ -543,12 +572,10 @@ void test_constraint_preserving_bjorhus_u_minus<
     }
     return tmp;
   }();
-  //
-  // Create a TempTensor that stores all temporaries computed
-  // here and elsewhere
-  TempBuffer<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
-                 all_local_vars<VolumeDim>>
-      buffer(slice_grid_points);
+  // Storage for intermediate vars
+  GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+      BjorhusIntermediatesComputer intermediate_vars(slice_grid_points);
+  auto& buffer = intermediate_vars.get_buffer();
   // Also create local variables and their time derivatives, both of which we
   // will populate as needed
   db::item_type<GeneralizedHarmonic::System<VolumeDim>::variables_tag>
@@ -563,42 +590,66 @@ void test_constraint_preserving_bjorhus_u_minus<
     // POPULATE various tensors needed to compute BcDtVSpacetimeMetric
     // EXACTLY as done in SpEC
     auto& local_inertial_coords =
-        get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<domain::Tags::Coordinates<VolumeDim, Frame::Inertial>>(buffer);
     auto& local_constraint_gamma2 =
-        get<::Tags::TempScalar<26, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Tags::ConstraintGamma2>(buffer);
     // timelike and spacelike SPACETIME vectors, l^a and k^a
     auto& local_outgoing_null_one_form =
-        get<::Tags::Tempa<0, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    outgoing_null_one_form<VolumeDim, DataVector>>(buffer);
     auto& local_incoming_null_one_form =
-        get<::Tags::Tempa<1, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    incoming_null_one_form<VolumeDim, DataVector>>(buffer);
     // timelike and spacelike SPACETIME oneforms, l_a and k_a
     auto& local_outgoing_null_vector =
-        get<::Tags::TempA<2, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    outgoing_null_vector<VolumeDim, DataVector>>(buffer);
     auto& local_incoming_null_vector =
-        get<::Tags::TempA<3, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    incoming_null_vector<VolumeDim, DataVector>>(buffer);
     // projection Ab
     auto& local_projection_Ab =
-        get<::Tags::TempAb<11, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::projection_Ab<
+                    VolumeDim, DataVector>>(buffer);
     // RhsVSpacetimeMetric and RhsVMinus
     auto& local_char_projected_rhs_dt_u_psi =
-        get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Tags::VSpacetimeMetric<VolumeDim,
+                                                        Frame::Inertial>>(
+            buffer);
+    auto& local_char_projected_rhs_dt_u_zero =
+        get<GeneralizedHarmonic::Tags::VZero<VolumeDim, Frame::Inertial>>(
+            buffer);
     auto& local_char_projected_rhs_dt_u_minus =
-        get<::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Tags::VMinus<VolumeDim, Frame::Inertial>>(
+            buffer);
 
     auto& local_unit_interface_normal_vector =
-        get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    interface_normal_vector<VolumeDim, DataVector>>(buffer);
 
     auto& local_pi =
         get<GeneralizedHarmonic::Tags::Pi<VolumeDim, frame>>(local_vars);
     auto& local_phi =
         get<GeneralizedHarmonic::Tags::Phi<VolumeDim, frame>>(local_vars);
 
-    auto& local_char_projected_rhs_dt_u_zero =
-        get<::Tags::Tempiaa<23, VolumeDim, Frame::Inertial, DataVector>>(
-            buffer);
-    auto& local_char_speeds_0 = get<::Tags::TempScalar<12, DataVector>>(buffer);
-    auto& local_char_speeds_1 = get<::Tags::TempScalar<13, DataVector>>(buffer);
-    auto& local_char_speeds_3 = get<::Tags::TempScalar<15, DataVector>>(buffer);
+    auto& local_char_speeds_0 =
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::char_speed_vpsi<
+                    DataVector>>(buffer);
+    auto& local_char_speeds_1 =
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::char_speed_vzero<
+                    DataVector>>(buffer);
+    auto& local_char_speeds_3 =
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::char_speed_vminus<
+                    DataVector>>(buffer);
 
     // Setting coords
     for (size_t i = 0; i < VolumeDim; ++i) {
@@ -702,12 +753,12 @@ void test_constraint_preserving_bjorhus_u_minus<
 
   // Compute return value from Action
   auto local_bc_dt_u_minus =
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_u_minus<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_minus<
           typename GeneralizedHarmonic::Tags::VMinus<VolumeDim, frame>::type,
           VolumeDim>::
           apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
                     VMinusBcMethod::Freezing,
-                buffer, local_vars, local_dt_vars, inertial_coords,
+                intermediate_vars, local_vars, local_dt_vars, inertial_coords,
                 local_unit_normal_one_form);
 
   // Initialize with values from SpEC
@@ -906,12 +957,10 @@ void test_constraint_preserving_bjorhus_u_minus<
     }
     return tmp;
   }();
-  //
-  // Create a TempTensor that stores all temporaries computed
-  // here and elsewhere
-  TempBuffer<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
-                 all_local_vars<VolumeDim>>
-      buffer(slice_grid_points);
+  // Storage for intermediate vars
+  GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+      BjorhusIntermediatesComputer intermediate_vars(slice_grid_points);
+  auto& buffer = intermediate_vars.get_buffer();
   // Also create local variables and their time derivatives, both of which we
   // will populate as needed
   db::item_type<GeneralizedHarmonic::System<VolumeDim>::variables_tag>
@@ -926,48 +975,80 @@ void test_constraint_preserving_bjorhus_u_minus<
     // POPULATE various tensors needed to compute BcDtVSpacetimeMetric
     // EXACTLY as done in SpEC
     auto& local_inertial_coords =
-        get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<domain::Tags::Coordinates<VolumeDim, Frame::Inertial>>(buffer);
     auto& local_constraint_gamma2 =
-        get<::Tags::TempScalar<26, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Tags::ConstraintGamma2>(buffer);
     // timelike and spacelike SPACETIME vectors, l^a and k^a
     auto& local_outgoing_null_one_form =
-        get<::Tags::Tempa<0, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    outgoing_null_one_form<VolumeDim, DataVector>>(buffer);
     auto& local_incoming_null_one_form =
-        get<::Tags::Tempa<1, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    incoming_null_one_form<VolumeDim, DataVector>>(buffer);
     // timelike and spacelike SPACETIME oneforms, l_a and k_a
     auto& local_outgoing_null_vector =
-        get<::Tags::TempA<2, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    outgoing_null_vector<VolumeDim, DataVector>>(buffer);
     auto& local_incoming_null_vector =
-        get<::Tags::TempA<3, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    incoming_null_vector<VolumeDim, DataVector>>(buffer);
     // spacetime projection operator P_ab, P^ab, and P^a_b
     auto& local_projection_AB =
-        get<::Tags::TempAA<9, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::projection_AB<
+                    VolumeDim, DataVector>>(buffer);
     auto& local_projection_ab =
-        get<::Tags::Tempaa<10, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::projection_ab<
+                    VolumeDim, DataVector>>(buffer);
     auto& local_projection_Ab =
-        get<::Tags::TempAb<11, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::projection_Ab<
+                    VolumeDim, DataVector>>(buffer);
     // constraint characteristics
     auto& local_constraint_char_zero_minus =
-        get<::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    constraint_char_zero_minus<VolumeDim, DataVector>>(buffer);
     auto& local_constraint_char_zero_plus =
-        get<::Tags::Tempa<34, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    constraint_char_zero_plus<VolumeDim, DataVector>>(buffer);
     // RhsVSpacetimeMetric and RhsVMinus
     auto& local_char_projected_rhs_dt_u_psi =
-        get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Tags::VSpacetimeMetric<VolumeDim,
+                                                        Frame::Inertial>>(
+            buffer);
     auto& local_char_projected_rhs_dt_u_minus =
-        get<::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Tags::VMinus<VolumeDim, Frame::Inertial>>(
+            buffer);
 
     auto& local_unit_interface_normal_vector =
-        get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    interface_normal_vector<VolumeDim, DataVector>>(buffer);
 
     auto& local_pi =
         get<GeneralizedHarmonic::Tags::Pi<VolumeDim, frame>>(local_vars);
     auto& local_phi =
         get<GeneralizedHarmonic::Tags::Phi<VolumeDim, frame>>(local_vars);
 
-    auto& local_char_speeds_0 = get<::Tags::TempScalar<12, DataVector>>(buffer);
-    auto& local_char_speeds_1 = get<::Tags::TempScalar<13, DataVector>>(buffer);
-    auto& local_char_speeds_3 = get<::Tags::TempScalar<15, DataVector>>(buffer);
+    auto& local_char_speeds_0 =
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::char_speed_vpsi<
+                    DataVector>>(buffer);
+    auto& local_char_speeds_1 =
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::char_speed_vzero<
+                    DataVector>>(buffer);
+    auto& local_char_speeds_3 =
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::char_speed_vminus<
+                    DataVector>>(buffer);
 
     // Setting coords
     for (size_t i = 0; i < VolumeDim; ++i) {
@@ -1206,12 +1287,12 @@ void test_constraint_preserving_bjorhus_u_minus<
 
   // Compute return value from Action
   auto local_bc_dt_u_minus =
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_u_minus<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_minus<
           typename GeneralizedHarmonic::Tags::VMinus<VolumeDim, frame>::type,
           VolumeDim>::
           apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
                     VMinusBcMethod::ConstraintPreservingBjorhus,
-                buffer, local_vars, local_dt_vars, inertial_coords,
+                intermediate_vars, local_vars, local_dt_vars, inertial_coords,
                 local_unit_normal_one_form);
 
   // Initialize with values from SpEC
@@ -1410,12 +1491,10 @@ void test_constraint_preserving_bjorhus_u_minus<
     }
     return tmp;
   }();
-  //
-  // Create a TempTensor that stores all temporaries computed
-  // here and elsewhere
-  TempBuffer<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
-                 all_local_vars<VolumeDim>>
-      buffer(slice_grid_points);
+  // Storage for intermediate vars
+  GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+      BjorhusIntermediatesComputer intermediate_vars(slice_grid_points);
+  auto& buffer = intermediate_vars.get_buffer();
   // Also create local variables and their time derivatives, both of which we
   // will populate as needed
   db::item_type<GeneralizedHarmonic::System<VolumeDim>::variables_tag>
@@ -1430,53 +1509,83 @@ void test_constraint_preserving_bjorhus_u_minus<
     // POPULATE various tensors needed to compute BcDtVSpacetimeMetric
     // EXACTLY as done in SpEC
     auto& local_inertial_coords =
-        get<::Tags::TempI<37, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<domain::Tags::Coordinates<VolumeDim, Frame::Inertial>>(buffer);
     auto& local_constraint_gamma2 =
-        get<::Tags::TempScalar<26, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Tags::ConstraintGamma2>(buffer);
     auto& local_three_index_constraint =
-        get<::Tags::Tempiaa<17, VolumeDim, Frame::Inertial, DataVector>>(
+        get<GeneralizedHarmonic::Tags::ThreeIndexConstraint<VolumeDim,
+                                                            Frame::Inertial>>(
             buffer);
     // timelike and spacelike SPACETIME vectors, l^a and k^a
     auto& local_outgoing_null_one_form =
-        get<::Tags::Tempa<0, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    outgoing_null_one_form<VolumeDim, DataVector>>(buffer);
     auto& local_incoming_null_one_form =
-        get<::Tags::Tempa<1, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    incoming_null_one_form<VolumeDim, DataVector>>(buffer);
     // timelike and spacelike SPACETIME oneforms, l_a and k_a
     auto& local_outgoing_null_vector =
-        get<::Tags::TempA<2, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    outgoing_null_vector<VolumeDim, DataVector>>(buffer);
     auto& local_incoming_null_vector =
-        get<::Tags::TempA<3, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    incoming_null_vector<VolumeDim, DataVector>>(buffer);
     // spacetime projection operator P_ab, P^ab, and P^a_b
     auto& local_projection_AB =
-        get<::Tags::TempAA<9, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::projection_AB<
+                    VolumeDim, DataVector>>(buffer);
     auto& local_projection_ab =
-        get<::Tags::Tempaa<10, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::projection_ab<
+                    VolumeDim, DataVector>>(buffer);
     auto& local_projection_Ab =
-        get<::Tags::TempAb<11, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::projection_Ab<
+                    VolumeDim, DataVector>>(buffer);
     // constraint characteristics
     auto& local_constraint_char_zero_minus =
-        get<::Tags::Tempa<16, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    constraint_char_zero_minus<VolumeDim, DataVector>>(buffer);
     auto& local_constraint_char_zero_plus =
-        get<::Tags::Tempa<34, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    constraint_char_zero_plus<VolumeDim, DataVector>>(buffer);
     // RhsVSpacetimeMetric and RhsVMinus
     auto& local_char_projected_rhs_dt_u_psi =
-        get<::Tags::Tempaa<22, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Tags::VSpacetimeMetric<VolumeDim,
+                                                        Frame::Inertial>>(
+            buffer);
     auto& local_char_projected_rhs_dt_u_minus =
-        get<::Tags::Tempaa<25, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Tags::VMinus<VolumeDim, Frame::Inertial>>(
+            buffer);
 
     auto& local_unit_interface_normal_one_form =
-        get<::Tags::Tempa<4, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    interface_normal_one_form<VolumeDim, DataVector>>(buffer);
     auto& local_unit_interface_normal_vector =
-        get<::Tags::TempA<5, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::
+                    interface_normal_vector<VolumeDim, DataVector>>(buffer);
     auto& local_spacetime_unit_normal_vector =
-        get<::Tags::TempA<7, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<gr::Tags::SpacetimeNormalVector<VolumeDim, Frame::Inertial,
+                                            DataVector>>(buffer);
 
-    auto& local_inverse_spatial_metric =
-        get<::Tags::TempII<21, VolumeDim, Frame::Inertial, DataVector>>(buffer);
-    auto& local_extrinsic_curvature =
-        get<::Tags::Tempii<35, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+    auto& local_inverse_spatial_metric = get<
+        gr::Tags::InverseSpatialMetric<VolumeDim, Frame::Inertial, DataVector>>(
+        buffer);
+    auto& local_extrinsic_curvature = get<
+        gr::Tags::ExtrinsicCurvature<VolumeDim, Frame::Inertial, DataVector>>(
+        buffer);
     auto& local_inverse_spacetime_metric =
-        get<::Tags::TempAA<36, VolumeDim, Frame::Inertial, DataVector>>(buffer);
+        get<gr::Tags::InverseSpacetimeMetric<VolumeDim, Frame::Inertial,
+                                             DataVector>>(buffer);
 
     auto& local_phi =
         get<GeneralizedHarmonic::Tags::Phi<VolumeDim, frame>>(local_vars);
@@ -1484,15 +1593,26 @@ void test_constraint_preserving_bjorhus_u_minus<
         get<gr::Tags::SpacetimeMetric<VolumeDim, frame, DataVector>>(
             local_vars);
     auto& local_d_pi =
-        get<::Tags::Tempiaa<32, VolumeDim, Frame::Inertial, DataVector>>(
-            buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::deriv_pi<
+                    VolumeDim, DataVector>>(buffer);
     auto& local_d_phi =
-        get<::Tags::Tempijaa<33, VolumeDim, Frame::Inertial, DataVector>>(
-            buffer);
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::deriv_phi<
+                    VolumeDim, DataVector>>(buffer);
 
-    auto& local_char_speeds_0 = get<::Tags::TempScalar<12, DataVector>>(buffer);
-    auto& local_char_speeds_1 = get<::Tags::TempScalar<13, DataVector>>(buffer);
-    auto& local_char_speeds_3 = get<::Tags::TempScalar<15, DataVector>>(buffer);
+    auto& local_char_speeds_0 =
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::char_speed_vpsi<
+                    DataVector>>(buffer);
+    auto& local_char_speeds_1 =
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::char_speed_vzero<
+                    DataVector>>(buffer);
+    auto& local_char_speeds_3 =
+        get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+                BjorhusIntermediatesComputer::internal_tags::char_speed_vminus<
+                    DataVector>>(buffer);
 
     // Setting coords
     for (size_t i = 0; i < VolumeDim; ++i) {
@@ -1941,12 +2061,12 @@ void test_constraint_preserving_bjorhus_u_minus<
 
   // Compute return value from Action
   auto local_bc_dt_u_minus =
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_u_minus<
+      GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_minus<
           typename GeneralizedHarmonic::Tags::VMinus<VolumeDim, frame>::type,
           VolumeDim>::
           apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
                     VMinusBcMethod::ConstraintPreservingPhysicalBjorhus,
-                buffer, local_vars, local_dt_vars, inertial_coords,
+                intermediate_vars, local_vars, local_dt_vars, inertial_coords,
                 local_unit_normal_one_form);
 
   // Initialize with values from SpEC
@@ -2108,11 +2228,10 @@ void test_constraint_preserving_bjorhus_u_minus<
 
 // Test helper functions needed to set dt<VMinus>
 namespace {
-// Test GeneralizedHarmonic::spatial_ricci_tensor_from_KST_vars
-void test_spatial_ricci_tensor_from_KST_vars(
-    const size_t grid_size_each_dimension,
-    const std::array<double, 3>& lower_bound,
-    const std::array<double, 3>& upper_bound) noexcept {
+// Test GeneralizedHarmonic::ricci_tensor
+void test_ricci_tensor(const size_t grid_size_each_dimension,
+                       const std::array<double, 3>& lower_bound,
+                       const std::array<double, 3>& upper_bound) noexcept {
   // Setup grid
   Mesh<VolumeDim> mesh{grid_size_each_dimension, Spectral::Basis::Legendre,
                        Spectral::Quadrature::GaussLobatto};
@@ -2197,26 +2316,9 @@ void test_spatial_ricci_tensor_from_KST_vars(
     }
   }
 
-  // D_(k,i,j) = (1/2) \partial_k g_(ij) and its derivative
-  tnsr::ijj<DataVector, VolumeDim, Frame::Inertial> local_kst_D(
-      get_size(get<0, 0, 0>(local_phi)));
-  tnsr::ijkk<DataVector, VolumeDim, Frame::Inertial> local_d_kst_D(
-      get_size(get<0, 0, 0>(local_phi)));
-  for (size_t i = 0; i < VolumeDim; ++i) {
-    for (size_t j = i; j < VolumeDim; ++j) {
-      for (size_t k = 0; k < VolumeDim; ++k) {
-        local_kst_D.get(k, i, j) = 0.5 * local_phi.get(k, i + 1, j + 1);
-        for (size_t l = 0; l < VolumeDim; ++l) {
-          local_d_kst_D.get(l, k, i, j) =
-              0.5 * local_d_phi.get(l, k, i + 1, j + 1);
-        }
-      }
-    }
-  }
-
   // Call tested function
-  auto local_ricci_3 = GeneralizedHarmonic::spatial_ricci_tensor_from_KST_vars(
-      local_kst_D, local_d_kst_D, local_inverse_spatial_metric);
+  auto local_ricci_3 = GeneralizedHarmonic::ricci_tensor(
+      local_phi, local_d_phi, local_inverse_spatial_metric);
 
   // Initialize with values from SpEC
   auto spec_ricci_3 = local_ricci_3;
@@ -2230,112 +2332,6 @@ void test_spatial_ricci_tensor_from_KST_vars(
 
   // Compare values returned by BC action vs those from SpEC
   CHECK_ITERABLE_APPROX(local_ricci_3, spec_ricci_3);
-}
-
-// Test GeneralizedHarmonic::spatial_christoffel_second_kind_from_KST_vars
-void test_spatial_christoffel_second_kind_from_KST_vars(
-    const size_t grid_size_each_dimension,
-    const std::array<double, 3>& lower_bound,
-    const std::array<double, 3>& upper_bound) noexcept {
-  // Setup grid
-  Mesh<VolumeDim> mesh{grid_size_each_dimension, Spectral::Basis::Legendre,
-                       Spectral::Quadrature::GaussLobatto};
-  const auto coord_map =
-      domain::make_coordinate_map<Frame::Logical, Frame::Inertial>(Affine3D{
-          Affine{-1., 1., lower_bound[0], upper_bound[0]},
-          Affine{-1., 1., lower_bound[1], upper_bound[1]},
-          Affine{-1., 1., lower_bound[2], upper_bound[2]},
-      });
-
-  // Setup coordinates
-  const auto x_logical = logical_coordinates(mesh);
-  const auto x = coord_map(x_logical);
-  const Direction<VolumeDim> direction(1, Side::Upper);  // +y direction
-  const size_t slice_grid_points =
-      mesh.extents().slice_away(direction.dimension()).product();
-  const auto inertial_coords = [&slice_grid_points, &lower_bound]() {
-    tnsr::I<DataVector, VolumeDim, frame> tmp(slice_grid_points, 0.);
-    // +y direction
-    get<1>(tmp) = 0.5;
-    for (size_t i = 0; i < VolumeDim; ++i) {
-      for (size_t j = 0; j < VolumeDim; ++j) {
-        get<0>(tmp)[i * VolumeDim + j] =
-            lower_bound[0] + 0.5 * static_cast<double>(i);
-        get<2>(tmp)[i * VolumeDim + j] =
-            lower_bound[2] + 0.5 * static_cast<double>(j);
-      }
-    }
-    return tmp;
-  }();
-
-  auto local_inverse_spatial_metric =
-      make_with_value<tnsr::II<DataVector, VolumeDim, Frame::Inertial>>(
-          inertial_coords, 0.);
-  auto local_phi =
-      make_with_value<tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>>(
-          inertial_coords, 0.);
-  auto local_d_pi =
-      make_with_value<tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>>(
-          inertial_coords, 0.);
-  auto local_d_phi =
-      make_with_value<tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>>(
-          inertial_coords, 0.);
-
-  // Setting inverse_spatial_metric
-  for (size_t i = 0; i < get<0>(inertial_coords).size(); ++i) {
-    for (size_t j = 0; j < VolumeDim; ++j) {
-      local_inverse_spatial_metric.get(0, j)[i] = 41.;
-      local_inverse_spatial_metric.get(1, j)[i] = 43.;
-      local_inverse_spatial_metric.get(2, j)[i] = 47.;
-    }
-  }
-  // Setting pi AND phi
-  for (size_t i = 0; i < get<0>(inertial_coords).size(); ++i) {
-    for (size_t a = 0; a <= VolumeDim; ++a) {
-      for (size_t b = 0; b <= VolumeDim; ++b) {
-        // local_pi.get(a, b)[i] = 1.;
-        local_phi.get(0, a, b)[i] = 3.;
-        local_phi.get(1, a, b)[i] = 5.;
-        local_phi.get(2, a, b)[i] = 7.;
-      }
-    }
-  }
-
-  // D_(k,i,j) = (1/2) \partial_k g_(ij) and its derivative
-  tnsr::ijj<DataVector, VolumeDim, Frame::Inertial> local_kst_D(
-      get_size(get<0, 0, 0>(local_phi)));
-  for (size_t i = 0; i < VolumeDim; ++i) {
-    for (size_t j = i; j < VolumeDim; ++j) {
-      for (size_t k = 0; k < VolumeDim; ++k) {
-        local_kst_D.get(k, i, j) = 0.5 * local_phi.get(k, i + 1, j + 1);
-      }
-    }
-  }
-
-  // Call tested function
-  auto local_spatial_christoffel_second_kind =
-      GeneralizedHarmonic::spatial_christoffel_second_kind_from_KST_vars(
-          local_kst_D, local_inverse_spatial_metric);
-
-  // Initialize with values from SpEC
-  auto spec_spatial_christoffel_second_kind =
-      local_spatial_christoffel_second_kind;
-  const std::array<double, 27> spec_vals = {
-      {61.5, 184.5, 307.5, 184.5, 307.5, 430.5, 307.5, 430.5, 553.5,
-       61.5, 188.5, 315.5, 188.5, 315.5, 442.5, 315.5, 442.5, 569.5,
-       59.5, 190.5, 321.5, 190.5, 321.5, 452.5, 321.5, 452.5, 583.5}};
-  for (size_t i = 0; i < VolumeDim; ++i) {
-    for (size_t j = 0; j < VolumeDim; ++j) {
-      for (size_t k = j; k < VolumeDim; ++k) {
-        spec_spatial_christoffel_second_kind.get(i, j, k) =
-            gsl::at(spec_vals, i * VolumeDim * VolumeDim + j * VolumeDim + k);
-      }
-    }
-  }
-
-  // Compare values returned by BC action vs those from SpEC
-  CHECK_ITERABLE_APPROX(local_spatial_christoffel_second_kind,
-                        spec_spatial_christoffel_second_kind);
 }
 
 // Test GeneralizedHarmonic::spatial_projection_tensor (3 OVERLOADS)
@@ -2740,9 +2736,7 @@ SPECTRE_TEST_CASE(
   const std::array<double, 3> lower_bound{{299., -0.5, -0.5}};
   const std::array<double, 3> upper_bound{{300., 0.5, 0.5}};
 
-  test_spatial_ricci_tensor_from_KST_vars(grid_size, lower_bound, upper_bound);
-  test_spatial_christoffel_second_kind_from_KST_vars(grid_size, lower_bound,
-                                                     upper_bound);
+  test_ricci_tensor(grid_size, lower_bound, upper_bound);
   test_spatial_projection_tensors(grid_size, lower_bound, upper_bound);
   test_weyl_propagating(grid_size, lower_bound, upper_bound);
 }
