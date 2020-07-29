@@ -23,6 +23,7 @@
 #include "Domain/Tags.hpp"
 #include "ErrorHandling/Assert.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/BjorhusHelpers.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/BoundaryConditions.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Constraints.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
@@ -43,10 +44,6 @@
 #include "Utilities/TypeTraits.hpp"
 
 /// \cond
-namespace Tags {
-template <typename Tag>
-struct Magnitude;
-}  // namespace Tags
 // IWYU pragma: no_forward_declare db::DataBox
 /// \endcond
 
@@ -56,19 +53,10 @@ namespace Actions {
 namespace BoundaryConditions_detail {}  // namespace BoundaryConditions_detail
 
 namespace BoundaryConditions_detail {
-enum class VSpacetimeMetricBcMethod {
-  Freezing,
-  ConstraintPreservingBjorhus,
-  Unknown
-};
-enum class VZeroBcMethod { Freezing, ConstraintPreservingBjorhus, Unknown };
-enum class VPlusBcMethod { Freezing, Unknown };
-enum class VMinusBcMethod {
-  Freezing,
-  ConstraintPreservingBjorhus,
-  ConstraintPreservingPhysicalBjorhus,
-  Unknown
-};
+using BoundaryConditions::Bjorhus::VMinusBcMethod;
+using BoundaryConditions::Bjorhus::VPlusBcMethod;
+using BoundaryConditions::Bjorhus::VSpacetimeMetricBcMethod;
+using BoundaryConditions::Bjorhus::VZeroBcMethod;
 
 class BjorhusIntermediatesComputer {
  public:
@@ -528,7 +516,7 @@ struct set_dt_v_psi {
     switch (Method) {
       case VSpacetimeMetricBcMethod::Freezing:
         return bc_dt_u_psi;
-      case VSpacetimeMetricBcMethod::ConstraintPreservingBjorhus:
+      case VSpacetimeMetricBcMethod::ConstraintPreserving:
         return apply_bjorhus_constraint_preserving(
             make_not_null(&bc_dt_u_psi), unit_interface_normal_vector,
             three_index_constraint, char_projected_rhs_dt_u_psi, char_speeds);
@@ -624,7 +612,7 @@ struct set_dt_v_zero {
     switch (Method) {
       case VZeroBcMethod::Freezing:
         return bc_dt_u_zero;
-      case VZeroBcMethod::ConstraintPreservingBjorhus:
+      case VZeroBcMethod::ConstraintPreserving:
         return apply_bjorhus_constraint_preserving(
             make_not_null(&bc_dt_u_zero), unit_interface_normal_vector,
             four_index_constraint, char_projected_rhs_dt_u_zero, char_speeds);
@@ -835,7 +823,7 @@ struct set_dt_v_minus {
             incoming_null_one_form, outgoing_null_one_form,
             incoming_null_vector, outgoing_null_vector, projection_Ab,
             char_projected_rhs_dt_u_psi);
-      case VMinusBcMethod::ConstraintPreservingBjorhus:
+      case VMinusBcMethod::ConstraintPreserving:
         apply_bjorhus_constraint_preserving(
             make_not_null(&bc_dt_u_minus), incoming_null_one_form,
             outgoing_null_one_form, incoming_null_vector, outgoing_null_vector,
@@ -847,7 +835,7 @@ struct set_dt_v_minus {
             incoming_null_one_form, outgoing_null_one_form,
             incoming_null_vector, outgoing_null_vector, projection_Ab,
             char_projected_rhs_dt_u_psi);
-      case VMinusBcMethod::ConstraintPreservingPhysicalBjorhus:
+      case VMinusBcMethod::ConstraintPreservingPhysical:
         apply_bjorhus_constraint_preserving(
             make_not_null(&bc_dt_u_minus), incoming_null_one_form,
             outgoing_null_one_form, incoming_null_vector, outgoing_null_vector,

@@ -13,6 +13,13 @@ namespace Solutions {
 template <typename GrSolution>
 struct WrappedGr;
 }  // namespace Solutions
+namespace BoundaryConditions {
+namespace Bjorhus {
+struct Freezing;
+struct ConstraintPreserving;
+struct ConstraintPreservingPhysical;
+}  // namespace Bjorhus
+}  // namespace BoundaryConditions
 }  // namespace GeneralizedHarmonic
 namespace gr {
 namespace Solutions {

@@ -22,6 +22,7 @@
 #include "ErrorHandling/Assert.hpp"
 #include "ErrorHandling/Error.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/BjorhusImpl.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/BoundaryConditions.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/ImposeBoundaryConditions.hpp"
@@ -41,17 +42,8 @@
 #include "Utilities/TaggedTuple.hpp"
 #include "Utilities/TypeTraits.hpp"
 
-/// \cond
-namespace Tags {
-template <typename Tag>
-struct Magnitude;
-}  // namespace Tags
-// IWYU pragma: no_forward_declare db::DataBox
-/// \endcond
-
 namespace GeneralizedHarmonic {
 namespace Actions {
-
 namespace BoundaryConditions_detail {}  // namespace BoundaryConditions_detail
 
 /// \ingroup ActionsGroup
@@ -87,6 +79,11 @@ namespace BoundaryConditions_detail {}  // namespace BoundaryConditions_detail
 ///
 template <typename Metavariables>
 struct ImposeBjorhusBoundaryConditions {
+ public:
+  using const_global_cache_tags =
+      tmpl::list<typename Metavariables::normal_dot_numerical_flux,
+                 typename Metavariables::boundary_condition_tag>;
+
  private:
   // {VSpacetimeMetric,VZero,VPlus,VMinus}BcMethod enumerate available
   // choices for boundary condition. The choice is made in the `apply`
@@ -97,12 +94,6 @@ struct ImposeBjorhusBoundaryConditions {
   using VPlusBcMethod = BoundaryConditions_detail::VPlusBcMethod;
   using VMinusBcMethod = BoundaryConditions_detail::VMinusBcMethod;
 
- public:
-  using const_global_cache_tags =
-      tmpl::list<typename Metavariables::normal_dot_numerical_flux,
-                 typename Metavariables::boundary_condition_tag>;
-
- private:
   template <size_t VolumeDim, VSpacetimeMetricBcMethod VSpacetimeMetricMethod,
             VZeroBcMethod VZeroMethod, VPlusBcMethod VPlusMethod,
             VMinusBcMethod VMinusMethod, typename DbTags, typename ArrayIndex,
@@ -222,9 +213,8 @@ struct ImposeBjorhusBoundaryConditions {
                       BoundaryConditions_detail::set_dt_v_zero<
                           typename Tags::VZero<VolumeDim,
                                                Frame::Inertial>::type,
-                          VolumeDim>::apply(VZeroMethod, intermediates,
-                                            vars, dt_vars,
-                                            unit_normal_one_form),
+                          VolumeDim>::apply(VZeroMethod, intermediates, vars,
+                                            dt_vars, unit_normal_one_form),
                       char_speeds.at(1));
               const auto bc_dt_u_plus =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
@@ -233,9 +223,8 @@ struct ImposeBjorhusBoundaryConditions {
                       BoundaryConditions_detail::set_dt_v_plus<
                           typename Tags::VPlus<VolumeDim,
                                                Frame::Inertial>::type,
-                          VolumeDim>::apply(VPlusMethod, intermediates,
-                                            vars, dt_vars,
-                                            unit_normal_one_form),
+                          VolumeDim>::apply(VPlusMethod, intermediates, vars,
+                                            dt_vars, unit_normal_one_form),
                       char_speeds.at(2));
               const auto bc_dt_u_minus =
                   BoundaryConditions_detail::set_bc_when_char_speed_is_negative(
@@ -244,8 +233,8 @@ struct ImposeBjorhusBoundaryConditions {
                       BoundaryConditions_detail::set_dt_v_minus<
                           typename Tags::VMinus<VolumeDim,
                                                 Frame::Inertial>::type,
-                          VolumeDim>::apply(VMinusMethod, intermediates,
-                                            vars, dt_vars, inertial_coords,
+                          VolumeDim>::apply(VMinusMethod, intermediates, vars,
+                                            dt_vars, inertial_coords,
                                             unit_normal_one_form),
                       char_speeds.at(3));
               // Convert them to desired values on dt<U>
@@ -311,21 +300,16 @@ struct ImposeBjorhusBoundaryConditions {
       Parallel::ConstGlobalCache<Metavariables>& cache,
       const ArrayIndex& array_index, const ActionList action_list,
       const ParallelComponent* const parallel_component) noexcept {
-    // One can insert logic here that determines / selects from various options
-    // for setting BCs on individual characteristic variables.
-    // `ConstraintPreservingBjorhus` are hardcoded for now.
     return apply_impl<Metavariables::system::volume_dim,
                       // BC choice for U_\Psi
-                      VSpacetimeMetricBcMethod::ConstraintPreservingBjorhus,
+                      Metavariables::boundary_conditions::v_spacetime_bc_method,
                       // BC choice for U_0
-                      VZeroBcMethod::ConstraintPreservingBjorhus,
+                      Metavariables::boundary_conditions::v_zero_bc_method,
                       // BC choice for U_+
-                      // (This field is never incoming, which is why we use
-                      // Freezing)
-                      VPlusBcMethod::Freezing,
+                      Metavariables::boundary_conditions::v_plus_bc_method,
                       // BC choice for U_-
-                      VMinusBcMethod::ConstraintPreservingBjorhus, DbTags,
-                      ArrayIndex, ActionList, ParallelComponent,
+                      Metavariables::boundary_conditions::v_minus_bc_method,
+                      DbTags, ArrayIndex, ActionList, ParallelComponent,
                       InboxTags...>::function_impl(box, inboxes, cache,
                                                    array_index, action_list,
                                                    parallel_component);

@@ -141,9 +141,13 @@ struct EvolutionMetavars {
   using boundary_conditions = BoundaryConditions;
   // Only Dirichlet boundary conditions imposed by an analytic solution are
   // supported right now.
-  using analytic_solution =
-      tmpl::conditional_t<evolution::is_numeric_initial_data_v<initial_data>,
-                          boundary_conditions, initial_data>;
+  using analytic_solution = tmpl::conditional_t<
+      evolution::is_analytic_solution_v<initial_data>, initial_data,
+      tmpl::conditional_t<
+          evolution::is_analytic_solution_v<boundary_conditions>,
+          boundary_conditions,
+          GeneralizedHarmonic::Solutions::WrappedGr<
+              gr::Solutions::KerrSchild>>>;
   using analytic_solution_tag = Tags::AnalyticSolution<analytic_solution>;
   using boundary_condition_tag = analytic_solution_tag;
 
@@ -283,9 +287,12 @@ struct EvolutionMetavars {
 
   // A tmpl::list of tags to be added to the ConstGlobalCache by the
   // metavariables
-  using const_global_cache_tags =
+  using const_global_cache_tags = tmpl::conditional_t<
+      evolution::is_analytic_solution_v<analytic_solution>,
       tmpl::list<analytic_solution_tag, normal_dot_numerical_flux,
-                 time_stepper_tag, Tags::EventsAndTriggers<events, triggers>>;
+                 time_stepper_tag, Tags::EventsAndTriggers<events, triggers>>,
+      tmpl::list<normal_dot_numerical_flux, time_stepper_tag,
+                 Tags::EventsAndTriggers<events, triggers>>>;
 
   struct ObservationType {};
   using element_observation_type = ObservationType;
@@ -362,9 +369,6 @@ struct EvolutionMetavars {
               domain::Tags::Coordinates<volume_dim, Frame::Logical>>>,
       Initialization::Actions::TimeStepperHistory<EvolutionMetavars>,
       GeneralizedHarmonic::Actions::InitializeGhAnd3Plus1Variables<volume_dim>,
-      GeneralizedHarmonic::gauges::Actions::InitializeDampedHarmonic<
-          volume_dim, use_damped_harmonic_rollon>,
-      GeneralizedHarmonic::Actions::InitializeConstraints<volume_dim>,
       dg::Actions::InitializeInterfaces<
           system,
           dg::Initialization::slice_tags_to_face<
@@ -373,12 +377,7 @@ struct EvolutionMetavars {
               gr::Tags::DetAndInverseSpatialMetricCompute<volume_dim, frame,
                                                           DataVector>,
               gr::Tags::Shift<volume_dim, frame, DataVector>,
-              gr::Tags::Lapse<DataVector>,
-              GeneralizedHarmonic::Tags::ThreeIndexConstraint<volume_dim,
-                                                              frame>,
-              GeneralizedHarmonic::Tags::GaugeH<volume_dim, frame>,
-              GeneralizedHarmonic::Tags::SpacetimeDerivGaugeH<volume_dim,
-                                                              frame>>,
+              gr::Tags::Lapse<DataVector>>,
           dg::Initialization::slice_tags_to_exterior<
               gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
               gr::Tags::DetAndInverseSpatialMetricCompute<volume_dim, frame,
@@ -405,9 +404,12 @@ struct EvolutionMetavars {
               GeneralizedHarmonic::CharacteristicFieldsCompute<volume_dim,
                                                                frame>>,
           true, true>,
-      Initialization::Actions::AddComputeTags<
-          tmpl::list<evolution::Tags::AnalyticCompute<
-              volume_dim, analytic_solution_tag, analytic_solution_fields>>>,
+      tmpl::conditional_t<evolution::is_analytic_solution_v<analytic_solution>,
+                          Initialization::Actions::AddComputeTags<
+                              tmpl::list<evolution::Tags::AnalyticCompute<
+                                  volume_dim, analytic_solution_tag,
+                                  analytic_solution_fields>>>,
+                          tmpl::list<>>,
       dg::Actions::InitializeMortars<boundary_scheme, !BjorhusExternalBoundary>,
       Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavars>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;

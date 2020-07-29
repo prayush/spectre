@@ -58,7 +58,7 @@ using frame = Frame::Inertial;
 constexpr size_t VolumeDim = 3;
 
 // Test boundary conditions on dt<VSpacetimeMetric>
-template <GeneralizedHarmonic::Actions::BoundaryConditions_detail::
+template <GeneralizedHarmonic::BoundaryConditions::Bjorhus::
               VSpacetimeMetricBcMethod BcMethod>
 void test_constraint_preserving_bjorhus_u_psi(
     size_t grid_size_each_dimension, const std::array<double, 3>& lower_bound,
@@ -66,8 +66,8 @@ void test_constraint_preserving_bjorhus_u_psi(
 
 template <>
 void test_constraint_preserving_bjorhus_u_psi<
-    GeneralizedHarmonic::Actions::BoundaryConditions_detail::
-        VSpacetimeMetricBcMethod::ConstraintPreservingBjorhus>(
+    GeneralizedHarmonic::BoundaryConditions::Bjorhus::VSpacetimeMetricBcMethod::
+        ConstraintPreserving>(
     const size_t grid_size_each_dimension,
     const std::array<double, 3>& lower_bound,
     const std::array<double, 3>& upper_bound) noexcept {
@@ -195,11 +195,10 @@ void test_constraint_preserving_bjorhus_u_psi<
       GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_psi<
           typename GeneralizedHarmonic::Tags::VSpacetimeMetric<VolumeDim,
                                                                frame>::type,
-          VolumeDim>::
-          apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
-                    VSpacetimeMetricBcMethod::ConstraintPreservingBjorhus,
-                intermediate_vars, local_vars, local_dt_vars,
-                local_unit_normal_one_form);
+          VolumeDim>::apply(GeneralizedHarmonic::BoundaryConditions::Bjorhus::
+                                VSpacetimeMetricBcMethod::ConstraintPreserving,
+                            intermediate_vars, local_vars, local_dt_vars,
+                            local_unit_normal_one_form);
   std::cout << "Compute return value from Action\n" << std::flush;
 
   // Initialize with values from SpEC
@@ -239,11 +238,10 @@ void test_constraint_preserving_bjorhus_u_psi<
       GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_psi<
           typename GeneralizedHarmonic::Tags::VSpacetimeMetric<VolumeDim,
                                                                frame>::type,
-          VolumeDim>::
-          apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
-                    VSpacetimeMetricBcMethod::ConstraintPreservingBjorhus,
-                intermediate_vars, local_vars, local_dt_vars,
-                local_unit_normal_one_form);
+          VolumeDim>::apply(GeneralizedHarmonic::BoundaryConditions::Bjorhus::
+                                VSpacetimeMetricBcMethod::ConstraintPreserving,
+                            intermediate_vars, local_vars, local_dt_vars,
+                            local_unit_normal_one_form);
   // Initialize with values from SpEC
   for (size_t i = 0; i < slice_grid_points; ++i) {
     get<0, 0>(spec_bd_dt_u_psi)[i] = 20.;
@@ -263,16 +261,16 @@ void test_constraint_preserving_bjorhus_u_psi<
 }
 
 // Test boundary conditions on dt<VZero>
-template <GeneralizedHarmonic::Actions::BoundaryConditions_detail::VZeroBcMethod
-              BcMethod>
+template <
+    GeneralizedHarmonic::BoundaryConditions::Bjorhus::VZeroBcMethod BcMethod>
 void test_constraint_preserving_bjorhus_u_zero(
     size_t grid_size_each_dimension, const std::array<double, 3>& lower_bound,
     const std::array<double, 3>& upper_bound) noexcept;
 
 template <>
 void test_constraint_preserving_bjorhus_u_zero<
-    GeneralizedHarmonic::Actions::BoundaryConditions_detail::VZeroBcMethod::
-        ConstraintPreservingBjorhus>(
+    GeneralizedHarmonic::BoundaryConditions::Bjorhus::VZeroBcMethod::
+        ConstraintPreserving>(
     const size_t grid_size_each_dimension,
     const std::array<double, 3>& lower_bound,
     const std::array<double, 3>& upper_bound) noexcept {
@@ -413,11 +411,10 @@ void test_constraint_preserving_bjorhus_u_zero<
   auto local_bc_dt_u_zero =
       GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_zero<
           typename GeneralizedHarmonic::Tags::VZero<VolumeDim, frame>::type,
-          VolumeDim>::
-          apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
-                    VZeroBcMethod::ConstraintPreservingBjorhus,
-                intermediate_vars, local_vars, local_dt_vars,
-                local_unit_normal_one_form);
+          VolumeDim>::apply(GeneralizedHarmonic::BoundaryConditions::Bjorhus::
+                                VZeroBcMethod::ConstraintPreserving,
+                            intermediate_vars, local_vars, local_dt_vars,
+                            local_unit_normal_one_form);
 
   // Initialize with values from SpEC
   auto spec_bc_dt_u_zero = local_bc_dt_u_zero;
@@ -478,11 +475,10 @@ void test_constraint_preserving_bjorhus_u_zero<
   local_bc_dt_u_zero =
       GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_zero<
           typename GeneralizedHarmonic::Tags::VZero<VolumeDim, frame>::type,
-          VolumeDim>::
-          apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
-                    VZeroBcMethod::ConstraintPreservingBjorhus,
-                intermediate_vars, local_vars, local_dt_vars,
-                local_unit_normal_one_form);
+          VolumeDim>::apply(GeneralizedHarmonic::BoundaryConditions::Bjorhus::
+                                VZeroBcMethod::ConstraintPreserving,
+                            intermediate_vars, local_vars, local_dt_vars,
+                            local_unit_normal_one_form);
 
   // Initialize with values from SpEC
   for (size_t i = 0; i < slice_grid_points; ++i) {
@@ -526,8 +522,8 @@ void test_constraint_preserving_bjorhus_u_zero<
 }
 
 // Test boundary conditions on dt<VMinus>
-template <GeneralizedHarmonic::Actions::BoundaryConditions_detail::
-              VMinusBcMethod BcMethod>
+template <
+    GeneralizedHarmonic::BoundaryConditions::Bjorhus::VMinusBcMethod BcMethod>
 void test_constraint_preserving_bjorhus_u_minus(
     size_t grid_size_each_dimension, const std::array<double, 3>& lower_bound,
     const std::array<double, 3>& upper_bound) noexcept;
@@ -536,10 +532,10 @@ void test_constraint_preserving_bjorhus_u_minus(
 // option `Freezing` is specified. Only the gauge portion of the RHS is set.
 template <>
 void test_constraint_preserving_bjorhus_u_minus<
-    GeneralizedHarmonic::Actions::BoundaryConditions_detail::VMinusBcMethod::
-        Freezing>(const size_t grid_size_each_dimension,
-                  const std::array<double, 3>& lower_bound,
-                  const std::array<double, 3>& upper_bound) noexcept {
+    GeneralizedHarmonic::BoundaryConditions::Bjorhus::VMinusBcMethod::Freezing>(
+    const size_t grid_size_each_dimension,
+    const std::array<double, 3>& lower_bound,
+    const std::array<double, 3>& upper_bound) noexcept {
   // Setup grid
   Mesh<VolumeDim> mesh{grid_size_each_dimension, Spectral::Basis::Legendre,
                        Spectral::Quadrature::GaussLobatto};
@@ -753,11 +749,10 @@ void test_constraint_preserving_bjorhus_u_minus<
   auto local_bc_dt_u_minus =
       GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_minus<
           typename GeneralizedHarmonic::Tags::VMinus<VolumeDim, frame>::type,
-          VolumeDim>::
-          apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
-                    VMinusBcMethod::Freezing,
-                intermediate_vars, local_vars, local_dt_vars, inertial_coords,
-                local_unit_normal_one_form);
+          VolumeDim>::apply(GeneralizedHarmonic::BoundaryConditions::Bjorhus::
+                                VMinusBcMethod::Freezing,
+                            intermediate_vars, local_vars, local_dt_vars,
+                            inertial_coords, local_unit_normal_one_form);
 
   // Initialize with values from SpEC
   auto spec_bc_dt_u_minus = local_bc_dt_u_minus;
@@ -917,11 +912,11 @@ void test_constraint_preserving_bjorhus_u_minus<
 }
 
 // Test the boundary condition imposed on VMinus when
-// option `ConstraintPreservingBjorhus` is specified.
+// option `ConstraintPreserving` is specified.
 template <>
 void test_constraint_preserving_bjorhus_u_minus<
-    GeneralizedHarmonic::Actions::BoundaryConditions_detail::VMinusBcMethod::
-        ConstraintPreservingBjorhus>(
+    GeneralizedHarmonic::BoundaryConditions::Bjorhus::VMinusBcMethod::
+        ConstraintPreserving>(
     const size_t grid_size_each_dimension,
     const std::array<double, 3>& lower_bound,
     const std::array<double, 3>& upper_bound) noexcept {
@@ -1287,11 +1282,10 @@ void test_constraint_preserving_bjorhus_u_minus<
   auto local_bc_dt_u_minus =
       GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_minus<
           typename GeneralizedHarmonic::Tags::VMinus<VolumeDim, frame>::type,
-          VolumeDim>::
-          apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
-                    VMinusBcMethod::ConstraintPreservingBjorhus,
-                intermediate_vars, local_vars, local_dt_vars, inertial_coords,
-                local_unit_normal_one_form);
+          VolumeDim>::apply(GeneralizedHarmonic::BoundaryConditions::Bjorhus::
+                                VMinusBcMethod::ConstraintPreserving,
+                            intermediate_vars, local_vars, local_dt_vars,
+                            inertial_coords, local_unit_normal_one_form);
 
   // Initialize with values from SpEC
   auto spec_bc_dt_u_minus = local_bc_dt_u_minus;
@@ -1451,11 +1445,11 @@ void test_constraint_preserving_bjorhus_u_minus<
 }
 
 // Test the boundary condition imposed on VMinus when
-// option `ConstraintPreservingBjorhus` is specified.
+// option `ConstraintPreserving` is specified.
 template <>
 void test_constraint_preserving_bjorhus_u_minus<
-    GeneralizedHarmonic::Actions::BoundaryConditions_detail::VMinusBcMethod::
-        ConstraintPreservingPhysicalBjorhus>(
+    GeneralizedHarmonic::BoundaryConditions::Bjorhus::VMinusBcMethod::
+        ConstraintPreservingPhysical>(
     const size_t grid_size_each_dimension,
     const std::array<double, 3>& lower_bound,
     const std::array<double, 3>& upper_bound) noexcept {
@@ -2061,11 +2055,10 @@ void test_constraint_preserving_bjorhus_u_minus<
   auto local_bc_dt_u_minus =
       GeneralizedHarmonic::Actions::BoundaryConditions_detail::set_dt_v_minus<
           typename GeneralizedHarmonic::Tags::VMinus<VolumeDim, frame>::type,
-          VolumeDim>::
-          apply(GeneralizedHarmonic::Actions::BoundaryConditions_detail::
-                    VMinusBcMethod::ConstraintPreservingPhysicalBjorhus,
-                intermediate_vars, local_vars, local_dt_vars, inertial_coords,
-                local_unit_normal_one_form);
+          VolumeDim>::apply(GeneralizedHarmonic::BoundaryConditions::Bjorhus::
+                                VMinusBcMethod::ConstraintPreservingPhysical,
+                            intermediate_vars, local_vars, local_dt_vars,
+                            inertial_coords, local_unit_normal_one_form);
 
   // Initialize with values from SpEC
   auto spec_bc_dt_u_minus = local_bc_dt_u_minus;
@@ -2707,8 +2700,8 @@ SPECTRE_TEST_CASE(
   const std::array<double, 3> upper_bound{{300., 0.5, 0.5}};
 
   test_constraint_preserving_bjorhus_u_psi<
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::
-          VSpacetimeMetricBcMethod::ConstraintPreservingBjorhus>(
+      GeneralizedHarmonic::BoundaryConditions::Bjorhus::
+          VSpacetimeMetricBcMethod::ConstraintPreserving>(
       grid_size, lower_bound, upper_bound);
 }
 
@@ -2721,8 +2714,8 @@ SPECTRE_TEST_CASE(
   const std::array<double, 3> upper_bound{{300., 0.5, 0.5}};
 
   test_constraint_preserving_bjorhus_u_zero<
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::VZeroBcMethod::
-          ConstraintPreservingBjorhus>(grid_size, lower_bound, upper_bound);
+      GeneralizedHarmonic::BoundaryConditions::Bjorhus::VZeroBcMethod::
+          ConstraintPreserving>(grid_size, lower_bound, upper_bound);
 }
 
 SPECTRE_TEST_CASE(
@@ -2749,13 +2742,12 @@ SPECTRE_TEST_CASE(
   const std::array<double, 3> upper_bound{{300., 0.5, 0.5}};
 
   test_constraint_preserving_bjorhus_u_minus<
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::VMinusBcMethod::
+      GeneralizedHarmonic::BoundaryConditions::Bjorhus::VMinusBcMethod::
           Freezing>(grid_size, lower_bound, upper_bound);
   test_constraint_preserving_bjorhus_u_minus<
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::VMinusBcMethod::
-          ConstraintPreservingBjorhus>(grid_size, lower_bound, upper_bound);
+      GeneralizedHarmonic::BoundaryConditions::Bjorhus::VMinusBcMethod::
+          ConstraintPreserving>(grid_size, lower_bound, upper_bound);
   test_constraint_preserving_bjorhus_u_minus<
-      GeneralizedHarmonic::Actions::BoundaryConditions_detail::VMinusBcMethod::
-          ConstraintPreservingPhysicalBjorhus>(grid_size, lower_bound,
-                                               upper_bound);
+      GeneralizedHarmonic::BoundaryConditions::Bjorhus::VMinusBcMethod::
+          ConstraintPreservingPhysical>(grid_size, lower_bound, upper_bound);
 }
