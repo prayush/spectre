@@ -24,6 +24,7 @@ template <typename System>
 struct NumericInitialData;
 }  // namespace evolution
 
-template <typename InitialData, typename BoundaryConditions>
+template <typename InitialData, typename BoundaryConditions,
+          bool BjorhusExternalBoundary>
 struct EvolutionMetavars;
 /// \endcond

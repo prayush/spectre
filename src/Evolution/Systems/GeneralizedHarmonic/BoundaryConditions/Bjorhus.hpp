@@ -17,7 +17,7 @@
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "Domain/FaceNormal.hpp"
-#include "Domain/IndexToSliceAt.hpp"
+#include "Domain/Structure/IndexToSliceAt.hpp"
 #include "Domain/Tags.hpp"
 #include "ErrorHandling/Assert.hpp"
 #include "ErrorHandling/Error.hpp"
@@ -88,10 +88,9 @@ namespace BoundaryConditions_detail {}  // namespace BoundaryConditions_detail
 template <typename Metavariables>
 struct ImposeBjorhusBoundaryConditions {
  private:
-  // {VSpacetimeMetric,VZero,VPlus,VMinus}BcMethod are used to select exactly
-  // how to apply the requested boundary condition based on user input. A
-  // specialized `apply_impl` struct is used that implements the boundary
-  // condition calculation for the different types.
+  // {VSpacetimeMetric,VZero,VPlus,VMinus}BcMethod enumerate available
+  // choices for boundary condition. The choice is made in the `apply`
+  // method below.
   using VSpacetimeMetricBcMethod =
       BoundaryConditions_detail::VSpacetimeMetricBcMethod;
   using VZeroBcMethod = BoundaryConditions_detail::VZeroBcMethod;

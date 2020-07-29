@@ -19,7 +19,7 @@
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "Domain/FaceNormal.hpp"
-#include "Domain/IndexToSliceAt.hpp"
+#include "Domain/Structure/IndexToSliceAt.hpp"
 #include "Domain/Tags.hpp"
 #include "ErrorHandling/Assert.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/BjorhusHelpers.hpp"

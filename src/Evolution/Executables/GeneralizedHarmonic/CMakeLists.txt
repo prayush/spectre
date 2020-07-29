@@ -22,12 +22,12 @@ set(LIBS_TO_LINK
   )
 
 function(add_generalized_harmonic_executable
-  EXECUTABLE_NAME INITIAL_DATA BOUNDARY_CONDITIONS)
+  EXECUTABLE_NAME INITIAL_DATA BOUNDARY_CONDITIONS BJORHUS)
   add_spectre_parallel_executable(
     "Evolve${EXECUTABLE_NAME}"
     EvolveGeneralizedHarmonic
     Evolution/Executables/GeneralizedHarmonic
-    "EvolutionMetavars<${INITIAL_DATA}, ${BOUNDARY_CONDITIONS}>"
+    "EvolutionMetavars<${INITIAL_DATA}, ${BOUNDARY_CONDITIONS}, ${BJORHUS}>"
     "${LIBS_TO_LINK}"
     )
 endfunction(add_generalized_harmonic_executable)
@@ -36,6 +36,7 @@ add_generalized_harmonic_executable(
   KerrSchild
   GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
   GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
+  false
 )
 target_link_libraries(
   EvolveKerrSchild
@@ -44,9 +45,22 @@ target_link_libraries(
   )
 
 add_generalized_harmonic_executable(
+  KerrSchildBjorhus
+  GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
+  GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
+  true
+)
+target_link_libraries(
+  EvolveKerrSchildBjorhus
+  PRIVATE
+  GeneralRelativitySolutions
+  )
+
+add_generalized_harmonic_executable(
   KerrSchildNumericInitialData
   evolution::NumericInitialData<GeneralizedHarmonic::System<3>>
   GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
+  false
 )
 target_link_libraries(
   EvolveKerrSchildNumericInitialData

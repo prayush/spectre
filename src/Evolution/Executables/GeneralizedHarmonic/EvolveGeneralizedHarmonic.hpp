@@ -294,55 +294,52 @@ struct EvolutionMetavars {
       tmpl::push_back<typename Event<observation_events>::creatable_classes,
                       typename AhA::post_horizon_find_callback>>;
 
-  using step_actions =
-      tmpl::list<
-          dg::Actions::ComputeNonconservativeBoundaryFluxes<
-              domain::Tags::InternalDirections<volume_dim>>,
-          dg::Actions::CollectDataForFluxes<
-              boundary_scheme, domain::Tags::InternalDirections<volume_dim>>,
-          dg::Actions::SendDataForFluxes<boundary_scheme>,
-          Actions::ComputeTimeDerivative<
-              GeneralizedHarmonic::ComputeDuDt<volume_dim>>,
-          evolution::Actions::AddMeshVelocityNonconservative,
-          dg::Actions::ComputeNonconservativeBoundaryFluxes<
-              domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
-          tmpl::conditional_t<
-              BjorhusExternalBoundary, tmpl::list<>,
-              tmpl::list<
-                  dg::Actions::ImposeDirichletBoundaryConditions<
-                      EvolutionMetavars>,
-                  dg::Actions::CollectDataForFluxes<
-                      boundary_scheme,
-                      domain::Tags::BoundaryDirectionsInterior<volume_dim>>>>,
-          dg::Actions::ReceiveDataForFluxes<boundary_scheme>,
-          tmpl::conditional_t<
-              local_time_stepping,
-              tmpl::list<tmpl::conditional_t<
-                             BjorhusExternalBoundary,
-                             tmpl::list<GeneralizedHarmonic::Actions::
-                                            ImposeBjorhusBoundaryConditions<
-                                                EvolutionMetavars>>,
-                             tmpl::list<>>,
-                         Actions::RecordTimeStepperData<>,
-                         Actions::MutateApply<boundary_scheme>>,
-              tmpl::list<Actions::MutateApply<boundary_scheme>,
-                         tmpl::conditional_t<
-                             BjorhusExternalBoundary,
-                             tmpl::list<GeneralizedHarmonic::Actions::
-                                            ImposeBjorhusBoundaryConditions<
-                                                EvolutionMetavars>>,
-                             tmpl::list<>>,
-                         Actions::RecordTimeStepperData<>>>,
-          Actions::UpdateU<>,
-          tmpl::conditional_t<
-              use_filtering,
-              dg::Actions::Filter<
-                  Filters::Exponential<0>,
-                  tmpl::list<
-                      gr::Tags::SpacetimeMetric<volume_dim, frame>,
-                      GeneralizedHarmonic::Tags::Pi<volume_dim, frame>,
-                      GeneralizedHarmonic::Tags::Phi<volume_dim, frame>>>,
-              tmpl::list<>>>> ;
+  using step_actions = tmpl::list<
+      dg::Actions::ComputeNonconservativeBoundaryFluxes<
+          domain::Tags::InternalDirections<volume_dim>>,
+      dg::Actions::CollectDataForFluxes<
+          boundary_scheme, domain::Tags::InternalDirections<volume_dim>>,
+      dg::Actions::SendDataForFluxes<boundary_scheme>,
+      Actions::ComputeTimeDerivative<
+          GeneralizedHarmonic::ComputeDuDt<volume_dim>>,
+      evolution::Actions::AddMeshVelocityNonconservative,
+      dg::Actions::ComputeNonconservativeBoundaryFluxes<
+          domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
+      tmpl::conditional_t<
+          BjorhusExternalBoundary, tmpl::list<>,
+          tmpl::list<
+              dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
+              dg::Actions::CollectDataForFluxes<
+                  boundary_scheme,
+                  domain::Tags::BoundaryDirectionsInterior<volume_dim>>>>,
+      dg::Actions::ReceiveDataForFluxes<boundary_scheme>,
+      tmpl::conditional_t<
+          local_time_stepping,
+          tmpl::list<tmpl::conditional_t<
+                         BjorhusExternalBoundary,
+                         tmpl::list<GeneralizedHarmonic::Actions::
+                                        ImposeBjorhusBoundaryConditions<
+                                            EvolutionMetavars>>,
+                         tmpl::list<>>,
+                     Actions::RecordTimeStepperData<>,
+                     Actions::MutateApply<boundary_scheme>>,
+          tmpl::list<Actions::MutateApply<boundary_scheme>,
+                     tmpl::conditional_t<
+                         BjorhusExternalBoundary,
+                         tmpl::list<GeneralizedHarmonic::Actions::
+                                        ImposeBjorhusBoundaryConditions<
+                                            EvolutionMetavars>>,
+                         tmpl::list<>>,
+                     Actions::RecordTimeStepperData<>>>,
+      Actions::UpdateU<>,
+      tmpl::conditional_t<
+          use_filtering,
+          dg::Actions::Filter<
+              Filters::Exponential<0>,
+              tmpl::list<gr::Tags::SpacetimeMetric<volume_dim, frame>,
+                         GeneralizedHarmonic::Tags::Pi<volume_dim, frame>,
+                         GeneralizedHarmonic::Tags::Phi<volume_dim, frame>>>,
+          tmpl::list<>>>;
 
   enum class Phase {
     Initialization,
@@ -365,8 +362,8 @@ struct EvolutionMetavars {
               domain::Tags::Coordinates<volume_dim, Frame::Logical>>>,
       Initialization::Actions::TimeStepperHistory<EvolutionMetavars>,
       GeneralizedHarmonic::Actions::InitializeGhAnd3Plus1Variables<volume_dim>,
-      GeneralizedHarmonic::Actions::InitializeDampedHarmonicRollonGauge<
-          volume_dim>,
+      GeneralizedHarmonic::gauges::Actions::InitializeDampedHarmonic<
+          volume_dim, use_damped_harmonic_rollon>,
       GeneralizedHarmonic::Actions::InitializeConstraints<volume_dim>,
       dg::Actions::InitializeInterfaces<
           system,
@@ -411,9 +408,6 @@ struct EvolutionMetavars {
       Initialization::Actions::AddComputeTags<
           tmpl::list<evolution::Tags::AnalyticCompute<
               volume_dim, analytic_solution_tag, analytic_solution_fields>>>,
-      GeneralizedHarmonic::gauges::Actions::InitializeDampedHarmonic<
-          volume_dim, use_damped_harmonic_rollon>,
-      GeneralizedHarmonic::Actions::InitializeConstraints<volume_dim>,
       dg::Actions::InitializeMortars<boundary_scheme, !BjorhusExternalBoundary>,
       Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavars>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
