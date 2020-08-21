@@ -378,12 +378,21 @@ struct EvolutionMetavars {
                                                           DataVector>,
               gr::Tags::Shift<volume_dim, frame, DataVector>,
               gr::Tags::Lapse<DataVector>>,
-          dg::Initialization::slice_tags_to_exterior<
-              gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
-              gr::Tags::DetAndInverseSpatialMetricCompute<volume_dim, frame,
-                                                          DataVector>,
-              gr::Tags::Shift<volume_dim, frame, DataVector>,
-              gr::Tags::Lapse<DataVector>>,
+          tmpl::conditional_t<
+              BjorhusExternalBoundary,
+              dg::Initialization::slice_tags_to_exterior<
+                  typename system::variables_tag,
+                  gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
+                  gr::Tags::DetAndInverseSpatialMetricCompute<volume_dim, frame,
+                                                              DataVector>,
+                  gr::Tags::Shift<volume_dim, frame, DataVector>,
+                  gr::Tags::Lapse<DataVector>>,
+              dg::Initialization::slice_tags_to_exterior<
+                  gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
+                  gr::Tags::DetAndInverseSpatialMetricCompute<volume_dim, frame,
+                                                              DataVector>,
+                  gr::Tags::Shift<volume_dim, frame, DataVector>,
+                  gr::Tags::Lapse<DataVector>>>,
           dg::Initialization::face_compute_tags<
               domain::Tags::BoundaryCoordinates<volume_dim, true>,
               GeneralizedHarmonic::Tags::ConstraintGamma0Compute<volume_dim,
@@ -403,7 +412,7 @@ struct EvolutionMetavars {
                                                                  frame>,
               GeneralizedHarmonic::CharacteristicFieldsCompute<volume_dim,
                                                                frame>>,
-          true, true>,
+          !BjorhusExternalBoundary, true>,
       tmpl::conditional_t<evolution::is_analytic_solution_v<analytic_solution>,
                           Initialization::Actions::AddComputeTags<
                               tmpl::list<evolution::Tags::AnalyticCompute<
