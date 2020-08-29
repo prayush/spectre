@@ -113,8 +113,7 @@ class Variables<tmpl::list<Tags...>> {
   using const_pointer = const value_type*;
   using allocator_type = std::allocator<value_type>;
   using pointer_type =
-      PointerVector<value_type, blaze_unaligned, blaze_unpadded,
-                    transpose_flag,
+      PointerVector<value_type, blaze_unaligned, blaze_unpadded, transpose_flag,
                     blaze::DynamicVector<value_type, transpose_flag>>;
 
   static_assert(
@@ -454,7 +453,7 @@ class Variables<tmpl::list<Tags...>> {
 
 // The above Variables implementation doesn't work for an empty parameter pack,
 // so specialize here.
-template<>
+template <>
 class Variables<tmpl::list<>> {
  public:
   Variables() noexcept = default;
@@ -669,7 +668,7 @@ Variables<tmpl::list<Tags...>>::Variables(
       number_of_grid_points_(rhs.number_of_grid_points()),
       variable_data_(variable_data_impl_.get(), size_),
       reference_variable_data_(std::move(rhs.reference_variable_data_)) {
-    static_assert(
+  static_assert(
       (std::is_same_v<typename Tags::type, typename WrappedTags::type> and ...),
       "Tensor types do not match!");
 }
