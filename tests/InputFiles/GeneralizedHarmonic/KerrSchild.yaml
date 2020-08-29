@@ -3,7 +3,7 @@
 
 # Executable: EvolveGhKerrSchild
 # Check: parse;execute
-# Timeout: 8
+# Timeout: 30
 # ExpectedOutput:
 #   GhKerrSchildVolume0.h5
 #   GhKerrSchildReductions.h5
