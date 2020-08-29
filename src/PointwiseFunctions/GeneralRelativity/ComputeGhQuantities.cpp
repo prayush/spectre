@@ -198,6 +198,20 @@ tnsr::a<DataType, SpatialDim, Frame> gauge_source(
 }
 
 template <size_t SpatialDim, typename Frame, typename DataType>
+void spatial_deriv_gauge_source_from_spacetime_deriv(
+    gsl::not_null<tnsr::ia<DataType, SpatialDim, Frame>*> deriv_gauge_source,
+    const tnsr::ab<DataType, SpatialDim, Frame>&
+        spacetime_deriv_gauge_source) noexcept {
+  destructive_resize_components(
+      deriv_gauge_source, get_size(get<0, 0>(spacetime_deriv_gauge_source)));
+  for (size_t i = 0; i < SpatialDim; ++i) {
+    for (size_t a = 0; a < SpatialDim + 1; ++a) {
+      deriv_gauge_source.get(i, a) = spacetime_deriv_gauge_source.get(1 + i, a);
+    }
+  }
+}
+
+template <size_t SpatialDim, typename Frame, typename DataType>
 void extrinsic_curvature(
     const gsl::not_null<tnsr::ii<DataType, SpatialDim, Frame>*> ex_curv,
     const tnsr::A<DataType, SpatialDim, Frame>& spacetime_normal_vector,
@@ -1056,7 +1070,13 @@ tnsr::a<DataType, SpatialDim, Frame> spacetime_deriv_of_norm_of_shift(
       const tnsr::ii<DTYPE(data), DIM(data), FRAME(data)>& spatial_metric,     \
       const Scalar<DTYPE(data)>& trace_extrinsic_curvature,                    \
       const tnsr::i<DTYPE(data), DIM(data), FRAME(data)>&                      \
-          trace_christoffel_last_indices) noexcept;
+          trace_christoffel_last_indices) noexcept;                            \
+  template void                                                                \
+  GeneralizedHarmonic::spatial_deriv_gauge_source_from_spacetime_deriv(        \
+      const gsl::not_null<tnsr::ia<DTYPE(data), DIM(data), FRAME(data)>*>      \
+          deriv_gauge_source,                                                  \
+      const tnsr::ab<DTYPE(data), DIM(data), FRAME(data)>&                     \
+          spacetime_deriv_gauge_source) noexcept;
 
 GENERATE_INSTANTIATIONS(INSTANTIATE, (1, 2, 3), (double, DataVector),
                         (Frame::Grid, Frame::Inertial))

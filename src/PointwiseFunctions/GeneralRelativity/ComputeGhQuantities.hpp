@@ -158,6 +158,17 @@ tnsr::a<DataType, SpatialDim, Frame> gauge_source(
         trace_christoffel_last_indices) noexcept;
 //@}
 
+/*!
+ * \ingroup GeneralRelativityGroup
+ * \brief  Extracts spatial derivatives of the gauge source function
+ * from its spacetime derivatives.
+ */
+template <size_t SpatialDim, typename Frame, typename DataType>
+void spatial_deriv_gauge_source_from_spacetime_deriv(
+    gsl::not_null<tnsr::ia<DataType, SpatialDim, Frame>*> deriv_gauge_source,
+    const tnsr::ab<DataType, SpatialDim, Frame>&
+        spacetime_deriv_gauge_source) noexcept;
+
 //@{
 /*!
  * \ingroup GeneralRelativityGroup
