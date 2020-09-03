@@ -80,7 +80,6 @@
 #include "ParallelAlgorithms/DiscontinuousGalerkin/InitializeMortars.hpp"
 #include "ParallelAlgorithms/Events/ObserveErrorNorms.hpp"
 #include "ParallelAlgorithms/Events/ObserveFields.hpp"
-#include "ParallelAlgorithms/Events/ObserveNorms.hpp"
 #include "ParallelAlgorithms/Events/ObserveVolumeIntegrals.hpp"
 #include "ParallelAlgorithms/EventsAndTriggers/Actions/RunEventsAndTriggers.hpp"
 #include "ParallelAlgorithms/EventsAndTriggers/Event.hpp"
@@ -272,9 +271,10 @@ struct EvolutionMetavars {
                  GeneralizedHarmonic::Tags::Phi<volume_dim, frame>>;
 
   using observation_events = tmpl::list<
-      dg::Events::Registrars::ObserveErrorNorms<Tags::Time,
-                                                analytic_solution_fields>,
-      //   dg::Events::Registrars::ObserveNorms<Tags::Time, constraint_fields>,
+      //   dg::Events::Registrars::ObserveErrorNorms<Tags::Time,
+      //                                             analytic_solution_fields>,
+      dg::Events::Registrars::ObserveVolumeIntegrals<volume_dim, Tags::Time,
+                                                     constraint_fields>,
       dg::Events::Registrars::ObserveFields<
           volume_dim, Tags::Time, observe_fields, analytic_solution_fields>,
       Events::Registrars::ChangeSlabSize<slab_choosers>>;
