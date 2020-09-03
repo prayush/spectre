@@ -64,8 +64,6 @@
 #include "NumericalAlgorithms/Interpolation/InterpolatorRegisterElement.hpp"
 #include "NumericalAlgorithms/Interpolation/Tags.hpp"
 #include "NumericalAlgorithms/Interpolation/TryToInterpolate.hpp"
-#include "NumericalAlgorithms/LinearOperators/ExponentialFilter.hpp"
-#include "NumericalAlgorithms/LinearOperators/FilterAction.hpp"  // IWYU pragma: keep
 #include "Options/Options.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/InitializationFunctions.hpp"
@@ -152,10 +150,6 @@ struct EvolutionMetavars {
 
   using normal_dot_numerical_flux = Tags::NumericalFlux<
       GeneralizedHarmonic::UpwindPenaltyCorrection<volume_dim>>;
-  // A filter is added here, but when performing numerical experiments with the
-  // generalized harmonic system, the user should determine whether this filter
-  // can be removed.
-  static constexpr bool use_filtering = true;
 
   using step_choosers_common =
       tmpl::list<StepChoosers::Registrars::Cfl<volume_dim, Frame::Inertial>,
@@ -338,15 +332,7 @@ struct EvolutionMetavars {
                                             EvolutionMetavars>>,
                          tmpl::list<>>,
                      Actions::RecordTimeStepperData<>>>,
-      Actions::UpdateU<>,
-      tmpl::conditional_t<
-          use_filtering,
-          dg::Actions::Filter<
-              Filters::Exponential<0>,
-              tmpl::list<gr::Tags::SpacetimeMetric<volume_dim, frame>,
-                         GeneralizedHarmonic::Tags::Pi<volume_dim, frame>,
-                         GeneralizedHarmonic::Tags::Phi<volume_dim, frame>>>,
-          tmpl::list<>>>;
+      Actions::UpdateU<>>;
 
   enum class Phase {
     Initialization,
