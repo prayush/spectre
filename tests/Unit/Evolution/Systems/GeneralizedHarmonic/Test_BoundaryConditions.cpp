@@ -2219,112 +2219,6 @@ void test_constraint_preserving_bjorhus_u_minus<
 
 // Test helper functions needed to set dt<VMinus>
 namespace {
-// Test GeneralizedHarmonic::ricci_tensor
-void test_ricci_tensor(const size_t grid_size_each_dimension,
-                       const std::array<double, 3>& lower_bound,
-                       const std::array<double, 3>& upper_bound) noexcept {
-  // Setup grid
-  Mesh<VolumeDim> mesh{grid_size_each_dimension, Spectral::Basis::Legendre,
-                       Spectral::Quadrature::GaussLobatto};
-  const auto coord_map =
-      domain::make_coordinate_map<Frame::Logical, Frame::Inertial>(Affine3D{
-          Affine{-1., 1., lower_bound[0], upper_bound[0]},
-          Affine{-1., 1., lower_bound[1], upper_bound[1]},
-          Affine{-1., 1., lower_bound[2], upper_bound[2]},
-      });
-
-  // Setup coordinates
-  const auto x_logical = logical_coordinates(mesh);
-  const auto x = coord_map(x_logical);
-  const Direction<VolumeDim> direction(1, Side::Upper);  // +y direction
-  const size_t slice_grid_points =
-      mesh.extents().slice_away(direction.dimension()).product();
-  const auto inertial_coords = [&slice_grid_points, &lower_bound]() {
-    tnsr::I<DataVector, VolumeDim, frame> tmp(slice_grid_points, 0.);
-    // +y direction
-    get<1>(tmp) = 0.5;
-    for (size_t i = 0; i < VolumeDim; ++i) {
-      for (size_t j = 0; j < VolumeDim; ++j) {
-        get<0>(tmp)[i * VolumeDim + j] =
-            lower_bound[0] + 0.5 * static_cast<double>(i);
-        get<2>(tmp)[i * VolumeDim + j] =
-            lower_bound[2] + 0.5 * static_cast<double>(j);
-      }
-    }
-    return tmp;
-  }();
-
-  auto local_inverse_spatial_metric =
-      make_with_value<tnsr::II<DataVector, VolumeDim, Frame::Inertial>>(
-          inertial_coords, 0.);
-  auto local_phi =
-      make_with_value<tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>>(
-          inertial_coords, 0.);
-  auto local_d_pi =
-      make_with_value<tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>>(
-          inertial_coords, 0.);
-  auto local_d_phi =
-      make_with_value<tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>>(
-          inertial_coords, 0.);
-
-  // Setting inverse_spatial_metric
-  for (size_t i = 0; i < get<0>(inertial_coords).size(); ++i) {
-    for (size_t j = 0; j < VolumeDim; ++j) {
-      local_inverse_spatial_metric.get(0, j)[i] = 41.;
-      local_inverse_spatial_metric.get(1, j)[i] = 43.;
-      local_inverse_spatial_metric.get(2, j)[i] = 47.;
-    }
-  }
-  // Setting pi AND phi
-  for (size_t i = 0; i < get<0>(inertial_coords).size(); ++i) {
-    for (size_t a = 0; a <= VolumeDim; ++a) {
-      for (size_t b = 0; b <= VolumeDim; ++b) {
-        // local_pi.get(a, b)[i] = 1.;
-        local_phi.get(0, a, b)[i] = 3.;
-        local_phi.get(1, a, b)[i] = 5.;
-        local_phi.get(2, a, b)[i] = 7.;
-      }
-    }
-  }
-  // Setting local_d_phi
-  // initialize dPhi (with same values as for SpEC)
-  for (size_t i = 0; i < get<0>(inertial_coords).size(); ++i) {
-    for (size_t a = 0; a <= VolumeDim; ++a) {
-      for (size_t b = 0; b <= VolumeDim; ++b) {
-        local_d_pi.get(0, a, b)[i] = 1.;
-        local_d_phi.get(0, 0, a, b)[i] = 3.;
-        local_d_phi.get(0, 1, a, b)[i] = 5.;
-        local_d_phi.get(0, 2, a, b)[i] = 7.;
-        local_d_pi.get(1, a, b)[i] = 53.;
-        local_d_phi.get(1, 0, a, b)[i] = 59.;
-        local_d_phi.get(1, 1, a, b)[i] = 61.;
-        local_d_phi.get(1, 2, a, b)[i] = 67.;
-        local_d_pi.get(2, a, b)[i] = 71.;
-        local_d_phi.get(2, 0, a, b)[i] = 73.;
-        local_d_phi.get(2, 1, a, b)[i] = 79.;
-        local_d_phi.get(2, 2, a, b)[i] = 83.;
-      }
-    }
-  }
-
-  // Call tested function
-  auto local_ricci_3 = GeneralizedHarmonic::ricci_tensor(
-      local_phi, local_d_phi, local_inverse_spatial_metric);
-
-  // Initialize with values from SpEC
-  auto spec_ricci_3 = local_ricci_3;
-  get<0, 0>(spec_ricci_3) = 153230.;
-  get<0, 1>(spec_ricci_3) = 5283.;
-  get<0, 2>(spec_ricci_3) = -142541.;
-  get<1, 0>(spec_ricci_3) = 5283.;
-  get<1, 1>(spec_ricci_3) = 2497.;
-  get<1, 2>(spec_ricci_3) = -928.;
-  get<2, 2>(spec_ricci_3) = 141189.;
-
-  // Compare values returned by BC action vs those from SpEC
-  CHECK_ITERABLE_APPROX(local_ricci_3, spec_ricci_3);
-}
-
 // Test GeneralizedHarmonic::spatial_projection_tensor (3 OVERLOADS)
 void test_spatial_projection_tensors(
     const size_t grid_size_each_dimension,
@@ -2727,7 +2621,6 @@ SPECTRE_TEST_CASE(
   const std::array<double, 3> lower_bound{{299., -0.5, -0.5}};
   const std::array<double, 3> upper_bound{{300., 0.5, 0.5}};
 
-  test_ricci_tensor(grid_size, lower_bound, upper_bound);
   test_spatial_projection_tensors(grid_size, lower_bound, upper_bound);
   test_weyl_propagating(grid_size, lower_bound, upper_bound);
 }

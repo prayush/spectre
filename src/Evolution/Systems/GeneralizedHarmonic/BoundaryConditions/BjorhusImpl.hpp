@@ -34,6 +34,7 @@
 #include "Parallel/Invoke.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/Tags.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Christoffel.hpp"
+#include "PointwiseFunctions/GeneralRelativity/GeneralizedHarmonic/Ricci.hpp"
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "Time/Tags.hpp"
@@ -1051,8 +1052,8 @@ ReturnType set_dt_v_minus<ReturnType, VolumeDim>::
     }
 
     // Compute spatial Ricci tensor
-    auto ricci_3 =
-        GeneralizedHarmonic::ricci_tensor(phi, d_phi, inverse_spatial_metric);
+    auto ricci_3 = GeneralizedHarmonic::spatial_ricci_tensor(
+        phi, d_phi, inverse_spatial_metric);
     tnsr::ijj<DataVector, VolumeDim, Frame::Inertial> CdK(
         get_size(get(gamma2)));
     {
