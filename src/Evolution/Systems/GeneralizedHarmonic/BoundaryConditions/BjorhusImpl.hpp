@@ -253,9 +253,6 @@ class BjorhusIntermediatesComputer {
     const auto& shift =
         get<gr::Tags::Shift<VolumeDim, Frame::Inertial, DataVector>>(
             vars_on_this_slice);
-    // const auto& spatial_metric =
-    //     get<gr::Tags::SpatialMetric<VolumeDim, Frame::Inertial, DataVector>>(
-    //         vars_on_this_slice);
     const auto& inverse_spatial_metric = get<
         gr::Tags::InverseSpatialMetric<VolumeDim, Frame::Inertial, DataVector>>(
         vars_on_this_slice);
@@ -485,8 +482,6 @@ struct set_dt_v_psi {
                           const Variables<DtVarsTagsList>& /* dt_vars */,
                           const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
                           /* unit_normal_one_form */) noexcept {
-    // Not using auto below to enforce a loose test on the quantity being
-    // fetched from the buffer
     const auto three_index_constraint = intermediates.get_var(
         Tags::ThreeIndexConstraint<VolumeDim, Frame::Inertial>{});
     const auto unit_interface_normal_vector = intermediates.get_var(
