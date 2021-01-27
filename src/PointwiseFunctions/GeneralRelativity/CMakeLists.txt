@@ -21,6 +21,7 @@ spectre_target_sources(
   SpacetimeNormalOneForm.cpp
   SpacetimeNormalVector.cpp
   SpatialMetric.cpp
+  SpatialProjectionOp.cpp
   TimeDerivativeOfSpacetimeMetric.cpp
   WeylElectric.cpp
   )
@@ -43,6 +44,7 @@ spectre_target_headers(
   SpacetimeNormalOneForm.hpp
   SpacetimeNormalVector.hpp
   SpatialMetric.hpp
+  SpatialProjectionOp.cpp
   Tags.hpp
   TagsDeclarations.hpp
   TimeDerivativeOfSpacetimeMetric.hpp

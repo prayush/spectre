@@ -10,6 +10,7 @@ set(LIBRARY_SOURCES
   Test_IndexManipulation.cpp
   Test_KerrSchildCoords.cpp
   Test_Ricci.cpp
+  Test_SpatialProjectionOp.cpp
   Test_Tags.cpp
   Test_WeylElectric.cpp
   )
