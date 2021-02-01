@@ -129,3 +129,23 @@ def spacetime_deriv_detg(sqrt_det_spatial_metric, inverse_spatial_metric,
     dg[0] = dtg
     dg[1:] = dxg
     return dg
+
+
+def covariant_deriv_extrinsic_curvture(spacetime_unit_nomal_vector,
+                                       spatial_christoffel_second_kind,
+                                       extrinsic_curvature,
+                                       inverse_spacetime_metric, phi, d_pi,
+                                       d_phi):
+    cdk = d_pi[:, 1:, 1:] + np.einsum(
+        'kija,a->kij', d_phi, spacetime_unit_nomal_vector) + np.einsum(
+            'kjia,a->kij', d_phi, spacetime_unit_nomal_vector)
+    -np.einsum('ija,b,ca,kcb->kij', phi, spacetime_unit_nomal_vector,
+               inverse_spacetime_metric, phi)
+    -np.einsum('jia,b,ca,kcb->kij', phi, spacetime_unit_nomal_vector,
+               inverse_spacetime_metric, phi)
+    -np.einsum('ija,b,c,a,kcb->kij', phi, spacetime_unit_nomal_vector, 0.5 *
+               spacetime_unit_nomal_vector, spacetime_unit_nomal_vector, phi)
+    -np.einsum('jia,b,c,a,kcb->kij', phi, spacetime_unit_nomal_vector, 0.5 *
+               spacetime_unit_nomal_vector, spacetime_unit_nomal_vector, phi)
+    cdk = 0.5 * cdk - np.einsum('lik,lj->kij') - np.einsum('ljk,li->kij')
+    return cdk

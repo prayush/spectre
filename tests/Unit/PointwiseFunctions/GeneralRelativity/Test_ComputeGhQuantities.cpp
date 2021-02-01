@@ -38,6 +38,7 @@
 #include "PointwiseFunctions/GeneralRelativity/DerivativesOfSpacetimeMetric.hpp"
 #include "PointwiseFunctions/GeneralRelativity/ExtrinsicCurvature.hpp"
 #include "PointwiseFunctions/GeneralRelativity/GeneralizedHarmonic/ConstraintGammas.hpp"
+#include "PointwiseFunctions/GeneralRelativity/GeneralizedHarmonic/CovariantDerivOfExtrinsicCurvature.hpp"
 #include "PointwiseFunctions/GeneralRelativity/GeneralizedHarmonic/DerivSpatialMetric.hpp"
 #include "PointwiseFunctions/GeneralRelativity/GeneralizedHarmonic/ExtrinsicCurvature.hpp"
 #include "PointwiseFunctions/GeneralRelativity/GeneralizedHarmonic/GaugeSource.hpp"
@@ -626,6 +627,26 @@ void test_spacetime_derivative_of_spacetime_metric(
   }
 }
 
+template <typename DataType, size_t SpatialDim, typename Frame>
+void test_cov_deriv_extrinsic_curvature(
+    const DataVector& used_for_size) noexcept {
+  // spatial_deriv_of_shift
+  pypp::check_with_random_values<1>(
+      static_cast<tnsr::ijj<DataType, SpatialDim, Frame> (*)(
+          const tnsr::A<DataType, SpatialDim, Frame>&,
+          const tnsr::Ijj<DataType, SpatialDim, Frame>&,
+          const tnsr::ii<DataType, SpatialDim, Frame>&,
+          const tnsr::AA<DataType, SpatialDim, Frame>&,
+          const tnsr::iaa<DataType, SpatialDim, Frame>&,
+          const tnsr::iaa<DataType, SpatialDim, Frame>&,
+          const tnsr::ijaa<DataType, SpatialDim, Frame>&)>(
+          &::GeneralizedHarmonic::covariant_deriv_of_extrinsic_curvature<
+              SpatialDim, Frame, DataType>),
+      "GeneralRelativity.ComputeGhQuantities",
+      "covariant_deriv_extrinsic_curvture",
+      {{{std::numeric_limits<double>::denorm_min(), 10.}}}, used_for_size);
+}
+
 }  // namespace
 
 SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GeneralRelativity.GhQuantities",
@@ -687,6 +708,16 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GeneralRelativity.GhQuantities",
   test_shift_deriv_functions<DataVector, 1, Frame::Inertial>(used_for_size);
   test_shift_deriv_functions<DataVector, 2, Frame::Inertial>(used_for_size);
   test_shift_deriv_functions<DataVector, 3, Frame::Inertial>(used_for_size);
+
+  test_cov_deriv_extrinsic_curvature<DataVector, 1, Frame::Grid>(used_for_size);
+  test_cov_deriv_extrinsic_curvature<DataVector, 2, Frame::Grid>(used_for_size);
+  test_cov_deriv_extrinsic_curvature<DataVector, 3, Frame::Grid>(used_for_size);
+  test_cov_deriv_extrinsic_curvature<DataVector, 1, Frame::Inertial>(
+      used_for_size);
+  test_cov_deriv_extrinsic_curvature<DataVector, 2, Frame::Inertial>(
+      used_for_size);
+  test_cov_deriv_extrinsic_curvature<DataVector, 3, Frame::Inertial>(
+      used_for_size);
 
   const double mass = 2.;
   const std::array<double, 3> spin{{0.3, 0.5, 0.2}};
