@@ -468,5 +468,31 @@ void set_dt_v_minus_constraint_preserving_physical(
     const tnsr::iaa<DataType, VolumeDim, Frame::Inertial>& d_pi,
     const std::array<DataType, 4>& char_speeds) noexcept;
 // @}
+
+/*!
+ * \brief Computes the expression needed to set boundary conditions on dt<VZero>
+ *
+ * \details Computes the correction to the characteristic projected
+ * time-derivatives of the fundamental variables corresponding to \f$u^0\f$:
+ *
+ * \f{align}
+ * \partial_t u^{0}_{iab} = \partial_t u^{0}_{iab} + v_{0} n^j C_{jiab}
+ * \f}
+ *
+ * where \f$n^i\f$ is the local unit normal to the external boundary,
+ * and \f$C_{ijab} = \partial_i\Phi_{jab} - \partial_j\Phi_{iab}\f$ is the
+ * four-index constraint.
+ */
+template <size_t VolumeDim, typename DataType>
+void set_dt_v_zero_constraint_preserving(
+    gsl::not_null<tnsr::iaa<DataType, VolumeDim, Frame::Inertial>*>
+        bc_dt_v_zero,
+    const tnsr::I<DataType, VolumeDim, Frame::Inertial>&
+        unit_interface_normal_vector,
+    const tnsr::iaa<DataType, VolumeDim, Frame::Inertial>&
+        four_index_constraint,
+    const tnsr::iaa<DataType, VolumeDim, Frame::Inertial>&
+        char_projected_rhs_dt_v_zero,
+    const std::array<DataType, 4>& char_speeds) noexcept;
 }  // namespace detail
 }  // namespace GeneralizedHarmonic::BoundaryConditions

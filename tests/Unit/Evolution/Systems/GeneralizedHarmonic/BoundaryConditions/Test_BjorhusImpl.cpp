@@ -12,6 +12,7 @@
 #include "Domain/Structure/Direction.hpp"
 #include "Domain/Structure/Side.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/BjorhusImpl.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/Constraints.hpp"
 #include "NumericalAlgorithms/Spectral/Mesh.hpp"
 #include "Utilities/ContainerHelpers.hpp"
 #include "Utilities/Gsl.hpp"
@@ -857,6 +858,191 @@ void test_constraint_preserving_physical_bjorhus_v_minus_spec(
     CHECK_ITERABLE_APPROX(local_bc_dt_v_minus, spec_bc_dt_v_minus);
   }
 }
+
+// Test boundary conditions on dt<VZero>
+void test_constraint_preserving_bjorhus_v_zero(
+    const size_t grid_size_each_dimension) noexcept {
+  // Setup grid
+  Mesh<VolumeDim> mesh{grid_size_each_dimension, Spectral::Basis::Legendre,
+                       Spectral::Quadrature::GaussLobatto};
+  const Direction<VolumeDim> direction(1, Side::Upper);  // +y direction
+  const size_t slice_grid_points =
+      mesh.extents().slice_away(direction.dimension()).product();
+
+  // Populate various tensors needed to compute BcDtVZero
+  tnsr::iaa<DataVector, VolumeDim, frame> local_four_index_constraint(
+      slice_grid_points, std::numeric_limits<double>::signaling_NaN());
+  tnsr::I<DataVector, VolumeDim, frame> local_unit_interface_normal_vector(
+      slice_grid_points, std::numeric_limits<double>::signaling_NaN());
+  tnsr::iaa<DataVector, VolumeDim, frame> local_char_projected_rhs_dt_v_zero(
+      slice_grid_points, std::numeric_limits<double>::signaling_NaN());
+  std::array<DataVector, 4> local_char_speeds{
+      DataVector(slice_grid_points,
+                 std::numeric_limits<double>::signaling_NaN()),
+      DataVector(slice_grid_points,
+                 std::numeric_limits<double>::signaling_NaN()),
+      DataVector(slice_grid_points,
+                 std::numeric_limits<double>::signaling_NaN()),
+      DataVector(slice_grid_points,
+                 std::numeric_limits<double>::signaling_NaN())};
+
+  {
+    // Setting 4idxConstraint:
+    // initialize dPhi (with same values as for SpEC) and compute C4 from it
+    auto local_dphi = make_with_value<tnsr::ijaa<DataVector, VolumeDim, frame>>(
+        local_unit_interface_normal_vector,
+        std::numeric_limits<double>::signaling_NaN());
+    for (size_t a = 0; a <= VolumeDim; ++a) {
+      for (size_t b = 0; b <= VolumeDim; ++b) {
+        for (size_t i = 0; i < slice_grid_points; ++i) {
+          local_dphi.get(0, 0, a, b)[i] = 3.;
+          local_dphi.get(0, 1, a, b)[i] = 5.;
+          local_dphi.get(0, 2, a, b)[i] = 7.;
+          local_dphi.get(1, 0, a, b)[i] = 59.;
+          local_dphi.get(1, 1, a, b)[i] = 61.;
+          local_dphi.get(1, 2, a, b)[i] = 67.;
+          local_dphi.get(2, 0, a, b)[i] = 73.;
+          local_dphi.get(2, 1, a, b)[i] = 79.;
+          local_dphi.get(2, 2, a, b)[i] = 83.;
+        }
+      }
+    }
+    // C4_{iab} = LeviCivita^{ijk} dphi_{jkab}
+    local_four_index_constraint =
+        GeneralizedHarmonic::four_index_constraint(local_dphi);
+
+    // Setting unit_interface_normal_Vector
+    for (size_t i = 0; i < slice_grid_points; ++i) {
+      get<0>(local_unit_interface_normal_vector)[i] = -1.;
+      get<1>(local_unit_interface_normal_vector)[i] = 1.;
+      get<2>(local_unit_interface_normal_vector)[i] = 1.;
+    }
+    // Setting local_RhsU0
+    for (size_t i = 0; i < slice_grid_points; ++i) {
+      for (size_t a = 0; a <= VolumeDim; ++a) {
+        for (size_t b = a; b <= VolumeDim; ++b) {
+          local_char_projected_rhs_dt_v_zero.get(0, a, b)[i] = 91.;
+          local_char_projected_rhs_dt_v_zero.get(1, a, b)[i] = 97.;
+          local_char_projected_rhs_dt_v_zero.get(2, a, b)[i] = 101.;
+        }
+      }
+    }
+    // Setting char speeds
+    for (size_t i = 0; i < slice_grid_points; ++i) {
+      local_char_speeds.at(0)[i] = -0.3;
+      local_char_speeds.at(1)[i] = -0.1;
+    }
+  }
+  // Allocate memory for output
+  tnsr::iaa<DataVector, VolumeDim, frame> local_bc_dt_v_zero(
+      slice_grid_points, std::numeric_limits<double>::signaling_NaN());
+  // Compute rhs value
+  GeneralizedHarmonic::BoundaryConditions::detail::
+      set_dt_v_zero_constraint_preserving(
+          make_not_null(&local_bc_dt_v_zero),
+          local_unit_interface_normal_vector, local_four_index_constraint,
+          local_char_projected_rhs_dt_v_zero, local_char_speeds);
+
+  // Initialize with values from SpEC
+  auto spec_bc_dt_v_zero =
+      make_with_value<tnsr::iaa<DataVector, VolumeDim, frame>>(
+          local_bc_dt_v_zero, std::numeric_limits<double>::signaling_NaN());
+
+  for (size_t i = 0; i < slice_grid_points; ++i) {
+    get<0, 0, 0>(spec_bc_dt_v_zero)[i] = 79.;
+    get<0, 0, 1>(spec_bc_dt_v_zero)[i] = 79.;
+    get<0, 0, 2>(spec_bc_dt_v_zero)[i] = 79.;
+    get<0, 0, 3>(spec_bc_dt_v_zero)[i] = 79.;
+    get<1, 0, 0>(spec_bc_dt_v_zero)[i] = 90.4;
+    get<1, 0, 1>(spec_bc_dt_v_zero)[i] = 90.4;
+    get<1, 0, 2>(spec_bc_dt_v_zero)[i] = 90.4;
+    get<1, 0, 3>(spec_bc_dt_v_zero)[i] = 90.4;
+    get<2, 0, 3>(spec_bc_dt_v_zero)[i] = 95.6;
+    get<2, 0, 0>(spec_bc_dt_v_zero)[i] = 95.6;
+    get<2, 0, 1>(spec_bc_dt_v_zero)[i] = 95.6;
+    get<2, 0, 2>(spec_bc_dt_v_zero)[i] = 95.6;
+
+    get<0, 1, 1>(spec_bc_dt_v_zero)[i] = 79.;
+    get<0, 1, 2>(spec_bc_dt_v_zero)[i] = 79.;
+    get<0, 1, 3>(spec_bc_dt_v_zero)[i] = 79.;
+    get<1, 1, 1>(spec_bc_dt_v_zero)[i] = 90.4;
+    get<1, 1, 2>(spec_bc_dt_v_zero)[i] = 90.4;
+    get<1, 1, 3>(spec_bc_dt_v_zero)[i] = 90.4;
+    get<2, 1, 1>(spec_bc_dt_v_zero)[i] = 95.6;
+    get<2, 1, 2>(spec_bc_dt_v_zero)[i] = 95.6;
+    get<2, 1, 3>(spec_bc_dt_v_zero)[i] = 95.6;
+
+    get<0, 2, 2>(spec_bc_dt_v_zero)[i] = 79.;
+    get<0, 2, 3>(spec_bc_dt_v_zero)[i] = 79.;
+    get<1, 2, 2>(spec_bc_dt_v_zero)[i] = 90.4;
+    get<1, 2, 3>(spec_bc_dt_v_zero)[i] = 90.4;
+    get<2, 2, 2>(spec_bc_dt_v_zero)[i] = 95.6;
+    get<2, 2, 3>(spec_bc_dt_v_zero)[i] = 95.6;
+
+    get<0, 3, 3>(spec_bc_dt_v_zero)[i] = 79.;
+    get<1, 3, 3>(spec_bc_dt_v_zero)[i] = 90.4;
+    get<2, 3, 3>(spec_bc_dt_v_zero)[i] = 95.6;
+  }
+
+  // Compare values returned by BC action vs those from SpEC
+  CHECK_ITERABLE_APPROX(local_bc_dt_v_zero, spec_bc_dt_v_zero);
+
+  // Test for another set of values
+  {
+    // Setting unit_interface_normal_Vector
+    for (size_t i = 0; i < slice_grid_points; ++i) {
+      get<0>(local_unit_interface_normal_vector)[i] = -1.;
+      get<1>(local_unit_interface_normal_vector)[i] = 0.;
+      get<2>(local_unit_interface_normal_vector)[i] = 0.;
+    }
+  }
+  // Compute rhs value
+  GeneralizedHarmonic::BoundaryConditions::detail::
+      set_dt_v_zero_constraint_preserving(
+          make_not_null(&local_bc_dt_v_zero),
+          local_unit_interface_normal_vector, local_four_index_constraint,
+          local_char_projected_rhs_dt_v_zero, local_char_speeds);
+
+  // Initialize with values from SpEC
+  for (size_t i = 0; i < slice_grid_points; ++i) {
+    get<0, 0, 0>(spec_bc_dt_v_zero)[i] = 91.;
+    get<0, 0, 1>(spec_bc_dt_v_zero)[i] = 91.;
+    get<0, 0, 2>(spec_bc_dt_v_zero)[i] = 91.;
+    get<0, 0, 3>(spec_bc_dt_v_zero)[i] = 91.;
+    get<1, 0, 0>(spec_bc_dt_v_zero)[i] = 91.6;
+    get<1, 0, 1>(spec_bc_dt_v_zero)[i] = 91.6;
+    get<1, 0, 2>(spec_bc_dt_v_zero)[i] = 91.6;
+    get<1, 0, 3>(spec_bc_dt_v_zero)[i] = 91.6;
+    get<2, 0, 3>(spec_bc_dt_v_zero)[i] = 94.4;
+    get<2, 0, 0>(spec_bc_dt_v_zero)[i] = 94.4;
+    get<2, 0, 1>(spec_bc_dt_v_zero)[i] = 94.4;
+    get<2, 0, 2>(spec_bc_dt_v_zero)[i] = 94.4;
+
+    get<0, 1, 1>(spec_bc_dt_v_zero)[i] = 91.;
+    get<0, 1, 2>(spec_bc_dt_v_zero)[i] = 91.;
+    get<0, 1, 3>(spec_bc_dt_v_zero)[i] = 91.;
+    get<1, 1, 1>(spec_bc_dt_v_zero)[i] = 91.6;
+    get<1, 1, 2>(spec_bc_dt_v_zero)[i] = 91.6;
+    get<1, 1, 3>(spec_bc_dt_v_zero)[i] = 91.6;
+    get<2, 1, 1>(spec_bc_dt_v_zero)[i] = 94.4;
+    get<2, 1, 2>(spec_bc_dt_v_zero)[i] = 94.4;
+    get<2, 1, 3>(spec_bc_dt_v_zero)[i] = 94.4;
+
+    get<0, 2, 2>(spec_bc_dt_v_zero)[i] = 91.;
+    get<0, 2, 3>(spec_bc_dt_v_zero)[i] = 91.;
+    get<1, 2, 2>(spec_bc_dt_v_zero)[i] = 91.6;
+    get<1, 2, 3>(spec_bc_dt_v_zero)[i] = 91.6;
+    get<2, 2, 2>(spec_bc_dt_v_zero)[i] = 94.4;
+    get<2, 2, 3>(spec_bc_dt_v_zero)[i] = 94.4;
+
+    get<0, 3, 3>(spec_bc_dt_v_zero)[i] = 91.;
+    get<1, 3, 3>(spec_bc_dt_v_zero)[i] = 91.6;
+    get<2, 3, 3>(spec_bc_dt_v_zero)[i] = 94.4;
+  }
+
+  // Compare values returned by BC action vs those from SpEC
+  CHECK_ITERABLE_APPROX(local_bc_dt_v_zero, spec_bc_dt_v_zero);
+}
 }  // namespace
 
 SPECTRE_TEST_CASE("Unit.Evolution.Systems.GeneralizedHarmonic.BCBjorhus.VPsi",
@@ -876,4 +1062,12 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.GeneralizedHarmonic.BCBjorhus.VMinus",
 
   test_constraint_preserving_physical_bjorhus_v_minus_spec(
       grid_size, lower_bound, upper_bound);
+}
+
+SPECTRE_TEST_CASE("Unit.Evolution.Systems.GeneralizedHarmonic.BCBjorhus.VZero",
+                  "[Unit][Evolution]") {
+  // Piece-wise tests with SpEC output
+  const size_t grid_size = 3;
+
+  test_constraint_preserving_bjorhus_v_zero(grid_size);
 }
