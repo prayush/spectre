@@ -35,3 +35,5 @@ target_link_libraries(
   PUBLIC DataStructures
   INTERFACE ErrorHandling
   )
+
+add_subdirectory(BoundaryCorrections)
