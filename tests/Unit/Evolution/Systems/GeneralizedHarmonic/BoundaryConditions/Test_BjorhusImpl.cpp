@@ -13,6 +13,9 @@
 #include "Domain/Structure/Side.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/BjorhusImpl.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Constraints.hpp"
+#include "Framework/CheckWithRandomValues.hpp"
+#include "Framework/SetupLocalPythonEnvironment.hpp"
+#include "Framework/TestHelpers.hpp"
 #include "NumericalAlgorithms/Spectral/Mesh.hpp"
 #include "Utilities/ContainerHelpers.hpp"
 #include "Utilities/Gsl.hpp"
@@ -1045,18 +1048,206 @@ void test_constraint_preserving_bjorhus_v_zero(
 }
 }  // namespace
 
+// Python tests
+namespace {
+tnsr::aa<DataVector, VolumeDim, Frame::Inertial> wrapper_func_v_psi(
+    const tnsr::I<DataVector, VolumeDim, Frame::Inertial>&
+        interface_normal_vector,
+    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+        three_index_constraint,
+    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& char_proj_dt_v_psi,
+    const tnsr::a<DataVector, 3, Frame::Inertial>& char_speeds) {
+  std::array<DataVector, 4> char_speed_array{
+      {get<0>(char_speeds), get<1>(char_speeds), get<2>(char_speeds),
+       get<3>(char_speeds)}};
+  auto dt_v_psi =
+      make_with_value<tnsr::aa<DataVector, VolumeDim, Frame::Inertial>>(
+          get<0>(interface_normal_vector), 0.);
+  GeneralizedHarmonic::BoundaryConditions::detail::
+      set_dt_v_psi_constraint_preserving<VolumeDim, DataVector>(
+          make_not_null(&dt_v_psi), interface_normal_vector,
+          three_index_constraint, char_proj_dt_v_psi, char_speed_array);
+  return dt_v_psi;
+}
+
+void test_set_dt_v_psi_constraint_preserving(
+    const size_t grid_size_each_dimension) noexcept {
+  pypp::check_with_random_values<1>(
+      &wrapper_func_v_psi,
+      "Evolution.Systems.GeneralizedHarmonic.BoundaryConditions.Bjorhus",
+      "set_dt_v_psi_constraint_preserving", {{{-1., 1.}}},
+      DataVector(grid_size_each_dimension));
+}
+
+tnsr::iaa<DataVector, VolumeDim, Frame::Inertial> wrapper_func_v_zero(
+    const tnsr::I<DataVector, VolumeDim, Frame::Inertial>&
+        interface_normal_vector,
+    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+        four_index_constraint,
+    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+        char_proj_dt_v_zero,
+    const tnsr::a<DataVector, 3, Frame::Inertial>& char_speeds) {
+  std::array<DataVector, 4> char_speed_array{
+      get<0>(char_speeds), get<1>(char_speeds), get<2>(char_speeds),
+      get<3>(char_speeds)};
+  auto dt_v_zero =
+      make_with_value<tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>>(
+          get<0>(interface_normal_vector), 0.);
+  GeneralizedHarmonic::BoundaryConditions::detail::
+      set_dt_v_zero_constraint_preserving<VolumeDim, DataVector>(
+          make_not_null(&dt_v_zero), interface_normal_vector,
+          four_index_constraint, char_proj_dt_v_zero, char_speed_array);
+  return dt_v_zero;
+}
+
+void test_set_dt_v_zero_constraint_preserving(
+    const size_t grid_size_each_dimension) noexcept {
+  pypp::check_with_random_values<1>(
+      &wrapper_func_v_zero,
+      "Evolution.Systems.GeneralizedHarmonic.BoundaryConditions.Bjorhus",
+      "set_dt_v_zero_constraint_preserving", {{{-1., 1.}}},
+      DataVector(grid_size_each_dimension));
+}
+
+tnsr::aa<DataVector, VolumeDim, Frame::Inertial> wrapper_func_cp_v_minus(
+    const Scalar<DataVector>& gamma2,
+    const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& inertial_coords,
+    const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+        incoming_null_one_form,
+    const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+        outgoing_null_one_form,
+    const tnsr::A<DataVector, VolumeDim, Frame::Inertial>& incoming_null_vector,
+    const tnsr::A<DataVector, VolumeDim, Frame::Inertial>& outgoing_null_vector,
+    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& projection_ab,
+    const tnsr::Ab<DataVector, VolumeDim, Frame::Inertial>& projection_Ab,
+    const tnsr::AA<DataVector, VolumeDim, Frame::Inertial>& projection_AB,
+    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
+        char_projected_rhs_dt_v_psi,
+    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
+        char_projected_rhs_dt_v_minus,
+    const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+        constraint_char_zero_plus,
+    const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+        constraint_char_zero_minus,
+    const tnsr::a<DataVector, 3, Frame::Inertial>& char_speeds) {
+  std::array<DataVector, 4> char_speed_array{
+      get<0>(char_speeds), get<1>(char_speeds), get<2>(char_speeds),
+      get<3>(char_speeds)};
+  auto dt_v_minus =
+      make_with_value<tnsr::aa<DataVector, VolumeDim, Frame::Inertial>>(
+          get(gamma2), 0.);
+  GeneralizedHarmonic::BoundaryConditions::detail::
+      set_dt_v_minus_constraint_preserving<VolumeDim, DataVector>(
+          make_not_null(&dt_v_minus), gamma2, inertial_coords,
+          incoming_null_one_form, outgoing_null_one_form, incoming_null_vector,
+          outgoing_null_vector, projection_ab, projection_Ab, projection_AB,
+          char_projected_rhs_dt_v_psi, char_projected_rhs_dt_v_minus,
+          constraint_char_zero_plus, constraint_char_zero_minus,
+          char_speed_array);
+  return dt_v_minus;
+}
+
+void test_set_dt_v_minus_constraint_preserving(
+    const size_t grid_size_each_dimension) noexcept {
+  pypp::check_with_random_values<1>(
+      &wrapper_func_cp_v_minus,
+      "Evolution.Systems.GeneralizedHarmonic.BoundaryConditions.Bjorhus",
+      "set_dt_v_minus_constraint_preserving", {{{-1., 1.}}},
+      DataVector(grid_size_each_dimension));
+}
+
+tnsr::aa<DataVector, VolumeDim, Frame::Inertial> wrapper_func_cpp_v_minus(
+    const Scalar<DataVector>& gamma2,
+    const tnsr::I<DataVector, VolumeDim, Frame::Inertial>& inertial_coords,
+    const tnsr::i<DataVector, VolumeDim, Frame::Inertial>&
+        unit_interface_normal_one_form,
+    const tnsr::I<DataVector, VolumeDim, Frame::Inertial>&
+        unit_interface_normal_vector,
+    const tnsr::A<DataVector, VolumeDim, Frame::Inertial>&
+        spacetime_unit_normal_vector,
+    const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+        incoming_null_one_form,
+    const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+        outgoing_null_one_form,
+    const tnsr::A<DataVector, VolumeDim, Frame::Inertial>& incoming_null_vector,
+    const tnsr::A<DataVector, VolumeDim, Frame::Inertial>& outgoing_null_vector,
+    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& projection_ab,
+    const tnsr::Ab<DataVector, VolumeDim, Frame::Inertial>& projection_Ab,
+    const tnsr::AA<DataVector, VolumeDim, Frame::Inertial>& projection_AB,
+    const tnsr::II<DataVector, VolumeDim, Frame::Inertial>&
+        inverse_spatial_metric,
+    const tnsr::ii<DataVector, VolumeDim, Frame::Inertial>& extrinsic_curvature,
+    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>& spacetime_metric,
+    const tnsr::AA<DataVector, VolumeDim, Frame::Inertial>&
+        inverse_spacetime_metric,
+    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>&
+        three_index_constraint,
+    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
+        char_projected_rhs_dt_v_psi,
+    const tnsr::aa<DataVector, VolumeDim, Frame::Inertial>&
+        char_projected_rhs_dt_v_minus,
+    const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+        constraint_char_zero_plus,
+    const tnsr::a<DataVector, VolumeDim, Frame::Inertial>&
+        constraint_char_zero_minus,
+    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& phi,
+    const tnsr::ijaa<DataVector, VolumeDim, Frame::Inertial>& d_phi,
+    const tnsr::iaa<DataVector, VolumeDim, Frame::Inertial>& d_pi,
+    const tnsr::a<DataVector, 3, Frame::Inertial>& char_speeds) {
+  std::array<DataVector, 4> char_speed_array{
+      get<0>(char_speeds), get<1>(char_speeds), get<2>(char_speeds),
+      get<3>(char_speeds)};
+  auto dt_v_minus =
+      make_with_value<tnsr::aa<DataVector, VolumeDim, Frame::Inertial>>(
+          get(gamma2), 0.);
+  GeneralizedHarmonic::BoundaryConditions::detail::
+      set_dt_v_minus_constraint_preserving_physical<VolumeDim, DataVector>(
+          make_not_null(&dt_v_minus), gamma2, inertial_coords,
+          unit_interface_normal_one_form, unit_interface_normal_vector,
+          spacetime_unit_normal_vector, incoming_null_one_form,
+          outgoing_null_one_form, incoming_null_vector, outgoing_null_vector,
+          projection_ab, projection_Ab, projection_AB, inverse_spatial_metric,
+          extrinsic_curvature, spacetime_metric, inverse_spacetime_metric,
+          three_index_constraint, char_projected_rhs_dt_v_psi,
+          char_projected_rhs_dt_v_minus, constraint_char_zero_plus,
+          constraint_char_zero_minus, phi, d_phi, d_pi, char_speed_array);
+  return dt_v_minus;
+}
+
+void test_set_dt_v_minus_constraint_preserving_physical(
+    const size_t grid_size_each_dimension) noexcept {
+  pypp::check_with_random_values<1>(
+      &wrapper_func_cpp_v_minus,
+      "Evolution.Systems.GeneralizedHarmonic.BoundaryConditions.Bjorhus",
+      "set_dt_v_minus_constraint_preserving_physical", {{{-1., 1.}}},
+      DataVector(grid_size_each_dimension));
+}
+}  // namespace
+
 SPECTRE_TEST_CASE("Unit.Evolution.Systems.GeneralizedHarmonic.BCBjorhus.VPsi",
                   "[Unit][Evolution]") {
-  // Piece-wise tests with SpEC output
+  pypp::SetupLocalPythonEnvironment local_python_env{""};
+
   const size_t grid_size = 3;
 
+  // Python test
+  test_set_dt_v_psi_constraint_preserving(grid_size);
+
+  // Piece-wise tests with SpEC output
   test_constraint_preserving_bjorhus_v_psi(grid_size);
 }
 
 SPECTRE_TEST_CASE("Unit.Evolution.Systems.GeneralizedHarmonic.BCBjorhus.VMinus",
                   "[Unit][Evolution]") {
-  // Piece-wise tests with SpEC output
+  pypp::SetupLocalPythonEnvironment local_python_env{""};
+
   const size_t grid_size = 3;
+
+  // Python test
+  test_set_dt_v_minus_constraint_preserving(grid_size);
+  test_set_dt_v_minus_constraint_preserving_physical(grid_size);
+
+  // Piece-wise tests with SpEC output
   const std::array<double, 3> lower_bound{{299., -0.5, -0.5}};
   const std::array<double, 3> upper_bound{{300., 0.5, 0.5}};
 
@@ -1066,8 +1257,13 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.GeneralizedHarmonic.BCBjorhus.VMinus",
 
 SPECTRE_TEST_CASE("Unit.Evolution.Systems.GeneralizedHarmonic.BCBjorhus.VZero",
                   "[Unit][Evolution]") {
-  // Piece-wise tests with SpEC output
+  pypp::SetupLocalPythonEnvironment local_python_env{""};
+
   const size_t grid_size = 3;
 
+  // Python test
+  test_set_dt_v_zero_constraint_preserving(grid_size);
+
+  // Piece-wise tests with SpEC output
   test_constraint_preserving_bjorhus_v_zero(grid_size);
 }
