@@ -8,8 +8,8 @@ add_spectre_library(${LIBRARY})
 spectre_target_sources(
   ${LIBRARY}
   PRIVATE
-  PlaneWaveMinkowski.cpp
   PlaneWave3DKerrSchild.cpp
+  PlaneWaveMinkowski.cpp
   RegularSphericalWave3DKerrSchild.cpp
   )
 
@@ -18,8 +18,8 @@ spectre_target_headers(
   INCLUDE_DIRECTORY ${CMAKE_SOURCE_DIR}/src
   HEADERS
   AnalyticData.hpp
-  PlaneWaveMinkowski.hpp
   PlaneWave3DKerrSchild.hpp
+  PlaneWaveMinkowski.hpp
   RegularSphericalWave3DKerrSchild.hpp
   ScalarWaveGr.hpp
   ScalarWaveGr.tpp

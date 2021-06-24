@@ -3,6 +3,8 @@
 
 #include "PointwiseFunctions/AnalyticData/CurvedWaveEquation/PlaneWaveMinkowski.hpp"
 
+#include "PointwiseFunctions/AnalyticData/CurvedWaveEquation/ScalarWaveGr.tpp"
+
 namespace CurvedScalarWave::AnalyticData {
 #define FUNCS_DECL(dim)                                                 \
   template class ScalarWaveGr<ScalarWave::Solutions::PlaneWave<dim>,    \

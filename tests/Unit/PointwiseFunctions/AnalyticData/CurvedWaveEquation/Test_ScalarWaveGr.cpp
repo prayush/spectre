@@ -226,17 +226,12 @@ void test_construct_from_options() noexcept {
 
     // construct internals of data constructed from options
     const gr::Solutions::Minkowski<3> flat_space_solution{};
-    const ScalarWave::Solutions::PlaneWave<3> flat_wave_solution{
-        {{1.0, 1.0, 1.0}},
-        {{0.0, 0.0, 0.0}},
-        std::make_unique<MathFunctions::Gaussian<1, Frame::Inertial>>(11., 1.4,
-                                                                      0.3)};
 
     CHECK(curved_wave_data_constructed_from_opts ==
           CurvedScalarWave::AnalyticData::ScalarWaveGr<
               ScalarWave::Solutions::PlaneWave<3>, gr::Solutions::Minkowski<3>>(
               flat_space_solution,
-              // cannot use `flat_wave_solution` in construction here
+              // cannot use a `flat_wave_solution` object in construction here
               // as it has a `std::unique_ptr` member
               ScalarWave::Solutions::PlaneWave<3>(
                   {{1.0, 1.0, 1.0}}, {{0.0, 0.0, 0.0}},
@@ -259,17 +254,12 @@ void test_construct_from_options() noexcept {
 
     // construct internals of data constructed from options
     const gr::Solutions::Minkowski<2> flat_space_solution{};
-    const ScalarWave::Solutions::PlaneWave<2> flat_wave_solution{
-        {{1.0, 1.0}},
-        {{0.0, 0.0}},
-        std::make_unique<MathFunctions::Gaussian<1, Frame::Inertial>>(11., 1.4,
-                                                                      0.3)};
 
     CHECK(curved_wave_data_constructed_from_opts ==
           CurvedScalarWave::AnalyticData::ScalarWaveGr<
               ScalarWave::Solutions::PlaneWave<2>, gr::Solutions::Minkowski<2>>(
               flat_space_solution,
-              // cannot use `flat_wave_solution` in construction here
+              // cannot use a `flat_wave_solution` object in construction here
               // as it has a `std::unique_ptr` member
               ScalarWave::Solutions::PlaneWave<2>(
                   {{1.0, 1.0}}, {{0.0, 0.0}},
@@ -292,17 +282,12 @@ void test_construct_from_options() noexcept {
 
     // construct internals of data constructed from options
     const gr::Solutions::Minkowski<1> flat_space_solution{};
-    const ScalarWave::Solutions::PlaneWave<2> flat_wave_solution{
-        {{1.0}},
-        {{0.0}},
-        std::make_unique<MathFunctions::Gaussian<1, Frame::Inertial>>(11., 1.4,
-                                                                      0.3)};
 
     CHECK(curved_wave_data_constructed_from_opts ==
           CurvedScalarWave::AnalyticData::ScalarWaveGr<
               ScalarWave::Solutions::PlaneWave<1>, gr::Solutions::Minkowski<1>>(
               flat_space_solution,
-              // cannot use `flat_wave_solution` in construction here
+              // cannot use a `flat_wave_solution` object in construction here
               // as it has a `std::unique_ptr` member
               ScalarWave::Solutions::PlaneWave<1>(
                   {{1.0}}, {{0.0}},
